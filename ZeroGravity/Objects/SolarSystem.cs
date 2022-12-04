@@ -145,19 +145,29 @@ public class SolarSystem
 				return;
 			}
 			EventWaitHandle wh = new AutoResetEvent(initialState: false);
-			Thread thr = new Thread((ThreadStart)delegate
+
+			// Create cancellation token.
+			CancellationTokenSource cts = new();
+
+			Task t = Task.Factory.StartNew(() =>
 			{
 				ParallelLoopResult parallelLoopResult = Parallel.ForEach(players, delegate(Player pl)
 				{
 					SendMovementMessageToPlayer(pl);
 				});
 				wh.Set();
-			});
-			thr.Start();
+			}, cts.Token);
+
+
 			if (!wh.WaitOne(10000))
 			{
 				Dbg.Warning("SendMovementMessage thread timeout. Aborting...");
-				thr.Abort();
+
+				// Request cancellation.
+				cts.Cancel();
+
+				// Clean up.
+				cts.Dispose();
 			}
 			foreach (Player kv in Server.Instance.AllPlayers)
 			{

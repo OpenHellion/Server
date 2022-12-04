@@ -65,6 +65,7 @@ public class GameClientThread
 		sendingThread.Interrupt();
 	}
 
+	// TODO: Broken.
 	public void StopImmediate()
 	{
 		runThread = false;
@@ -74,9 +75,11 @@ public class GameClientThread
 			socket.Close();
 		}
 		listeningThread.Interrupt();
+		#pragma warning disable SYSLIB0006
 		listeningThread.Abort();
 		sendingThread.Interrupt();
 		sendingThread.Abort();
+		#pragma warning restore SYSLIB0006
 	}
 
 	private void Send()

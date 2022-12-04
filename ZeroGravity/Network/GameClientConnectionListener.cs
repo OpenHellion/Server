@@ -20,6 +20,7 @@ public class GameClientConnectionListener
 		listeningThread.Interrupt();
 	}
 
+	// TODO: Broken.
 	public void StopImmidiate()
 	{
 		if (listeningThread.IsAlive)
@@ -27,7 +28,9 @@ public class GameClientConnectionListener
 			runThread = false;
 			tcpListener.Stop();
 			listeningThread.Interrupt();
+			#pragma warning disable SYSLIB0006
 			listeningThread.Abort();
+			#pragma warning restore SYSLIB0006
 		}
 	}
 

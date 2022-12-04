@@ -9,54 +9,22 @@ using ZeroGravity.Network;
 
 public static class Program
 {
-	private enum CtrlType
+	private static void ProcessExit(object sender, EventArgs e)
 	{
-		CTRL_C_EVENT = 0,
-		CTRL_BREAK_EVENT = 1,
-		CTRL_CLOSE_EVENT = 2,
-		CTRL_LOGOFF_EVENT = 5,
-		CTRL_SHUTDOWN_EVENT = 6
-	}
-
-	[Flags]
-	public enum ErrorModes : uint
-	{
-		SYSTEM_DEFAULT = 0u,
-		SEM_FAILCRITICALERRORS = 1u,
-		SEM_NOALIGNMENTFAULTEXCEPT = 4u,
-		SEM_NOGPFAULTERRORBOX = 2u,
-		SEM_NOOPENFILEERRORBOX = 0x8000u
-	}
-
-	private delegate bool EventHandler(CtrlType sig);
-
-	private static EventHandler _handler;
-
-	[DllImport("Kernel32")]
-	private static extern bool SetConsoleCtrlHandler(EventHandler handler, bool add);
-
-	[DllImport("kernel32.dll")]
-	private static extern ErrorModes SetErrorMode(ErrorModes uMode);
-
-	private static bool Handler(CtrlType sig)
-	{
-		if (sig == CtrlType.CTRL_C_EVENT || sig == CtrlType.CTRL_BREAK_EVENT || sig == CtrlType.CTRL_LOGOFF_EVENT || sig == CtrlType.CTRL_SHUTDOWN_EVENT || sig == CtrlType.CTRL_CLOSE_EVENT)
+		Console.WriteLine("Exiting safely...");
+		Server.IsRunning = false;
+		if (Server.PersistenceSaveInterval > 0.0)
 		{
-			Server.IsRunning = false;
-			if (Server.PersistenceSaveInterval > 0.0)
-			{
-				Server.SavePersistenceDataOnShutdown = true;
-			}
-			Server.MainLoopEnded.WaitOne(10000);
+			Server.SavePersistenceDataOnShutdown = true;
 		}
-		return false;
+		Server.MainLoopEnded.WaitOne(10000);
 	}
 
 	private static void Main(string[] args)
 	{
-		SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX);
-		_handler = (EventHandler)Delegate.Combine(_handler, new EventHandler(Handler));
-		SetConsoleCtrlHandler(_handler, add: true);
+		AppDomain.CurrentDomain.ProcessExit += new EventHandler(ProcessExit);
+		Console.CancelKeyPress += new ConsoleCancelEventHandler(ProcessExit);
+
 		bool shutDown = false;
 		string gport = null;
 		string sport = null;
@@ -124,6 +92,13 @@ public static class Program
 			ShutdownServerInstance();
 			return;
 		}
+
+		if (!File.Exists(Server.ConfigDir + "GameServer.ini"))
+		{
+			Console.WriteLine("GameServer.ini not found in folder " + Server.ConfigDir);
+			return;
+		}
+
 		CheckIniFields();
 		Dbg.OutputDir = Server.ConfigDir;
 		Dbg.Initialize();

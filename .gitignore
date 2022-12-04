@@ -387,3 +387,5 @@ FodyWeavers.xsd
 **_log.txt
 **_log_backup.txt
 *.log
+*.save
+ServerID.txt

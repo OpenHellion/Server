@@ -200,6 +200,7 @@ public class GameClientThread
 			Dbg.Exception(ex);
 			Disconnect();
 		}
+
 		if (client != null && client.Player != null)
 		{
 			client.Player.RemovePlayerFromTrigger();

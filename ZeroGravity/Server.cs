@@ -627,7 +627,6 @@ public class Server
 		StaticData.LoadData();
 	}
 
-#if HELLION_SP
 	/// <summary>
 	/// 	Gets the arguments provided to the program and sets the properties accordingly. Only executed at the start of the program.
 	/// </summary>
@@ -670,6 +669,39 @@ public class Server
 
 					LoadPersistenceFromFile = args[i];
 				break;
+				case "-randomships":
+					i++;
+
+					if (i >= args.Length)
+					{
+						Dbg.Error("-randomships was not supplied a number.");
+						break;
+					}
+
+					randomShips = args[++i];
+				break;
+				case "-gport":
+					i++;
+
+					if (i >= args.Length)
+					{
+						Dbg.Error("-gport was not supplied a port.");
+						break;
+					}
+
+					gPort = args[++i];
+				break;
+				case "-sport":
+					i++;
+
+					if (i >= args.Length)
+					{
+						Dbg.Error("-sport was not supplied a port.");
+						break;
+					}
+
+					sPort = args[++i];
+				break;
 			}
 		}
 
@@ -688,7 +720,6 @@ public class Server
 			Properties.SetProperty("spawn_random_ships_count", randomShips);
 		}
 	}
-#endif
 
 	private void LoadServerSettings()
 	{

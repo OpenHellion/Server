@@ -24,6 +24,10 @@ public static class Program
 		// Error handlers.
 		AppDomain.CurrentDomain.ProcessExit += new EventHandler(ProcessExit);
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(ProcessExit);
+
+		// Parse arguments.
+		Server.InitProperties(args);
+
 #if HELLION_SP
 		if (!ParentProcess.FileName.ToLower().Contains("hellion") && !ParentProcess.FileName.ToLower().Contains("unity"))
 		{
@@ -32,45 +36,11 @@ public static class Program
 			Dbg.Error("This executable is for creating the single player server, and has to be executed by either the Unity Editor or the Hellion distributable. That means you can't launch this manually.");
 			return;
 		}
-
-		// Parse arguments.
-		Server.InitProperties(args);
 #else
 		bool shutdown = false;
-		string gport = null;
-		string sport = null;
-		string randomships = null;
 		for (int i = 0; i < args.Length; i++)
 		{
-			if (args[i].ToLower() == "-configdir" && args.Length > i + 1)
-			{
-				Server.ConfigDir = args[++i];
-				if (!Server.ConfigDir.EndsWith("/"))
-				{
-					Server.ConfigDir += "/";
-				}
-			}
-			else if (args[i].ToLower() == "-clean" || args[i].ToLower() == "-noload")
-			{
-				Server.CleanStart = true;
-			}
-			else if (args[i].ToLower() == "-load" && args.Length > i + 1)
-			{
-				Server.LoadPersistenceFromFile = args[++i];
-			}
-			else if (args[i].ToLower() == "-gport" && args.Length > i + 1)
-			{
-				gport = args[++i];
-			}
-			else if (args[i].ToLower() == "-sport" && args.Length > i + 1)
-			{
-				sport = args[++i];
-			}
-			else if (args[i].ToLower() == "-randomships" && args.Length > i + 1)
-			{
-				randomships = args[++i];
-			}
-			else if (args[i].ToLower() == "-shutdown")
+			if (args[i].ToLower() == "-shutdown")
 			{
 				shutdown = true;
 			}
@@ -85,19 +55,7 @@ public static class Program
 				Environment.Exit(0);
 			}
 		}
-		Server.Properties = new Properties(Server.ConfigDir + "GameServer.ini");
-		if (gport != null)
-		{
-			Server.Properties.SetProperty("game_client_port", gport);
-		}
-		if (sport != null)
-		{
-			Server.Properties.SetProperty("status_port", sport);
-		}
-		if (randomships != null)
-		{
-			Server.Properties.SetProperty("spawn_random_ships_count", randomships);
-		}
+
 		if (shutdown)
 		{
 			ShutdownServerInstance();

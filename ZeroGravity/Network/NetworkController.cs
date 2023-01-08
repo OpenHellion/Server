@@ -40,7 +40,7 @@ public class NetworkController
 
 	private MainServerThreads mainServerThreads;
 
-	public long ServerID = 0L;
+	public string ServerID = "";
 
 	public EventSystem EventSystem;
 

@@ -7,5 +7,5 @@ public class DeleteCharacterRequest : NetworkData
 {
 	public string SteamId;
 
-	public long ServerId;
+	public string ServerId;
 }

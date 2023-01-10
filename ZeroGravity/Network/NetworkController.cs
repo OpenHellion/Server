@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using OpenHellion.Networking.Message.MainServer;
 using ZeroGravity.Objects;
 
 namespace ZeroGravity.Network;
@@ -34,12 +35,6 @@ public class NetworkController
 
 	private StatusPortConnectionListener statusPortConnectionListener;
 
-	public string MainServerAddres = "188.166.144.65";
-
-	public int MainServerPort = 6001;
-
-	private MainServerThreads mainServerThreads;
-
 	public string ServerID = "";
 
 	public EventSystem EventSystem;
@@ -47,7 +42,6 @@ public class NetworkController
 	public NetworkController()
 	{
 		EventSystem = new EventSystem();
-		mainServerThreads = new MainServerThreads();
 		EventSystem.AddListener(typeof(LogInRequest), LogInRequestListener);
 		EventSystem.AddListener(typeof(LogOutRequest), LogOutRequestListener);
 	}
@@ -234,11 +228,6 @@ public class NetworkController
 		gameClientConnectionListener.Start(Server.GamePort);
 		statusPortConnectionListener = new StatusPortConnectionListener();
 		statusPortConnectionListener.Start(Server.StatusPort);
-	}
-
-	public void SendToMainServer(NetworkData data)
-	{
-		mainServerThreads.Send(data);
 	}
 
 	public Client AddClient(Socket c, GameClientThread thr)

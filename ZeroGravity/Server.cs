@@ -9,6 +9,8 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using BulletSharp;
+using OpenHellion.Networking;
+using OpenHellion.Networking.Message.MainServer;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -316,8 +318,6 @@ public class Server
 
 	private long numberOfTicks = 64L;
 
-	public static string IPAddress = "";
-
 #if HELLION_SP
 	public static int GamePort = 6104;
 
@@ -327,12 +327,6 @@ public class Server
 
 	public static int StatusPort = 6005;
 #endif
-
-	public static string AltIPAddress = "";
-
-	public static int AltGamePort;
-
-	public static int AltStatusPort;
 
 	public static bool SavePersistenceDataOnShutdown = false;
 
@@ -354,7 +348,7 @@ public class Server
 
 	public static int MaxNumberOfSaveFiles = 10;
 
-	private IPAddressRange[] AdminIPAddressRanges = new IPAddressRange[0];
+	private IpAddressRange[] AdminIPAddressRanges = new IpAddressRange[0];
 
 	private Dictionary<string, SpawnPointInviteData> SpawnPointInvites = new Dictionary<string, SpawnPointInviteData>();
 
@@ -617,13 +611,13 @@ public class Server
 		NetworkController = new NetworkController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
-		Console.Title = ServerName + " (id: " + ((NetworkController.ServerID <= 0) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
+		Console.Title = ServerName + " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
 		Stopwatch stopWatch = new Stopwatch();
 		stopWatch.Start();
 		Thread.Sleep(1);
 		stopWatch.Stop();
 		long maxTicks = (long)(1000.0 / stopWatch.Elapsed.TotalMilliseconds);
-		Dbg.UnformattedMessage(string.Format("==============================================================================\r\n\tServer name: {5}\r\n\tServer ID: {1}\r\n\tGame port: {6}\r\n\tStatus port: {7}\r\n\tStart date: {0}\r\n\tServer ticks: {2}{4}\r\n\tMax server ticks (not precise): {3}\r\n==============================================================================", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), (NetworkController.ServerID <= 0) ? "Not yet assigned" : string.Concat(NetworkController.ServerID), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", ServerName, GamePort, StatusPort));
+		Dbg.UnformattedMessage(string.Format("==============================================================================\r\n\tServer name: {5}\r\n\tServer ID: {1}\r\n\tGame port: {6}\r\n\tStatus port: {7}\r\n\tStart date: {0}\r\n\tServer ticks: {2}{4}\r\n\tMax server ticks (not precise): {3}\r\n==============================================================================", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), (NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", ServerName, GamePort, StatusPort));
 		StaticData.LoadData();
 	}
 
@@ -725,7 +719,7 @@ public class Server
 	{
 		try
 		{
-			NetworkController.ServerID = long.Parse(File.ReadAllText(ConfigDir + "ServerID.txt").Trim());
+			NetworkController.ServerID = File.ReadAllText(ConfigDir + "ServerID.txt").Trim();
 		}
 		catch
 		{
@@ -736,13 +730,8 @@ public class Server
 #if HELLION_SP
 		CheckAndFixPorts();
 #endif
-		Properties.GetProperty("alt_ip_address", ref AltIPAddress);
-		AltGamePort = GamePort;
-		Properties.GetProperty("alt_game_client_port", ref AltGamePort);
-		AltStatusPort = StatusPort;
-		Properties.GetProperty("alt_status_port", ref AltStatusPort);
-		Properties.GetProperty("main_server_ip", ref NetworkController.MainServerAddres);
-		Properties.GetProperty("main_server_port", ref NetworkController.MainServerPort);
+		Properties.GetProperty("main_server_ip", ref MSConnection.IpAddress);
+		Properties.GetProperty("main_server_port", ref MSConnection.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
@@ -1142,7 +1131,6 @@ public class Server
 		NetworkController.EventSystem.AddListener(typeof(TransferResourceMessage), TransferResourcesMessageListener);
 		NetworkController.EventSystem.AddListener(typeof(FabricateItemMessage), FabricateItemMessageListener);
 		NetworkController.EventSystem.AddListener(typeof(CancelFabricationMessage), CancelFabricationMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(CheckInResponse), CheckInResponseListener);
 		NetworkController.EventSystem.AddListener(typeof(PlayersOnServerRequest), PlayersOnServerRequestListener);
 		NetworkController.EventSystem.AddListener(typeof(AvailableSpawnPointsRequest), AvailableSpawnPointsRequestListener);
 		NetworkController.EventSystem.AddListener(typeof(RepairItemMessage), RepairMessageListener);
@@ -1156,20 +1144,16 @@ public class Server
 		NetworkController.EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
 #if !HELLION_SP
-		NetworkController.SendToMainServer(new CheckInRequest
+		MSConnection.Get<PublishServerResponse>(new PublishServerRequest
 		{
-			ServerID = NetworkController.ServerID,
-			ServerName = ServerName,
-			IPAddress = IPAddress.Trim(),
+			//ServerID = NetworkController.ServerID,
+			//ServerName = ServerName,
 			GamePort = GamePort,
 			StatusPort = StatusPort,
-			AltIPAddress = AltIPAddress.Trim(),
-			AltGamePort = AltGamePort,
-			AltStatusPort = AltStatusPort,
-			Private = !ServerPassword.IsNullOrEmpty(),
-			ServerHash = CombinedHash,
-			CleanStart = CleanStart
-		});
+			//Private = !ServerPassword.IsNullOrEmpty(),
+			Hash = CombinedHash
+			//CleanStart = CleanStart
+		}, CheckInResponseListener);
 #endif
 	}
 
@@ -2083,7 +2067,7 @@ public class Server
 		PlayerSpawnResponse spawnResponse = new PlayerSpawnResponse();
 		if (!spawnSuccsessful)
 		{
-			spawnResponse.Response = ResponseResult.Error;
+			spawnResponse.Response = OpenHellion.Networking.Message.MainServer.ResponseResult.Error;
 		}
 		else
 		{
@@ -2738,15 +2722,14 @@ public class Server
 		}
 	}
 
-	public void CheckInResponseListener(NetworkData data)
+	public void CheckInResponseListener(PublishServerResponse data)
 	{
-		CheckInResponse resp = data as CheckInResponse;
-		if (resp.Response == ResponseResult.Success)
+		if (data.Result == OpenHellion.Networking.Message.MainServer.ResponseResult.Success)
 		{
-			if (NetworkController.ServerID != resp.ServerID)
+			if (NetworkController.ServerID != data.ServerId)
 			{
-				NetworkController.ServerID = resp.ServerID;
-				Console.Title = ServerName + " (id: " + ((NetworkController.ServerID <= 0) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
+				NetworkController.ServerID = data.ServerId;
+				Console.Title = ServerName + " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
 				Dbg.UnformattedMessage("==============================================================================\r\n\tServer ID: " + NetworkController.ServerID + "\r\n==============================================================================\r\n");
 				try
 				{
@@ -2757,7 +2740,7 @@ public class Server
 				}
 			}
 			CheckInPassed = true;
-			AdminIPAddressRanges = resp.AdminIPAddressRanges;
+			AdminIPAddressRanges = data.AdminIPAddressRanges;
 #if !HELLION_SP
 			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_hr, SendCheckInMessage);
 #endif
@@ -2765,7 +2748,7 @@ public class Server
 		else
 		{
 			IsRunning = false;
-			Dbg.Exception(new Exception(resp.Message));
+			Dbg.Exception(new Exception(data.Result.ToString()));
 		}
 	}
 
@@ -2898,9 +2881,9 @@ public class Server
 
 	public void SendCheckInMessage(double amount)
 	{
-		NetworkController.SendToMainServer(new CheckInMessage
+		MSConnection.Send(new CheckInMessage
 		{
-			ServerID = NetworkController.ServerID
+			ServerId = NetworkController.ServerID
 		});
 	}
 
@@ -2915,8 +2898,8 @@ public class Server
 			byte[] bytes = System.Net.IPAddress.Parse(address).GetAddressBytes();
 			Array.Reverse(bytes);
 			uint addr = BitConverter.ToUInt32(bytes, 0);
-			IPAddressRange[] adminIPAddressRanges = AdminIPAddressRanges;
-			foreach (IPAddressRange range in adminIPAddressRanges)
+			IpAddressRange[] adminIPAddressRanges = AdminIPAddressRanges;
+			foreach (IpAddressRange range in adminIPAddressRanges)
 			{
 				byte[] sBytes = System.Net.IPAddress.Parse(range.StartAddress).GetAddressBytes();
 				Array.Reverse(sBytes);
@@ -3147,7 +3130,7 @@ public class Server
 	{
 		return new ServerStatusResponse
 		{
-			Response = ResponseResult.Success,
+			Response = OpenHellion.Networking.Message.MainServer.ResponseResult.Success,
 			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.CurrentOnlinePlayers(),

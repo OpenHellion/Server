@@ -50,7 +50,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = ((Player != null) ? Player.FakeGuid : (-1)),
 					PlayerName = ((Player != null) ? Player.Name : ""),
-					PlayerSteamID = ((Player != null) ? Player.SteamId : ""),
+					PlayerSteamID = ((Player != null) ? Player.PlayerId : ""),
 					InvitedPlayerName = InvitedPlayerName,
 					InvitedPlayerSteamID = InvitedPlayerSteamID
 				};
@@ -107,7 +107,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = sender.FakeGuid,
 					PlayerName = sender.Name,
-					PlayerSteamID = sender.SteamId
+					PlayerSteamID = sender.PlayerId
 				};
 			}
 			if (stats.NewState == SpawnPointState.Authorized)
@@ -128,7 +128,7 @@ public class ShipSpawnPoint
 						NewState = sender.AuthorizedSpawnPoint.State,
 						PlayerGUID = sender.FakeGuid,
 						PlayerName = sender.Name,
-						PlayerSteamID = sender.SteamId
+						PlayerSteamID = sender.PlayerId
 					});
 					retMsg.SelfDestructTime = sender.AuthorizedSpawnPoint.Ship.SelfDestructTimer?.Time;
 					Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
@@ -142,7 +142,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = sender.FakeGuid,
 					PlayerName = sender.Name,
-					PlayerSteamID = sender.SteamId
+					PlayerSteamID = sender.PlayerId
 				};
 			}
 		}
@@ -170,7 +170,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = ((Player != null) ? Player.FakeGuid : (-1)),
 					PlayerName = ((Player != null) ? Player.Name : ""),
-					PlayerSteamID = ((Player != null) ? Player.SteamId : ""),
+					PlayerSteamID = ((Player != null) ? Player.PlayerId : ""),
 					PlayerInvite = true,
 					InvitedPlayerName = InvitedPlayerName,
 					InvitedPlayerSteamID = InvitedPlayerSteamID
@@ -203,7 +203,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = Player.FakeGuid,
 					PlayerName = Player.Name,
-					PlayerSteamID = Player.SteamId
+					PlayerSteamID = Player.PlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
 				Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);

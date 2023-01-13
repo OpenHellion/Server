@@ -76,7 +76,7 @@ public class SolarSystem
 	public void CalculatePositionsAfterTime(double time)
 	{
 		currentTime = time;
-		timeCorrection = (double)HiResTime.Milliseconds / 1000.0 - time;
+		timeCorrection = HiResTime.Milliseconds / 1000.0 - time;
 		foreach (CelestialBody body in celesitalBodies)
 		{
 			body.Update();
@@ -85,7 +85,7 @@ public class SolarSystem
 
 	public void UpdateTime(double timeDelta)
 	{
-		currentTime = (double)HiResTime.Milliseconds / 1000.0 - timeCorrection;
+		currentTime = HiResTime.Milliseconds / 1000.0 - timeCorrection;
 	}
 
 	public void UpdatePositions()

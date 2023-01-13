@@ -10,7 +10,7 @@ public static class Program
 {
 	private static void ProcessExit(object sender, EventArgs e)
 	{
-		Console.WriteLine("Exiting safely...");
+		Dbg.Log("Exiting safely...");
 		Server.IsRunning = false;
 		if (Server.PersistenceSaveInterval > 0.0)
 		{
@@ -21,12 +21,16 @@ public static class Program
 
 	private static void Main(string[] args)
 	{
-		// Error handlers.
+		// Exit handlers.
 		AppDomain.CurrentDomain.ProcessExit += new EventHandler(ProcessExit);
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(ProcessExit);
 
 		// Parse arguments.
 		Server.InitProperties(args);
+
+		// Enable debugger.
+		Dbg.OutputDir = Server.ConfigDir;
+		Dbg.Initialize();
 
 #if HELLION_SP
 		if (!ParentProcess.FileName.ToLower().Contains("hellion") && !ParentProcess.FileName.ToLower().Contains("unity"))
@@ -71,8 +75,6 @@ public static class Program
 		CheckIniFields();
 #endif
 
-		Dbg.OutputDir = Server.ConfigDir;
-		Dbg.Initialize();
 		AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionHandler;
 		try
 		{

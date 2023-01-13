@@ -825,7 +825,7 @@ public class Server
 		}
 	}
 
-	public void LoginPlayer(long guid, string steamId, CharacterData characterData)
+	public void LoginPlayer(long guid, string playerId, CharacterData characterData)
 	{
 		if (!WorldInitialized)
 		{
@@ -838,11 +838,11 @@ public class Server
 		}
 		else
 		{
-			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, steamId, characterData.Gender, characterData.HeadType, characterData.HairType);
+			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
 			NetworkController.ConnectPlayer(player, doLogin: false);
 		}
-		if (serverAdmins.Contains(player.SteamId) || serverAdmins.Contains("*"))
+		if (serverAdmins.Contains(player.PlayerId) || serverAdmins.Contains("*"))
 		{
 			player.IsAdmin = true;
 		}
@@ -850,9 +850,9 @@ public class Server
 
 	private void ResetSpawnPointsForPlayer(Player pl, Ship skipShip)
 	{
-		if (!pl.SteamId.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(pl.SteamId))
+		if (!pl.PlayerId.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(pl.PlayerId))
 		{
-			ClearSpawnPointInvitation(pl.SteamId);
+			ClearSpawnPointInvitation(pl.PlayerId);
 		}
 		foreach (SpaceObjectVessel ves in AllVessels)
 		{
@@ -895,12 +895,12 @@ public class Server
 					foundShip.Forward = forward;
 					foundShip.Up = up;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.SteamId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.SteamId,
+							SteamID = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -919,12 +919,12 @@ public class Server
 					foundShip.Forward = forward2;
 					foundShip.Up = up2;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.SteamId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.SteamId,
+							SteamID = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -937,12 +937,12 @@ public class Server
 				if (foundShip != null)
 				{
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.SteamId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.SteamId,
+							SteamID = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -1002,10 +1002,10 @@ public class Server
 				}
 			}
 		}
-		else if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.SteamId) && SpawnPointInvites[pl.SteamId].SpawnPoint.Ship.GUID == shipID)
+		else if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.PlayerId) && SpawnPointInvites[pl.PlayerId].SpawnPoint.Ship.GUID == shipID)
 		{
 			foundShip = GetVessel(shipID) as Ship;
-			foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.SteamId].SpawnPoint : null);
+			foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.PlayerId].SpawnPoint : null);
 			if (foundSpawnPoint != null)
 			{
 				ResetSpawnPointsForPlayer(pl, null);
@@ -1044,10 +1044,10 @@ public class Server
 			}
 			break;
 		case SpawnSetupType.None:
-			if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.SteamId) && SpawnPointInvites[pl.SteamId].SpawnPoint.Ship.GUID == shipID)
+			if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.PlayerId) && SpawnPointInvites[pl.PlayerId].SpawnPoint.Ship.GUID == shipID)
 			{
 				foundShip = GetVessel(shipID) as Ship;
-				foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.SteamId].SpawnPoint : null);
+				foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.PlayerId].SpawnPoint : null);
 				if (foundSpawnPoint != null)
 				{
 					ResetSpawnPointsForPlayer(pl, null);
@@ -1098,9 +1098,9 @@ public class Server
 	public List<SpawnPointDetails> GetAvailableSpawnPoints(Player pl)
 	{
 		List<SpawnPointDetails> retVal = new List<SpawnPointDetails>();
-		if (pl.SteamId != null && SpawnPointInvites.ContainsKey(pl.SteamId))
+		if (pl.PlayerId != null && SpawnPointInvites.ContainsKey(pl.PlayerId))
 		{
-			ShipSpawnPoint sp = SpawnPointInvites[pl.SteamId].SpawnPoint;
+			ShipSpawnPoint sp = SpawnPointInvites[pl.PlayerId].SpawnPoint;
 			SpawnPointDetails spd = new SpawnPointDetails();
 			spd.Name = sp.Ship.FullName;
 			spd.IsPartOfCrew = false;
@@ -1144,10 +1144,11 @@ public class Server
 		NetworkController.EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
 #if !HELLION_SP
-		MSConnection.Get<PublishServerResponse>(new PublishServerRequest
+		MSConnection.Get<CheckInResponse>(new CheckInRequest
 		{
 			//ServerID = NetworkController.ServerID,
 			//ServerName = ServerName,
+			Region = Region.Europe,
 			GamePort = GamePort,
 			StatusPort = StatusPort,
 			//Private = !ServerPassword.IsNullOrEmpty(),
@@ -1482,6 +1483,7 @@ public class Server
 				Vector3D spawnItemPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
 				if (parts[1].ToLower() == "player")
 				{
+					// TODO: This should probably not exist.
 					Player newPlayer = new Player(MathHelper.RandomNextInt(), Vector3D.Zero, QuaternionD.Identity, "Dummy player", MathHelper.RandomNextInt().ToString(), Gender.Female, 0, 0, addToServerList: true, player);
 					newPlayer.Parent = player.Parent;
 					newPlayer.LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
@@ -1808,7 +1810,7 @@ public class Server
 			if (parts[0] == "teleport" && parts.Length == 2)
 			{
 				ArtificialBody target = null;
-				Player p = _players.Values.FirstOrDefault((Player m) => m.SteamId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
+				Player p = _players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
 				if (p != null && p.Parent is ArtificialBody)
 				{
 					target = ((!(p.Parent is SpaceObjectVessel)) ? (p.Parent as ArtificialBody) : (p.Parent as SpaceObjectVessel).MainVessel);
@@ -2067,7 +2069,7 @@ public class Server
 		PlayerSpawnResponse spawnResponse = new PlayerSpawnResponse();
 		if (!spawnSuccsessful)
 		{
-			spawnResponse.Response = OpenHellion.Networking.Message.MainServer.ResponseResult.Error;
+			spawnResponse.Response = ResponseResult.Error;
 		}
 		else
 		{
@@ -2509,11 +2511,11 @@ public class Server
 					Thread.Sleep((int)(tickMilliseconds - span.TotalMilliseconds));
 				}
 			}
-#if HELLION_SP
-			catch (Exception ex2)
+			catch (Exception ex)
 			{
-				Dbg.Exception(ex2);
+				Dbg.Exception(ex);
 			}
+#if HELLION_SP
 			try
 			{
 				if (ParentProcess.GetParentProcess().HasExited)
@@ -2523,11 +2525,11 @@ public class Server
 					Restart = false;
 				}
 			}
-#endif
 			catch (Exception ex)
 			{
 				Dbg.Exception(ex);
 			}
+#endif
 		}
 		if (SavePersistenceDataOnShutdown)
 		{
@@ -2722,9 +2724,9 @@ public class Server
 		}
 	}
 
-	public void CheckInResponseListener(PublishServerResponse data)
+	public void CheckInResponseListener(CheckInResponse data)
 	{
-		if (data.Result == OpenHellion.Networking.Message.MainServer.ResponseResult.Success)
+		if (data.Result == ResponseResult.Success)
 		{
 			if (NetworkController.ServerID != data.ServerId)
 			{
@@ -2783,16 +2785,16 @@ public class Server
 			res2.PlayersOnServer = new List<PlayerOnServerData>();
 			foreach (NetworkController.Client cl2 in NetworkController.ClientList.Values)
 			{
-				if (cl2.Player != null && !cl2.Player.SteamId.IsNullOrEmpty())
+				if (cl2.Player != null && !cl2.Player.PlayerId.IsNullOrEmpty())
 				{
 					res2.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						SteamID = cl2.Player.SteamId,
+						SteamID = cl2.Player.PlayerId,
 						Name = cl2.Player.Name,
-						AlreadyHasInvite = SpawnPointInvites.ContainsKey(cl2.Player.SteamId)
+						AlreadyHasInvite = SpawnPointInvites.ContainsKey(cl2.Player.PlayerId)
 					});
 				}
-				if (cl2.Player != null && cl2.Player.SteamId.IsNullOrEmpty())
+				if (cl2.Player != null && cl2.Player.PlayerId.IsNullOrEmpty())
 				{
 					Dbg.Error("Player steam ID is null or empty", cl2.Player.GUID, cl2.Player.Name);
 				}
@@ -2814,16 +2816,16 @@ public class Server
 			res.PlayersOnServer = new List<PlayerOnServerData>();
 			foreach (NetworkController.Client cl in NetworkController.ClientList.Values)
 			{
-				if (cl.Player != null && !cl.Player.SteamId.IsNullOrEmpty())
+				if (cl.Player != null && !cl.Player.PlayerId.IsNullOrEmpty())
 				{
 					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						SteamID = cl.Player.SteamId,
+						SteamID = cl.Player.PlayerId,
 						Name = cl.Player.Name,
 						AlreadyHasInvite = false
 					});
 				}
-				if (cl.Player != null && cl.Player.SteamId.IsNullOrEmpty())
+				if (cl.Player != null && cl.Player.PlayerId.IsNullOrEmpty())
 				{
 					Dbg.Error("Player steam ID is null or empty", cl.Player.GUID, cl.Player.Name);
 				}
@@ -3130,7 +3132,7 @@ public class Server
 	{
 		return new ServerStatusResponse
 		{
-			Response = OpenHellion.Networking.Message.MainServer.ResponseResult.Success,
+			Response = ResponseResult.Success,
 			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.CurrentOnlinePlayers(),

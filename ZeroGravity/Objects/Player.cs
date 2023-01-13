@@ -24,7 +24,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public string Name;
 
-	public string SteamId;
+	public string PlayerId;
 
 	public Gender Gender;
 
@@ -270,12 +270,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public bool AffectsQuantity => false;
 
-	public Player(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string steamId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
+	public Player(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
 		: base(guid, localPosition, localRotation)
 	{
 		FakeGuid = GUIDFactory.NextPlayerFakeGUID();
 		Name = name;
-		SteamId = steamId;
+		PlayerId = playerId;
 		Gender = gender;
 		HeadType = headType;
 		HairType = hairType;
@@ -444,7 +444,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		damage = ((wep == null) ? (psm.ShotData.IsMeleeAttack ? 30f : 0f) : (psm.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage));
 		if (sp is DynamicObject)
 		{
-			(sp as DynamicObject).Item.TakeDamage(new Dictionary<TypeOfDamage, float> { 
+			(sp as DynamicObject).Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
 			{
 				TypeOfDamage.Hit,
 				damage
@@ -1180,7 +1180,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			Gender = Gender,
 			HeadType = HeadType,
 			HairType = HairType,
-			SteamId = SteamId,
+			SteamId = PlayerId,
 			ParentID = ((Parent != null) ? Parent.GUID : (-1)),
 			ParentType = ((Parent != null) ? Parent.ObjectType : SpaceObjectType.None),
 			DynamicObjects = dods,
@@ -1435,7 +1435,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		data.LocalRotation = LocalRotation.ToArray();
 		data.IsAlive = IsAlive;
 		data.Name = Name;
-		data.SteamId = SteamId;
+		data.SteamId = PlayerId;
 		data.Gender = Gender;
 		data.HeadType = HeadType;
 		data.HairType = HairType;
@@ -1485,7 +1485,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			LocalRotation = data.LocalRotation.ToQuaternionD();
 			IsAlive = data.IsAlive;
 			Name = data.Name;
-			SteamId = data.SteamId;
+			PlayerId = data.SteamId;
 			Gender = data.Gender;
 			HeadType = data.HeadType;
 			HairType = data.HairType;

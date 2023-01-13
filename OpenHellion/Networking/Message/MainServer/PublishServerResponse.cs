@@ -22,7 +22,7 @@ namespace OpenHellion.Networking.Message.MainServer;
 
 [Serializable]
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class PublishServerResponse : DataPacket
+public class CheckInResponse : DataPacket
 {
 	public ResponseResult Result;
 

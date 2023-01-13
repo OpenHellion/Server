@@ -22,7 +22,7 @@ namespace OpenHellion.Networking.Message.MainServer;
 
 [Serializable]
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class PublishServerRequest : MSMessage
+public class CheckInRequest : MSMessage
 {
 	public Region Region;
 
@@ -34,6 +34,6 @@ public class PublishServerRequest : MSMessage
 
 	public override string GetDestination()
 	{
-		return "publishServer";
+		return "checkIn";
 	}
 }

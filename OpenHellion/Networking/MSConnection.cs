@@ -18,7 +18,6 @@
 
 using System;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 using OpenHellion.Networking.Message.MainServer;
@@ -27,12 +26,12 @@ using ZeroGravity;
 namespace OpenHellion.Networking;
 
 /// <summary>
-/// 	Handles connections to the main server.<br/>
+/// 	Handles connections to the main server.<br />
 /// 	Since the main server uses an REST api, the requests cause a callback.
 /// </summary>
 public static class MSConnection
 {
-		public static string IpAddress = "127.0.0.1";
+		public static string IpAddress = "localhost";
 		public static ushort Port = 6001;
 
 		public static string Address {
@@ -48,21 +47,21 @@ public static class MSConnection
 		/// </summary>
 		public static void Get<T>(MSMessage message, SendCallback<T> callback)
 		{
-			Task task = Task.Run(() =>
+			Task.Run(async () =>
 			{
 				try {
 					// Create new client and request and load it with data.
 					HttpClient httpClient = new HttpClient();
-					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, Address + "/api/" + message.GetDestination());
+					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
 					request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
 
-					Dbg.Log("Sending data to:", Address + "/api/" + message.GetDestination());
+					Dbg.Log("Sending data to:", request.RequestUri);
 
 					// Send message and get result.
-					HttpResponseMessage result = httpClient.SendAsync(request).Result;
+					HttpResponseMessage result = await httpClient.SendAsync(request);
 
 					// Read data as string.
-					string str = result.Content.ReadAsStringAsync().Result;
+					string str = await result.Content.ReadAsStringAsync();
 
 					Dbg.Log("Data:", str);
 
@@ -74,10 +73,10 @@ public static class MSConnection
 					request.Dispose();
 					result.Dispose();
 				}
-				catch (HttpRequestException e)
+				catch (Exception e)
 				{
 					Console.WriteLine("\nException Caught!");
-					Console.WriteLine("Message :{0} ", e.Message);
+					Console.WriteLine("Message: {0} ", e.Message);
 				}
 			});
 		}
@@ -87,25 +86,26 @@ public static class MSConnection
 		/// </summary>
 		public static void Send(MSMessage message)
 		{
-			Task task = Task.Run(async () =>
+			Task.Run(async () =>
 			{
-				try {
+				try
+				{
 					HttpClient httpClient = new HttpClient();
-					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, Address + "/api/" + message.GetDestination());
+					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
 					request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
 
 					// Send message.
-					HttpResponseMessage result = httpClient.SendAsync(request).Result;
+					HttpResponseMessage result = await httpClient.SendAsync(request);
 
 					// Clean up.
 					httpClient.Dispose();
 					request.Dispose();
 					result.Dispose();
 				}
-				catch (HttpRequestException e)
+				catch (Exception e)
 				{
 					Console.WriteLine("\nException Caught!");
-					Console.WriteLine("Message :{0} ", e.Message);
+					Console.WriteLine("Message: {0} ", e.Message);
 				}
 			});
 		}

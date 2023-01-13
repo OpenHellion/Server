@@ -444,7 +444,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			foreach (ShipSpawnPoint point in SpawnPoints)
 			{
-				if ((point.Player == null && point.Type == SpawnPointType.SimpleSpawn) || point.Player == pl || point.InvitedPlayerSteamID == pl.SteamId)
+				if ((point.Player == null && point.Type == SpawnPointType.SimpleSpawn) || point.Player == pl || point.InvitedPlayerSteamID == pl.PlayerId)
 				{
 					return point;
 				}
@@ -716,7 +716,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	private void UpdateAuthorizationData(Player pl)
 	{
-		AuthorizedPerson ap = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerGUID == pl.GUID || m.SteamID == pl.SteamId);
+		AuthorizedPerson ap = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerGUID == pl.GUID || m.SteamID == pl.PlayerId);
 		if (ap != null)
 		{
 			ap.PlayerGUID = pl.GUID;
@@ -760,7 +760,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		if (pl != null)
 		{
-			AddModifyPlayerPosition(pl.GUID, pl.SteamId, pl.Name, rank);
+			AddModifyPlayerPosition(pl.GUID, pl.PlayerId, pl.Name, rank);
 		}
 	}
 
@@ -773,7 +773,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		UpdateAuthorizationData(executingPl);
 		if (pl != null)
 		{
-			steamID = pl.SteamId;
+			steamID = pl.PlayerId;
 		}
 		AuthorizedPerson commander = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.CommandingOfficer);
 		AuthorizedPerson officer = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.ExecutiveOfficer);
@@ -835,7 +835,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		if (pl != null)
 		{
 			UpdateAuthorizationData(pl);
-			steamID = pl.SteamId;
+			steamID = pl.PlayerId;
 		}
 		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == steamID);
 		if (existing == null)
@@ -868,7 +868,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public bool ChangeVesselName(Player pl, string newName)
 	{
-		if (pl == null || AuthorizedPersonel.Find((AuthorizedPerson m) => (m.PlayerGUID == pl.GUID || m.SteamID == pl.SteamId) && m.Rank == AuthorizedPersonRank.CommandingOfficer) == null)
+		if (pl == null || AuthorizedPersonel.Find((AuthorizedPerson m) => (m.PlayerGUID == pl.GUID || m.SteamID == pl.PlayerId) && m.Rank == AuthorizedPersonRank.CommandingOfficer) == null)
 		{
 			return false;
 		}
@@ -1754,7 +1754,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				NewType = sp.Type,
 				PlayerGUID = ((sp.Player != null) ? sp.Player.FakeGuid : (-1)),
 				PlayerName = ((sp.Player != null) ? sp.Player.Name : null),
-				PlayerSteamID = ((sp.Player != null) ? sp.Player.SteamId : null)
+				PlayerSteamID = ((sp.Player != null) ? sp.Player.PlayerId : null)
 			});
 		}
 		ss.EmblemId = EmblemId;

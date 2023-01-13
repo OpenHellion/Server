@@ -35,7 +35,7 @@ public class NetworkController
 
 	private StatusPortConnectionListener statusPortConnectionListener;
 
-	public string ServerID = "";
+	public string ServerID = null;
 
 	public EventSystem EventSystem;
 
@@ -139,6 +139,7 @@ public class NetworkController
 	public void LogInRequestListener(NetworkData data)
 	{
 		LogInRequest req = data as LogInRequest;
+
 		if (Server.Instance.NetworkController.CurrentOnlinePlayers() >= Server.Instance.MaxPlayers)
 		{
 			Dbg.Warning("Maximum number of players exceeded.", req.ServerID, ServerID);
@@ -148,15 +149,19 @@ public class NetworkController
 			});
 			return;
 		}
+
+		// TODO: Ignoring this for now.
+#if false
 		if (req.ClientHash != Server.CombinedHash)
 		{
 			Dbg.Warning("Server/client hash mismatch.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
 			{
-				Response = ResponseResult.Error
+				Response = ResponseResult.ClientVersionError
 			});
 			return;
 		}
+#endif
 
 #if !HELLION_SP
 		if (req.ServerID != ServerID)
@@ -173,6 +178,7 @@ public class NetworkController
 		{
 			req.Password = "";
 		}
+
 		if (req.Password != Server.Instance.ServerPassword)
 		{
 			Dbg.Warning("LogInRequest server password doesn't match this server's password.", req.ServerID, ServerID);
@@ -182,7 +188,8 @@ public class NetworkController
 			});
 			return;
 		}
-		long guid = GUIDFactory.SteamIdToGuid(req.SteamId);
+
+		long guid = GUIDFactory.SteamIdToGuid(req.PlayerId);
 		if (ClientList.ContainsKey(guid))
 		{
 			try
@@ -209,17 +216,19 @@ public class NetworkController
 				}
 				AddClient(guid, ClientList[req.Sender]);
 				RemoveClient(req.Sender);
-				Server.Instance.LoginPlayer(guid, req.SteamId, req.CharacterData);
+				Server.Instance.LoginPlayer(guid, req.PlayerId, req.CharacterData);
 				return;
 			}
 		}
+
 		if (ClientList.ContainsKey(req.Sender))
 		{
 			ClientList[req.Sender].ClientGUID = guid;
 		}
+
 		AddClient(guid, ClientList[req.Sender]);
 		RemoveClient(req.Sender);
-		Server.Instance.LoginPlayer(guid, req.SteamId, req.CharacterData);
+		Server.Instance.LoginPlayer(guid, req.PlayerId, req.CharacterData);
 	}
 
 	public void Start()
@@ -303,7 +312,7 @@ public class NetworkController
 			ClientList[player.GUID].Player = player;
 			ClientList[player.GUID].Player.ConnectToNetworkController();
 			LogInResponse lir = new LogInResponse();
-			lir.ID = player.FakeGuid;
+			lir.GUID = player.FakeGuid;
 			lir.Data = new CharacterData
 			{
 				Name = player.Name,

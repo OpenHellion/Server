@@ -325,7 +325,7 @@ public class SpawnRule
 					PlayerGUID = questTrigger.Quest.Player.GUID,
 					Name = questTrigger.Quest.Player.Name,
 					Rank = AuthorizedPersonRank.Crewman,
-					SteamID = questTrigger.Quest.Player.SteamId
+					SteamID = questTrigger.Quest.Player.PlayerId
 				};
 				QuestTrigger.QuestTriggerID qtid = questTrigger.GetQuestTriggerID();
 				List<SpaceObjectVessel> vessels = mainVessels.SelectMany((SpaceObjectVessel m) => m.AllVessels).ToList();
@@ -431,10 +431,10 @@ public class SpawnRule
 	{
 		return LocationType switch
 		{
-			SpawnRuleLocationType.Random => ExecuteRandomRule(), 
-			SpawnRuleLocationType.StartingScene => ExecuteStaringRule(), 
-			SpawnRuleLocationType.Station => ExecuteBlueprintRule(force), 
-			_ => null, 
+			SpawnRuleLocationType.Random => ExecuteRandomRule(),
+			SpawnRuleLocationType.StartingScene => ExecuteStaringRule(),
+			SpawnRuleLocationType.Station => ExecuteBlueprintRule(force),
+			_ => null,
 		};
 	}
 

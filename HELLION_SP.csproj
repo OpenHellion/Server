@@ -21,6 +21,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="Data\**"  CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Sandbox\**"  CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />

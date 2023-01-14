@@ -10,7 +10,9 @@ public class VesselSecurityAuthorizedPerson
 
 	public long GUID;
 
-	public string SteamID;
+	public string PlayerNativeId;
+
+	public string PlayerId;
 
 	public string Name;
 }

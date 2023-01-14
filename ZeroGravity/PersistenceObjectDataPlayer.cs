@@ -25,7 +25,9 @@ public class PersistenceObjectDataPlayer : PersistenceObjectData
 
 	public string Name;
 
-	public string SteamId;
+	public string PlayerId;
+
+	public string NativeId;
 
 	public Gender Gender;
 

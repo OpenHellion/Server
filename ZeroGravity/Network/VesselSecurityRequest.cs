@@ -10,13 +10,13 @@ public class VesselSecurityRequest : NetworkData
 
 	public string VesselName;
 
-	public string AddPlayerSteamID;
+	public string AddPlayerId;
 
 	public AuthorizedPersonRank? AddPlayerRank;
 
 	public string AddPlayerName;
 
-	public string RemovePlayerSteamID;
+	public string RemovePlayerId;
 
 	public bool? HackPanel;
 }

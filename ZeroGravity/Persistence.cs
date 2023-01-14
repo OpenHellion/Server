@@ -282,7 +282,7 @@ public class Persistence
 			{
 				foreach (PersistenceObjectDataPlayer data4 in per.Players)
 				{
-					Player pl = new Player(data4.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", data4.Gender, data4.HeadType, data4.HairType, addToServerList: false);
+					Player pl = new Player(data4.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", "", data4.Gender, data4.HeadType, data4.HairType, addToServerList: false);
 					pl.LoadPersistenceData(data4);
 				}
 			}

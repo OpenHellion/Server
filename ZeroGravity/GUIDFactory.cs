@@ -66,7 +66,7 @@ public static class GUIDFactory
 		return newGUID;
 	}
 
-	public static long SteamIdToGuid(string steamId)
+	public static long PlayerIdToGuid(string steamId)
 	{
 		return 0x7FFFFFFFFFFFFFFFL & steamId.GetHashCode();
 	}

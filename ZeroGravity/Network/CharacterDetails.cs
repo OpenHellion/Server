@@ -21,7 +21,9 @@ public class CharacterDetails
 
 	public string Name;
 
-	public string SteamId;
+	public string NativeId;
+
+	public string PlayerId;
 
 	public CharacterTransformData TransformData;
 

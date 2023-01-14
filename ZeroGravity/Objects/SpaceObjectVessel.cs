@@ -716,7 +716,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	private void UpdateAuthorizationData(Player pl)
 	{
-		AuthorizedPerson ap = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerGUID == pl.GUID || m.SteamID == pl.PlayerId);
+		AuthorizedPerson ap = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerGUID == pl.GUID || m.PlayerId == pl.PlayerId);
 		if (ap != null)
 		{
 			ap.PlayerGUID = pl.GUID;
@@ -724,23 +724,64 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public bool AddAuthorizedPerson(Player executingPl, Player pl, AuthorizedPersonRank rank)
+	public bool AddAuthorizedPerson(Player executingPl, Player pl, string name, AuthorizedPersonRank rank)
 	{
-		return AddAuthorizedPerson_Impl(executingPl, pl, null, null, rank);
+		if (executingPl == null || pl == null)
+		{
+			return false;
+		}
+
+		UpdateAuthorizationData(executingPl);
+
+		AuthorizedPerson commander = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.CommandingOfficer);
+		AuthorizedPerson officer = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.ExecutiveOfficer);
+
+		bool isCommander = commander == null || commander.PlayerGUID == executingPl.GUID;
+		bool isOfficer = officer == null || officer.PlayerGUID == executingPl.GUID;
+
+		bool addModifyPlayer = false;
+		if (rank == AuthorizedPersonRank.CommandingOfficer && isCommander)
+		{
+			if (commander != null && commander.PlayerId != pl.PlayerId)
+			{
+				AddModifyPlayerPosition(commander.PlayerGUID, commander.PlayerNativeId, commander.PlayerId, commander.Name, AuthorizedPersonRank.Crewman);
+			}
+
+			addModifyPlayer = true;
+		}
+		else if (rank == AuthorizedPersonRank.ExecutiveOfficer && (isOfficer || isCommander))
+		{
+			if (officer != null && officer.PlayerId != pl.PlayerId)
+			{
+				AddModifyPlayerPosition(officer.PlayerGUID, officer.PlayerNativeId, officer.PlayerId, officer.Name, AuthorizedPersonRank.Crewman);
+			}
+
+			addModifyPlayer = true;
+		}
+		else if (rank == AuthorizedPersonRank.Crewman && (isOfficer || isCommander))
+		{
+			addModifyPlayer = true;
+		}
+
+		if (addModifyPlayer)
+		{
+			AddModifyPlayerPosition(pl.GUID, pl.NativeId, pl.PlayerId, name, rank);
+			CopyAuthorizedPersonelListToChildren();
+
+			return true;
+		}
+
+		return false;
 	}
 
-	public bool AddAuthorizedPerson(Player executingPl, string steamID, string name, AuthorizedPersonRank rank)
+	private void AddModifyPlayerPosition(long guid, string nativeId, string playerId, string name, AuthorizedPersonRank rank)
 	{
-		return AddAuthorizedPerson_Impl(executingPl, Server.Instance.GetPlayerFromSteamID(steamID), steamID, name, rank);
-	}
-
-	private void AddModifyPlayerPosition(long guid, string steamId, string name, AuthorizedPersonRank rank)
-	{
-		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == steamId);
+		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == playerId);
 		if (existing != null)
 		{
 			existing.Rank = rank;
-			existing.SteamID = steamId;
+			existing.PlayerNativeId = nativeId;
+			existing.PlayerId = playerId;
 			existing.Name = name;
 			existing.PlayerGUID = guid;
 		}
@@ -748,96 +789,25 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			AuthorizedPersonel.Add(new AuthorizedPerson
 			{
-				PlayerGUID = guid,
-				SteamID = steamId,
+				Rank = rank,
+				PlayerNativeId = nativeId,
+				PlayerId = playerId,
 				Name = name,
-				Rank = rank
+				PlayerGUID = guid
 			});
 		}
 	}
 
-	private void AddModifyPlayerPosition(Player pl, AuthorizedPersonRank rank)
-	{
-		if (pl != null)
-		{
-			AddModifyPlayerPosition(pl.GUID, pl.PlayerId, pl.Name, rank);
-		}
-	}
-
-	private bool AddAuthorizedPerson_Impl(Player executingPl, Player pl, string steamID, string name, AuthorizedPersonRank rank)
-	{
-		if (executingPl == null || (pl == null && steamID.IsNullOrEmpty()))
-		{
-			return false;
-		}
-		UpdateAuthorizationData(executingPl);
-		if (pl != null)
-		{
-			steamID = pl.PlayerId;
-		}
-		AuthorizedPerson commander = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.CommandingOfficer);
-		AuthorizedPerson officer = AuthorizedPersonel.Find((AuthorizedPerson m) => m.Rank == AuthorizedPersonRank.ExecutiveOfficer);
-		bool isCommander = commander == null || commander.PlayerGUID == executingPl.GUID;
-		bool isOfficer = officer == null || officer.PlayerGUID == executingPl.GUID;
-		bool addModifyPlayer = false;
-		if (rank == AuthorizedPersonRank.CommandingOfficer && isCommander)
-		{
-			if (commander != null && commander.SteamID != steamID)
-			{
-				AddModifyPlayerPosition(commander.PlayerGUID, commander.SteamID, commander.Name, AuthorizedPersonRank.Crewman);
-			}
-			addModifyPlayer = true;
-		}
-		else if (rank == AuthorizedPersonRank.ExecutiveOfficer && (isOfficer || isCommander))
-		{
-			if (officer != null && officer.SteamID != steamID)
-			{
-				AddModifyPlayerPosition(officer.PlayerGUID, officer.SteamID, officer.Name, AuthorizedPersonRank.Crewman);
-			}
-			addModifyPlayer = true;
-		}
-		else if (rank == AuthorizedPersonRank.Crewman && (isOfficer || isCommander))
-		{
-			addModifyPlayer = true;
-		}
-		if (addModifyPlayer)
-		{
-			if (pl != null)
-			{
-				AddModifyPlayerPosition(pl, rank);
-			}
-			else
-			{
-				AddModifyPlayerPosition(0L, steamID, name, rank);
-			}
-			CopyAuthorizedPersonelListToChildren();
-			return true;
-		}
-		return false;
-	}
-
 	public bool RemoveAuthorizedPerson(Player executingPl, Player pl)
 	{
-		return RemoveAuthorizedPerson_Impl(executingPl, pl, null);
-	}
-
-	public bool RemoveAuthorizedPerson(Player executingPl, string steamID)
-	{
-		return RemoveAuthorizedPerson_Impl(executingPl, Server.Instance.GetPlayerFromSteamID(steamID), steamID);
-	}
-
-	private bool RemoveAuthorizedPerson_Impl(Player executingPl, Player pl, string steamID)
-	{
-		if (executingPl == null || (pl == null && steamID.IsNullOrEmpty()))
+		if (executingPl == null || pl == null)
 		{
 			return false;
 		}
-		if (pl != null)
-		{
-			UpdateAuthorizationData(pl);
-			steamID = pl.PlayerId;
-		}
-		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == steamID);
+
+		UpdateAuthorizationData(pl);
+
+		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId);
 		if (existing == null)
 		{
 			return false;
@@ -868,7 +838,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public bool ChangeVesselName(Player pl, string newName)
 	{
-		if (pl == null || AuthorizedPersonel.Find((AuthorizedPerson m) => (m.PlayerGUID == pl.GUID || m.SteamID == pl.PlayerId) && m.Rank == AuthorizedPersonRank.CommandingOfficer) == null)
+		if (pl == null || AuthorizedPersonel.Find((AuthorizedPerson m) => (m.PlayerGUID == pl.GUID || m.PlayerId == pl.PlayerId) && m.Rank == AuthorizedPersonRank.CommandingOfficer) == null)
 		{
 			return false;
 		}
@@ -899,7 +869,8 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			Player pl = Server.Instance.GetPlayer(per.PlayerGUID);
 			authPersonel.Add(new VesselSecurityAuthorizedPerson
 			{
-				SteamID = per.SteamID,
+				PlayerNativeId = per.PlayerNativeId,
+				PlayerId = per.PlayerId,
 				GUID = (pl?.FakeGuid ?? 0),
 				Name = ((pl != null) ? pl.Name : per.Name),
 				Rank = per.Rank

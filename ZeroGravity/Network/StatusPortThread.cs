@@ -74,7 +74,7 @@ public class StatusPortThread
 				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
 				if (dcr.ServerId == Server.Instance.NetworkController.ServerID)
 				{
-					Player pl = Server.Instance.GetPlayerFromSteamID(dcr.SteamId);
+					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.SteamId);
 					if (!Server.Instance.NetworkController.ClientList.ContainsKey(pl.GUID))
 					{
 						pl.Destroy();

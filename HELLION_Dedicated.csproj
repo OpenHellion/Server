@@ -7,6 +7,7 @@
     <Product>HELLION Server</Product>
     <Authors>OpenHELLION contributors</Authors>
     <Company>OpenHELLION</Company>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <OutputType>exe</OutputType>
@@ -15,8 +16,8 @@
     <LangVersion>latest</LangVersion>
     <PublishRelease>true</PublishRelease>
   </PropertyGroup>
-  <PropertyGroup>
-    <ApplicationIcon>app.ico</ApplicationIcon>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor|AnyCPU' ">
+    <DefineConstants>build_for_unit_tests;</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <None Include="Data\**"  CopyToPublishDirectory="PreserveNewest" />

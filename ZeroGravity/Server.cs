@@ -510,6 +510,9 @@ public class Server
 		return null;
 	}
 
+	/// <summary>
+	/// 	Get a player with a guid.
+	/// </summary>
 	public Player GetPlayer(long guid)
 	{
 		Player player = null;
@@ -517,9 +520,21 @@ public class Server
 		return player;
 	}
 
-	public Player GetPlayerFromSteamID(string steamID)
+	/// <summary>
+	/// 	Gets a player from a specified player id.
+	/// </summary>
+	public Player GetPlayerFromPlayerId(string playerId)
 	{
-		return GetPlayer(GUIDFactory.SteamIdToGuid(steamID));
+		return GetPlayer(GUIDFactory.PlayerIdToGuid(playerId));
+	}
+
+	/// <summary>
+	/// 	Gets a player from a specified native id.<br />
+	/// 	Warning: This is pretty slow, as it searches through all players.
+	/// </summary>
+	public Player GetPlayerFromNativeId(string nativeId)
+	{
+		return _players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
 	}
 
 	public SpaceObjectVessel GetVessel(long guid)
@@ -825,7 +840,7 @@ public class Server
 		}
 	}
 
-	public void LoginPlayer(long guid, string playerId, CharacterData characterData)
+	public void LoginPlayer(long guid, string playerId, string nativeId, CharacterData characterData)
 	{
 		if (!WorldInitialized)
 		{
@@ -838,7 +853,7 @@ public class Server
 		}
 		else
 		{
-			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, characterData.Gender, characterData.HeadType, characterData.HairType);
+			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, nativeId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
 			NetworkController.ConnectPlayer(player, doLogin: false);
 		}
@@ -895,12 +910,12 @@ public class Server
 					foundShip.Forward = forward;
 					foundShip.Up = up;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.PlayerId,
+							PlayerNativeId = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -919,12 +934,12 @@ public class Server
 					foundShip.Forward = forward2;
 					foundShip.Up = up2;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.PlayerId,
+							PlayerNativeId = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -937,12 +952,12 @@ public class Server
 				if (foundShip != null)
 				{
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.SteamID == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							SteamID = pl.PlayerId,
+							PlayerNativeId = pl.PlayerId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -1481,27 +1496,6 @@ public class Server
 			if (parts[0] == "spawn" && (parts.Length == 2 || parts.Length == 3))
 			{
 				Vector3D spawnItemPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
-				if (parts[1].ToLower() == "player")
-				{
-					// TODO: This should probably not exist.
-					Player newPlayer = new Player(MathHelper.RandomNextInt(), Vector3D.Zero, QuaternionD.Identity, "Dummy player", MathHelper.RandomNextInt().ToString(), Gender.Female, 0, 0, addToServerList: true, player);
-					newPlayer.Parent = player.Parent;
-					newPlayer.LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
-					newPlayer.Stats.GodMode = false;
-					Add(newPlayer);
-					NetworkController.SendToClientsSubscribedTo(new SpawnObjectsResponse
-					{
-						Data = new List<SpawnObjectResponseData>
-						{
-							new SpawnCharacterResponseData
-							{
-								GUID = newPlayer.GUID,
-								Details = newPlayer.GetDetails()
-							}
-						}
-					}, -1L, player.Parent);
-					return;
-				}
 				if (parts[1].ToLower() == "corpse")
 				{
 					Corpse corpse = new Corpse(player);
@@ -2789,7 +2783,8 @@ public class Server
 				{
 					res2.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						SteamID = cl2.Player.PlayerId,
+						PlayerNativeId = cl2.Player.NativeId,
+						PlayerId = cl2.Player.PlayerId,
 						Name = cl2.Player.Name,
 						AlreadyHasInvite = SpawnPointInvites.ContainsKey(cl2.Player.PlayerId)
 					});
@@ -2820,7 +2815,8 @@ public class Server
 				{
 					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						SteamID = cl.Player.PlayerId,
+						PlayerNativeId = cl.Player.NativeId,
+						PlayerId = cl.Player.PlayerId,
 						Name = cl.Player.Name,
 						AlreadyHasInvite = false
 					});
@@ -3137,7 +3133,7 @@ public class Server
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.CurrentOnlinePlayers(),
 			AlivePlayers = (short)_players.Values.Count((Player m) => m.IsAlive),
-			CharacterData = GetPlayerFromSteamID(req.SteamId)?.GetCharacterData()
+			CharacterData = GetPlayerFromPlayerId(req.SteamId)?.GetCharacterData()
 		};
 	}
 

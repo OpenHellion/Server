@@ -2,8 +2,8 @@ namespace ZeroGravity.Data;
 
 public enum AuthorizedPersonRank
 {
-	None,
-	CommandingOfficer,
-	ExecutiveOfficer,
-	Crewman
+	None = 0,
+	CommandingOfficer = 1,
+	ExecutiveOfficer = 2,
+	Crewman = 3
 }

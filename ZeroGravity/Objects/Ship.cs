@@ -1891,26 +1891,53 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			return;
 		}
-		Player pl = Server.Instance.GetPlayer(data.Sender);
-		if (pl != null)
+		Player sender = Server.Instance.GetPlayer(data.Sender);
+		if (sender != null)
 		{
+			// Get player.
+			Player pl;
+			if (!req.AddPlayerId.IsNullOrEmpty())
+			{
+				pl = Server.Instance.GetPlayerFromPlayerId(req.AddPlayerId);
+			}
+			else if (!req.RemovePlayerId.IsNullOrEmpty())
+			{
+				pl = Server.Instance.GetPlayerFromPlayerId(req.RemovePlayerId);
+			}
+			else
+			{
+				return;
+			}
+
+			Dbg.Log(data);
+
 			bool sendSecurityResponse = false;
-			if (!req.VesselName.IsNullOrEmpty() && ChangeVesselName(pl, req.VesselName))
+
+			// Change name.
+			if (!req.VesselName.IsNullOrEmpty() && ChangeVesselName(sender, req.VesselName))
 			{
 				sendSecurityResponse = true;
 			}
-			if (!req.AddPlayerSteamID.IsNullOrEmpty() && req.AddPlayerRank.HasValue && AddAuthorizedPerson(pl, req.AddPlayerSteamID, req.AddPlayerName, req.AddPlayerRank.Value))
+
+			// Add player.
+			if (!req.AddPlayerId.IsNullOrEmpty() && req.AddPlayerRank.HasValue && AddAuthorizedPerson(sender, pl, req.AddPlayerName, req.AddPlayerRank.Value))
 			{
 				sendSecurityResponse = true;
 			}
-			if (!req.RemovePlayerSteamID.IsNullOrEmpty() && RemoveAuthorizedPerson(pl, req.RemovePlayerSteamID))
+
+			// Removing player.
+			if (!req.RemovePlayerId.IsNullOrEmpty() && RemoveAuthorizedPerson(sender, pl))
 			{
 				sendSecurityResponse = true;
 			}
-			if (req.HackPanel.HasValue && req.HackPanel.Value && ClearSecuritySystem(pl))
+
+			// Hack.
+			if (req.HackPanel.HasValue && req.HackPanel.Value && ClearSecuritySystem(sender))
 			{
 				sendSecurityResponse = true;
 			}
+
+			// Send if it was successful.
 			if (sendSecurityResponse)
 			{
 				SendSecurityResponse(includeVesselName: true);
@@ -2128,12 +2155,12 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			{
 				List<VesselRepairPoint> priority = Enumerable.Where(predicate: damagePiority switch
 				{
-					VesselRepairPoint.Priority.Internal => (VesselRepairPoint m) => !m.External, 
-					VesselRepairPoint.Priority.External => (VesselRepairPoint m) => m.External, 
-					VesselRepairPoint.Priority.Fire => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.Fire, 
-					VesselRepairPoint.Priority.Breach => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.Breach, 
-					VesselRepairPoint.Priority.System => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.System, 
-					_ => (VesselRepairPoint m) => true, 
+					VesselRepairPoint.Priority.Internal => (VesselRepairPoint m) => !m.External,
+					VesselRepairPoint.Priority.External => (VesselRepairPoint m) => m.External,
+					VesselRepairPoint.Priority.Fire => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.Fire,
+					VesselRepairPoint.Priority.Breach => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.Breach,
+					VesselRepairPoint.Priority.System => (VesselRepairPoint m) => m.DamageType == RepairPointDamageType.System,
+					_ => (VesselRepairPoint m) => true,
 				}, source: RepairPoints).OrderBy(sortOrder).ToList();
 				list.RemoveAll((VesselRepairPoint m) => priority.Contains(m));
 				list.InsertRange(0, priority);
@@ -2155,7 +2182,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 						where m != null
 						orderby MathHelper.RandomNextDouble()
 						select m).FirstOrDefault();
-					mp?.TakeDamage(new Dictionary<TypeOfDamage, float> { 
+					mp?.TakeDamage(new Dictionary<TypeOfDamage, float> {
 					{
 						TypeOfDamage.Impact,
 						mp.MaxHealth

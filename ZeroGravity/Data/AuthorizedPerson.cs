@@ -9,7 +9,9 @@ public class AuthorizedPerson : ISceneData
 
 	public long PlayerGUID;
 
-	public string SteamID;
+	public string PlayerNativeId;
+
+	public string PlayerId;
 
 	public string Name;
 }

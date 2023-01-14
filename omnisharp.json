@@ -1,0 +1,8 @@
+{
+    "msbuild": {
+        "Configuration": "Editor"
+    },
+	"FormattingOptions": {
+		"EnableEditorConfigSupport": false
+	}
+}

@@ -189,7 +189,7 @@ public class NetworkController
 			return;
 		}
 
-		long guid = GUIDFactory.SteamIdToGuid(req.PlayerId);
+		long guid = GUIDFactory.PlayerIdToGuid(req.PlayerId);
 		if (ClientList.ContainsKey(guid))
 		{
 			try
@@ -216,7 +216,7 @@ public class NetworkController
 				}
 				AddClient(guid, ClientList[req.Sender]);
 				RemoveClient(req.Sender);
-				Server.Instance.LoginPlayer(guid, req.PlayerId, req.CharacterData);
+				Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
 				return;
 			}
 		}
@@ -228,7 +228,7 @@ public class NetworkController
 
 		AddClient(guid, ClientList[req.Sender]);
 		RemoveClient(req.Sender);
-		Server.Instance.LoginPlayer(guid, req.PlayerId, req.CharacterData);
+		Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
 	}
 
 	public void Start()

@@ -13,5 +13,7 @@ public class LogInRequest : NetworkData
 
 	public string PlayerId;
 
+	public string NativeId;
+
 	public CharacterData CharacterData;
 }

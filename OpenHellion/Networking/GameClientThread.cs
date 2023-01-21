@@ -2,8 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
+using ZeroGravity;
+using ZeroGravity.Network;
 
-namespace ZeroGravity.Network;
+namespace OpenHellion.Networking;
 
 public class GameClientThread
 {

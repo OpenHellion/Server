@@ -1,9 +1,11 @@
 using System;
 using System.Net.Sockets;
 using System.Threading;
+using ZeroGravity;
+using ZeroGravity.Network;
 using ZeroGravity.Objects;
 
-namespace ZeroGravity.Network;
+namespace OpenHellion.Networking;
 
 public class StatusPortThread
 {

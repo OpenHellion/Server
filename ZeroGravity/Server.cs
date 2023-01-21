@@ -745,8 +745,8 @@ public class Server
 #if HELLION_SP
 		CheckAndFixPorts();
 #endif
-		Properties.GetProperty("main_server_ip", ref MSConnection.IpAddress);
-		Properties.GetProperty("main_server_port", ref MSConnection.Port);
+		Properties.GetProperty("main_server_ip", ref ConnectionMain.IpAddress);
+		Properties.GetProperty("main_server_port", ref ConnectionMain.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
@@ -1137,29 +1137,29 @@ public class Server
 
 	private void Start()
 	{
-		NetworkController.EventSystem.AddListener(typeof(PlayerSpawnRequest), PlayerSpawnRequestListener);
-		NetworkController.EventSystem.AddListener(typeof(PlayerRespawnRequest), PlayerRespawnRequestListener);
-		NetworkController.EventSystem.AddListener(typeof(SpawnObjectsRequest), SpawnObjectsRequestListener);
-		NetworkController.EventSystem.AddListener(typeof(SubscribeToObjectsRequest), SubscribeToSpaceObjectListener);
-		NetworkController.EventSystem.AddListener(typeof(UnsubscribeFromObjectsRequest), UnsubscribeFromSpaceObjectListener);
-		NetworkController.EventSystem.AddListener(typeof(TextChatMessage), TextChatMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(TransferResourceMessage), TransferResourcesMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(FabricateItemMessage), FabricateItemMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(CancelFabricationMessage), CancelFabricationMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(PlayersOnServerRequest), PlayersOnServerRequestListener);
-		NetworkController.EventSystem.AddListener(typeof(AvailableSpawnPointsRequest), AvailableSpawnPointsRequestListener);
-		NetworkController.EventSystem.AddListener(typeof(RepairItemMessage), RepairMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(RepairVesselMessage), RepairMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(HurtPlayerMessage), HurtPlayerMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(ConsoleMessage), ConsoleMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(ExplosionMessage), ExplosionMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(LatencyTestMessage), LatencyTestListener);
-		NetworkController.EventSystem.AddListener(typeof(SaveGameMessage), SaveGameMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(ServerShutDownMessage), ServerShutDownMessageListener);
-		NetworkController.EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
+		EventSystem.AddListener(typeof(PlayerSpawnRequest), PlayerSpawnRequestListener);
+		EventSystem.AddListener(typeof(PlayerRespawnRequest), PlayerRespawnRequestListener);
+		EventSystem.AddListener(typeof(SpawnObjectsRequest), SpawnObjectsRequestListener);
+		EventSystem.AddListener(typeof(SubscribeToObjectsRequest), SubscribeToSpaceObjectListener);
+		EventSystem.AddListener(typeof(UnsubscribeFromObjectsRequest), UnsubscribeFromSpaceObjectListener);
+		EventSystem.AddListener(typeof(TextChatMessage), TextChatMessageListener);
+		EventSystem.AddListener(typeof(TransferResourceMessage), TransferResourcesMessageListener);
+		EventSystem.AddListener(typeof(FabricateItemMessage), FabricateItemMessageListener);
+		EventSystem.AddListener(typeof(CancelFabricationMessage), CancelFabricationMessageListener);
+		EventSystem.AddListener(typeof(PlayersOnServerRequest), PlayersOnServerRequestListener);
+		EventSystem.AddListener(typeof(AvailableSpawnPointsRequest), AvailableSpawnPointsRequestListener);
+		EventSystem.AddListener(typeof(RepairItemMessage), RepairMessageListener);
+		EventSystem.AddListener(typeof(RepairVesselMessage), RepairMessageListener);
+		EventSystem.AddListener(typeof(HurtPlayerMessage), HurtPlayerMessageListener);
+		EventSystem.AddListener(typeof(ConsoleMessage), ConsoleMessageListener);
+		EventSystem.AddListener(typeof(ExplosionMessage), ExplosionMessageListener);
+		EventSystem.AddListener(typeof(LatencyTestMessage), LatencyTestListener);
+		EventSystem.AddListener(typeof(SaveGameMessage), SaveGameMessageListener);
+		EventSystem.AddListener(typeof(ServerShutDownMessage), ServerShutDownMessageListener);
+		EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
 #if !HELLION_SP
-		MSConnection.Get<CheckInResponse>(new CheckInRequest
+		ConnectionMain.Get<CheckInResponse>(new CheckInRequest
 		{
 			//ServerID = NetworkController.ServerID,
 			//ServerName = ServerName,
@@ -2879,7 +2879,7 @@ public class Server
 
 	public void SendCheckInMessage(double amount)
 	{
-		MSConnection.Send(new CheckInMessage
+		ConnectionMain.Send(new CheckInMessage
 		{
 			ServerId = NetworkController.ServerID
 		});

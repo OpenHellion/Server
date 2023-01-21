@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
+using OpenHellion.Networking;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 
@@ -157,14 +158,14 @@ public class Corpse : SpaceObjectTransferable
 
 	public void ConnectToNetworkController()
 	{
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
+		EventSystem.AddListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
+		EventSystem.AddListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
+		EventSystem.RemoveListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
+		EventSystem.RemoveListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
 	}
 
 	private void CorpseMovementMessageListener(NetworkData data)

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -312,37 +313,37 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(CharacterMovementMessage), UpdateMovementListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PlayerShootingMessage), PlayerShootingListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PlayerHitMessage), PlayerHitListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(SuicideRequest), SuicideListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(QuestTriggerMessage), QuestTriggerMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
+		EventSystem.AddListener(typeof(CharacterMovementMessage), UpdateMovementListener);
+		EventSystem.AddListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
+		EventSystem.AddListener(typeof(PlayerShootingMessage), PlayerShootingListener);
+		EventSystem.AddListener(typeof(PlayerHitMessage), PlayerHitListener);
+		EventSystem.AddListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
+		EventSystem.AddListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
+		EventSystem.AddListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
+		EventSystem.AddListener(typeof(SuicideRequest), SuicideListener);
+		EventSystem.AddListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
+		EventSystem.AddListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
+		EventSystem.AddListener(typeof(QuestTriggerMessage), QuestTriggerMessageListener);
+		EventSystem.AddListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
+		EventSystem.AddListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
 	}
 
 	public void DiconnectFromNetworkContoller()
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(CharacterMovementMessage), UpdateMovementListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(PlayerShootingMessage), PlayerShootingListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(PlayerHitMessage), PlayerHitListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(SuicideRequest), SuicideListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
+		EventSystem.RemoveListener(typeof(CharacterMovementMessage), UpdateMovementListener);
+		EventSystem.RemoveListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
+		EventSystem.RemoveListener(typeof(PlayerShootingMessage), PlayerShootingListener);
+		EventSystem.RemoveListener(typeof(PlayerHitMessage), PlayerHitListener);
+		EventSystem.RemoveListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
+		EventSystem.RemoveListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
+		EventSystem.RemoveListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
+		EventSystem.RemoveListener(typeof(SuicideRequest), SuicideListener);
+		EventSystem.RemoveListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
+		EventSystem.RemoveListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
+		EventSystem.RemoveListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
+		EventSystem.RemoveListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
 	}
 
 	public void RemovePlayerFromTrigger()

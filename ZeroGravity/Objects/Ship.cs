@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenHellion.Networking;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -142,13 +143,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		: base(guid, initializeOrbit, position, velocity, forward, up)
 	{
 		Radius = 100.0;
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(ShipStatsMessage), ShipStatsMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(ManeuverCourseRequest), ManeuverCourseRequestListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(DistressCallRequest), DistressCallRequestListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(VesselRequest), VesselRequestListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(VesselSecurityRequest), VesselSecurityRequestListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(RoomPressureMessage), RoomPressureMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(RecycleItemMessage), RecycleItemMessageListener);
+		EventSystem.AddListener(typeof(ShipStatsMessage), ShipStatsMessageListener);
+		EventSystem.AddListener(typeof(ManeuverCourseRequest), ManeuverCourseRequestListener);
+		EventSystem.AddListener(typeof(DistressCallRequest), DistressCallRequestListener);
+		EventSystem.AddListener(typeof(VesselRequest), VesselRequestListener);
+		EventSystem.AddListener(typeof(VesselSecurityRequest), VesselSecurityRequestListener);
+		EventSystem.AddListener(typeof(RoomPressureMessage), RoomPressureMessageListener);
+		EventSystem.AddListener(typeof(RecycleItemMessage), RecycleItemMessageListener);
 	}
 
 	public void ResetRotationAndThrust()
@@ -1433,13 +1434,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	private void DisconectListener()
 	{
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(ShipStatsMessage), ShipStatsMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(ManeuverCourseRequest), ManeuverCourseRequestListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(DistressCallRequest), DistressCallRequestListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(VesselRequest), VesselRequestListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(VesselSecurityRequest), VesselSecurityRequestListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(RoomPressureMessage), RoomPressureMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(RecycleItemMessage), RecycleItemMessageListener);
+		EventSystem.RemoveListener(typeof(ShipStatsMessage), ShipStatsMessageListener);
+		EventSystem.RemoveListener(typeof(ManeuverCourseRequest), ManeuverCourseRequestListener);
+		EventSystem.RemoveListener(typeof(DistressCallRequest), DistressCallRequestListener);
+		EventSystem.RemoveListener(typeof(VesselRequest), VesselRequestListener);
+		EventSystem.RemoveListener(typeof(VesselSecurityRequest), VesselSecurityRequestListener);
+		EventSystem.RemoveListener(typeof(RoomPressureMessage), RoomPressureMessageListener);
+		EventSystem.RemoveListener(typeof(RecycleItemMessage), RecycleItemMessageListener);
 	}
 
 	~Ship()

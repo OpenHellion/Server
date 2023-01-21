@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -227,14 +228,14 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public void ConnectToNetworkController()
 	{
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
+		EventSystem.AddListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
+		EventSystem.AddListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
-		Server.Instance.NetworkController.EventSystem.RemoveListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
+		EventSystem.RemoveListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
+		EventSystem.RemoveListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
 	}
 
 	private void DynamicObectMovementMessageListener(NetworkData data)

@@ -2,8 +2,9 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using ZeroGravity;
 
-namespace ZeroGravity.Network;
+namespace OpenHellion.Networking;
 
 public class StatusPortConnectionListener
 {

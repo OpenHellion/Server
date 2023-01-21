@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -22,7 +23,7 @@ internal class PortableTurret : Item
 	public PortableTurret(DynamicObjectAuxData data)
 	{
 		_stats = new PortableTurretStats();
-		Server.Instance.NetworkController.EventSystem.AddListener(typeof(PortableTurretShootingMessage), PortableTurretShootingMessageListener);
+		EventSystem.AddListener(typeof(PortableTurretShootingMessage), PortableTurretShootingMessageListener);
 		if (data != null)
 		{
 			SetData(data);

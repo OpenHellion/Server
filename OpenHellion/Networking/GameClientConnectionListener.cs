@@ -2,9 +2,12 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using ZeroGravity;
 
-namespace ZeroGravity.Network;
+namespace OpenHellion.Networking;
 
+
+// TODO: Delete
 public class GameClientConnectionListener
 {
 	private volatile bool runThread;

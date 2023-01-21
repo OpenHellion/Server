@@ -4,9 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using OpenHellion.Networking.Message.MainServer;
+using ZeroGravity;
+using ZeroGravity.Network;
 using ZeroGravity.Objects;
 
-namespace ZeroGravity.Network;
+namespace OpenHellion.Networking;
 
 public class NetworkController
 {

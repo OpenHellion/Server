@@ -6,7 +6,7 @@ using ZeroGravity;
 
 namespace OpenHellion.Networking;
 
-public class StatusPortConnectionListener
+public class ConnectionGameStatusListener
 {
 	private volatile bool runThread;
 
@@ -42,7 +42,7 @@ public class StatusPortConnectionListener
 				{
 					break;
 				}
-				StatusPortThread connection = new StatusPortThread(soc);
+				ConnectionGameStatus connection = new ConnectionGameStatus(soc);
 				connection.Start();
 			}
 			catch (Exception)

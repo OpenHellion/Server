@@ -248,7 +248,7 @@ public class Corpse : SpaceObjectTransferable
 		}
 		ListenToSenderID = dosm.Sender;
 		lastSenderTime = DateTime.UtcNow;
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, (Parent != null) ? Parent.Parent : null);
+		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, (Parent != null) ? Parent.Parent : null);
 	}
 
 	internal void CheckInventoryDestroy()

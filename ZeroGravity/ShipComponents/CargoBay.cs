@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -122,7 +123,7 @@ public class CargoBay : ICargo, IPersistantObject
 		{
 			compartment.Resources.Remove(res);
 		}
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(new ShipStatsMessage
+		NetworkController.Instance.SendToClientsSubscribedTo(new ShipStatsMessage
 		{
 			GUID = ParentVessel.GUID,
 			Temperature = ParentVessel.Temperature,

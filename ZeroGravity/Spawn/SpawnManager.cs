@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -405,7 +406,7 @@ public static class SpawnManager
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
+		NetworkController.Instance.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
 		return true;
 	}
 

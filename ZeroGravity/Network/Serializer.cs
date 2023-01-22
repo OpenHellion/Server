@@ -7,19 +7,14 @@ using ProtoBuf;
 
 namespace ZeroGravity.Network;
 
+/// <summary>
+/// 	Class for deserialisation of network messages. Handles safe deserialsation of packets from the server.
+/// </summary>
 public static class Serializer
 {
 	public class ZeroDataException : Exception
 	{
 		public ZeroDataException(string message)
-			: base(message)
-		{
-		}
-	}
-
-	public class CorruptedPackageException : Exception
-	{
-		public CorruptedPackageException(string message)
 			: base(message)
 		{
 		}
@@ -41,25 +36,26 @@ public static class Serializer
 		}
 	}
 
-	public const int SizeOfMessageLength = 4;
-
 	private static DateTime statisticUpdateResetTime = DateTime.UtcNow;
 
 	private static DateTime lastStatisticUpdateTime;
 
-	private static double statisticsLogUpdateTime = 0.0;
+	private static double statisticsLogUpdateTime = 1.0;
 
 	private static Dictionary<Type, StatisticsHelper> sentStatistics = new Dictionary<Type, StatisticsHelper>();
 
 	private static Dictionary<Type, StatisticsHelper> receivedStatistics = new Dictionary<Type, StatisticsHelper>();
 
+	/// <summary>
+	/// 	For deserialisation of data not sent through network.
+	/// </summary>
 	public static NetworkData Deserialize(MemoryStream ms)
 	{
-		NetworkData data = null;
+		NetworkData networkData = null;
 		ms.Position = 0L;
 		try
 		{
-			data = ProtoBuf.Serializer.Deserialize<NetworkDataTransportWrapper>(ms).data;
+			networkData = ProtoBuf.Serializer.Deserialize<NetworkDataTransportWrapper>(ms).data;
 		}
 		catch (Exception ex)
 		{
@@ -69,13 +65,15 @@ public static class Serializer
 		{
 			try
 			{
-				ProcessStatistics(data, ms, receivedStatistics);
+				ProcessStatistics(networkData, ms, receivedStatistics);
+				return networkData;
 			}
 			catch
 			{
+				return networkData;
 			}
 		}
-		return data;
+		return networkData;
 	}
 
 	public static NetworkData ReceiveData(Socket soc)
@@ -84,42 +82,42 @@ public static class Serializer
 		{
 			return null;
 		}
-		return ReceiveData(new NetworkStream(soc));
+		return Unpackage(new NetworkStream(soc));
 	}
 
-	public static NetworkData ReceiveData(Stream str)
+	public static NetworkData Unpackage(Stream str)
 	{
-		byte[] bufferSize = new byte[4];
-		int size = 0;
-		int dataReadSize = 0;
+		byte[] array = new byte[4];
+		int num2 = 0;
+		int num;
 		do
 		{
-			size = str.Read(bufferSize, dataReadSize, bufferSize.Length - dataReadSize);
-			if (size == 0)
+			num = str.Read(array, num2, array.Length - num2);
+			if (num == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
 			}
-			dataReadSize += size;
+			num2 += num;
 		}
-		while (dataReadSize < bufferSize.Length);
-		uint bufferLength = BitConverter.ToUInt32(bufferSize, 0);
-		byte[] buffer = new byte[bufferLength];
-		dataReadSize = 0;
+		while (num2 < array.Length);
+		uint num3 = BitConverter.ToUInt32(array, 0);
+		byte[] array2 = new byte[num3];
+		num2 = 0;
 		do
 		{
-			size = str.Read(buffer, dataReadSize, buffer.Length - dataReadSize);
-			if (size == 0)
+			num = str.Read(array2, num2, array2.Length - num2);
+			if (num == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
 			}
-			dataReadSize += size;
+			num2 += num;
 		}
-		while (dataReadSize < buffer.Length);
-		MemoryStream ms = new MemoryStream(buffer, 0, buffer.Length);
+		while (num2 < array2.Length);
+		MemoryStream ms = new MemoryStream(array2, 0, array2.Length);
 		return Deserialize(ms);
 	}
 
-	public static byte[] Serialize(NetworkData data)
+	public static byte[] Package(NetworkData data)
 	{
 		using MemoryStream outMs = new MemoryStream();
 		using MemoryStream ms = new MemoryStream();
@@ -129,7 +127,7 @@ public static class Serializer
 			{
 				data = data
 			};
-			ProtoBuf.Serializer.Serialize((Stream)ms, ndtw);
+			ProtoBuf.Serializer.Serialize(outMs, ndtw);
 		}
 		catch (Exception ex)
 		{
@@ -140,7 +138,7 @@ public static class Serializer
 		{
 			try
 			{
-				ProcessStatistics(data, ms, sentStatistics);
+				ProcessStatistics(data, outMs, sentStatistics);
 			}
 			catch
 			{
@@ -178,7 +176,6 @@ public static class Serializer
 			kv.Value.BytesSinceLastCheck = 0L;
 			totalBytes += kv.Value.ByteSum;
 		}
-		printVal = printVal + "-----------------------------------------\nTotal: " + ((float)totalBytes / 1000f).ToString("##,0") + " kB (avg: " + ((double)totalBytes / timeFromReset.TotalSeconds / 1000.0).ToString("##,0") + " kB/s)";
 		lastStatisticUpdateTime = DateTime.UtcNow;
 	}
 

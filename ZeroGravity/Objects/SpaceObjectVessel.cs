@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BulletSharp;
 using BulletSharp.Math;
+using OpenHellion.Networking;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -95,7 +96,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 					rotDiff = it.Player.LocalRotation.Inverse() * it.RotFromParent;
 				}
 				it.Player.ModifyLocalPositionAndRotation(posDiff, rotDiff);
-				if (Server.Instance.NetworkController.ClientList.ContainsKey(it.Player.GUID) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
+				if (NetworkController.Instance.ContainsClient(it.Player.GUID) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
 				{
 					it.Player.SetDockUndockCorrection(posDiff, rotDiff);
 				}
@@ -894,7 +895,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		if (HasSecuritySystem)
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(new VesselSecurityResponse
+			NetworkController.Instance.SendToClientsSubscribedTo(new VesselSecurityResponse
 			{
 				VesselGUID = GUID,
 				Data = GetVesselSecurityData(includeVesselName)
@@ -1628,9 +1629,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		Player ret = null;
 		double dist = double.MaxValue;
 		distance = 0.0;
-		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in Server.Instance.NetworkController.ClientList.Values
-				where m.Player != null
-				select m.Player)
+		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in NetworkController.Instance.GetAllPlayers() select m)
 			where m.IsAlive
 			select m)
 		{

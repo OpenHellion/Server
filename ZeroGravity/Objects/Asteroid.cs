@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenHellion.Networking;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -312,7 +313,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		{
 			if (amp.CheckGasBurst())
 			{
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				NetworkController.Instance.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					GasBurst = true
@@ -321,7 +322,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 			}
 			if (amp.StatusChanged)
 			{
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				NetworkController.Instance.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					Quantity = amp.Quantity

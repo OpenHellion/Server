@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -341,7 +342,7 @@ public class SolarSystem
 		}
 		pl.LastMovementMessageSolarSystemTime = CurrentTime;
 		pl.UpdateArtificialBodyMovement.Clear();
-		Server.Instance.NetworkController.SendToGameClient(pl.GUID, mm);
+		NetworkController.Instance.SendToGameClient(pl.GUID, mm);
 	}
 
 	public void InitializeData()

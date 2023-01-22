@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -201,7 +202,7 @@ public class DebrisField
 				ShipOne = v.GUID,
 				ShipTwo = -1L
 			};
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(scm, -1L, v);
+			NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, v);
 			v.ChangeHealthBy(0f - MathHelper.RandomRange(Data.Damage.Min, Data.Damage.Max), null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.SmallDebrisHit, time);
 		}
 	}

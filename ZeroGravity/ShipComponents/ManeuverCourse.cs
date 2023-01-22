@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BulletSharp;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -134,7 +135,7 @@ public class ManeuverCourse
 			}
 			if (!isValid)
 			{
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+				NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
 				{
 					IsValid = isValid,
 					CourseGUID = GUID,
@@ -157,7 +158,7 @@ public class ManeuverCourse
 			{
 				parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			Server.Instance.NetworkController.SendToAllClients(new ManeuverCourseResponse
+			NetworkController.Instance.SendToAllClients(new ManeuverCourseResponse
 			{
 				IsValid = false,
 				IsFinished = true,
@@ -289,7 +290,7 @@ public class ManeuverCourse
 			{
 				parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
@@ -478,7 +479,7 @@ public class ManeuverCourse
 	{
 		if (isValid)
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
@@ -497,7 +498,7 @@ public class ManeuverCourse
 		if (isValid && !isStartingSoonSent)
 		{
 			isStartingSoonSent = true;
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,

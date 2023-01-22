@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
+using OpenHellion.Networking;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 
@@ -105,7 +106,7 @@ public class PlayerStats
 
 	public void SendAcumulatedMessage(double time)
 	{
-		Server.Instance.NetworkController.SendToGameClient(pl.GUID, psm);
+		NetworkController.Instance.SendToGameClient(pl.GUID, psm);
 	}
 
 	public void TakeDamage(HurtType hurtType, float amount)
@@ -179,7 +180,7 @@ public class PlayerStats
 		{
 			psm.GUID = pl.FakeGuid;
 			psm.Health = (int)HealthPoints;
-			Server.Instance.NetworkController.SendToGameClient(pl.GUID, psm);
+			NetworkController.Instance.SendToGameClient(pl.GUID, psm);
 			psm = new PlayerStatsMessage();
 			acummulatedDamage = 0f;
 		}
@@ -196,7 +197,7 @@ public class PlayerStats
 				GUID = pl.FakeGuid,
 				Health = (int)HealthPoints
 			};
-			Server.Instance.NetworkController.SendToGameClient(pl.GUID, psm);
+			NetworkController.Instance.SendToGameClient(pl.GUID, psm);
 		}
 	}
 

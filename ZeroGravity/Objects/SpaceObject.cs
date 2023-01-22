@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using OpenHellion.Networking;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.Spawn;
@@ -79,11 +80,11 @@ public abstract class SpaceObject
 		};
 		if (this is SpaceObjectVessel)
 		{
-			Server.Instance.NetworkController.SendToAllClients(dom, -1L);
+			NetworkController.Instance.SendToAllClients(dom, -1L);
 		}
 		else
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedToParents(dom, this, -1L);
+			NetworkController.Instance.SendToClientsSubscribedToParents(dom, this, -1L);
 		}
 		if (this is Player)
 		{

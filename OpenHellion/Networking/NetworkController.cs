@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using OpenHellion.Networking.Message.MainServer;
 using ZeroGravity;
 using ZeroGravity.Network;
@@ -12,110 +10,76 @@ namespace OpenHellion.Networking;
 
 public class NetworkController
 {
-	public class Client
+	private ConnectionGame _gameConnection;
+
+	private Dictionary<long, int> _clients = new();
+
+	private ConnectionGameStatusListener statusPortConnectionListener;
+
+	public static string ServerID = null;
+
+	private static NetworkController s_instance;
+	public static NetworkController Instance
 	{
-		public long ClientGUID;
-
-		public Socket TcpClientSocket;
-
-		public Player Player = null;
-
-		public GameClientThread Thread = null;
-
-		public Client(Socket soc, GameClientThread th)
+		get
 		{
-			TcpClientSocket = soc;
-			Thread = th;
+			if (s_instance == null)
+			{
+				Dbg.Info("Creating new network controller instance.");
+				s_instance = new NetworkController();
+				return s_instance;
+			}
+
+			return s_instance;
 		}
 	}
 
-	private ConcurrentDictionary<long, Client> clientList = new ConcurrentDictionary<long, Client>();
-
-	public Dictionary<long, Client> ClientList = new Dictionary<long, Client>();
-
-	private GameClientConnectionListener gameClientConnectionListener;
-
-	private StatusPortConnectionListener statusPortConnectionListener;
-
-	public string ServerID = null;
-
-	public EventSystem EventSystem;
-
 	public NetworkController()
 	{
-		EventSystem = new EventSystem();
+		_gameConnection = new ConnectionGame();
 		EventSystem.AddListener(typeof(LogInRequest), LogInRequestListener);
 		EventSystem.AddListener(typeof(LogOutRequest), LogOutRequestListener);
 	}
 
 	public short CurrentOnlinePlayers()
 	{
-		return (short)ClientList.Count;
-	}
-
-	public void SendDestroyPlayerMessage(long guid, long fakeGUID)
-	{
-		foreach (KeyValuePair<long, Client> client in ClientList)
-		{
-			if (client.Value.Player != null && client.Value.Player.GUID != guid)
-			{
-				DestroyObjectMessage dom = new DestroyObjectMessage();
-				dom.ObjectType = SpaceObjectType.Player;
-				dom.ID = fakeGUID;
-				SendToGameClient(client.Value.Player.GUID, dom);
-			}
-		}
+		return (short)_clients.Count;
 	}
 
 	public void DisconnectClient(long guid)
 	{
-		if (ClientList.ContainsKey(guid))
+		if (_clients.ContainsKey(guid))
 		{
-			DisconnectClient(ClientList[guid]);
-		}
-	}
+			RemoveClient(guid);
 
-	public void DisconnectClient(Client cl)
-	{
-		if (cl.Player != null)
-		{
-			cl.Player.LogoutDisconnectReset();
-			cl.Player.DiconnectFromNetworkContoller();
-			cl.Thread.Stop();
-			if (ClientList.ContainsKey(cl.Player.GUID))
-			{
-				RemoveClient(cl.Player.GUID);
-			}
+			_gameConnection.Disconnect(_clients[guid]);
 		}
 		else
 		{
-			cl.Thread.Stop();
-			if (ClientList.ContainsKey(cl.ClientGUID))
-			{
-				RemoveClient(cl.ClientGUID);
-			}
+			Dbg.Error("Tried to disconnect client that isn't registered as connected", guid);
 		}
 	}
 
+	/// <summary>
+	/// 	Disconnect all currently connected clients.<br />
+	/// 	Stops their connections, logging them out, and removes them from our list of active clients.
+	/// </summary>
 	public void DisconnectAllClients()
 	{
-		foreach (long clientID in ClientList.Keys)
-		{
-			DisconnectClient(clientID);
-		}
+		_gameConnection.DisconnectAll();
+		_clients.Clear();
 	}
 
 	public void SendCharacterSpawnToOtherPlayers(Player spawnedPlayer)
 	{
-		if (!ClientList.ContainsKey(spawnedPlayer.GUID))
+		if (!_clients.ContainsKey(spawnedPlayer.GUID))
 		{
 			return;
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(spawnedPlayer.GetSpawnResponseData(null));
-		foreach (KeyValuePair<long, Client> client in ClientList)
+		foreach (Player player in GetAllPlayers())
 		{
-			Player player = client.Value.Player;
 			if (player != null && player != spawnedPlayer && player.IsAlive && player.EnvironmentReady && player.IsSubscribedTo(spawnedPlayer, checkParent: true))
 			{
 				SendToGameClient(player.GUID, res);
@@ -142,7 +106,7 @@ public class NetworkController
 	{
 		LogInRequest req = data as LogInRequest;
 
-		if (Server.Instance.NetworkController.CurrentOnlinePlayers() >= Server.Instance.MaxPlayers)
+		if (Instance.CurrentOnlinePlayers() >= Server.Instance.MaxPlayers)
 		{
 			Dbg.Warning("Maximum number of players exceeded.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
@@ -152,8 +116,8 @@ public class NetworkController
 			return;
 		}
 
-		// TODO: Ignoring this for now.
 #if false
+		// TODO: Ignoring this for now.
 		if (req.ClientHash != Server.CombinedHash)
 		{
 			Dbg.Warning("Server/client hash mismatch.", req.ServerID, ServerID);
@@ -181,6 +145,7 @@ public class NetworkController
 			req.Password = "";
 		}
 
+		// Password check.
 		if (req.Password != Server.Instance.ServerPassword)
 		{
 			Dbg.Warning("LogInRequest server password doesn't match this server's password.", req.ServerID, ServerID);
@@ -191,128 +156,192 @@ public class NetworkController
 			return;
 		}
 
+		// Check if player id is valid.
+		if (!Guid.TryParse(req.PlayerId, out _))
+		{
+			Dbg.Warning("Player id isn't valid.", req.ServerID, ServerID);
+			SendToGameClient(req.Sender, new LogInResponse
+			{
+				Response = ResponseResult.Error
+			});
+			return;
+		}
+
+		// TODO: Guid could probably be replaced with player id.
 		long guid = GUIDFactory.PlayerIdToGuid(req.PlayerId);
-		if (ClientList.ContainsKey(guid))
+		if (PatchClient(guid, req.Sender))
 		{
-			try
-			{
-				if (ClientList.ContainsKey(guid))
-				{
-					Server.Instance.NetworkController.DisconnectClient(ClientList[guid]);
-				}
-				if (ClientList.ContainsKey(req.Sender))
-				{
-					Server.Instance.NetworkController.DisconnectClient(ClientList[req.Sender]);
-				}
-				return;
-			}
-			catch (Exception)
-			{
-				if (ClientList.ContainsKey(guid))
-				{
-					DisconnectClient(guid);
-				}
-				if (ClientList.ContainsKey(req.Sender))
-				{
-					ClientList[req.Sender].ClientGUID = guid;
-				}
-				AddClient(guid, ClientList[req.Sender]);
-				RemoveClient(req.Sender);
-				Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
-				return;
-			}
+			Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
 		}
-
-		if (ClientList.ContainsKey(req.Sender))
-		{
-			ClientList[req.Sender].ClientGUID = guid;
-		}
-
-		AddClient(guid, ClientList[req.Sender]);
-		RemoveClient(req.Sender);
-		Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
 	}
 
 	public void Start()
 	{
-		gameClientConnectionListener = new GameClientConnectionListener();
-		gameClientConnectionListener.Start(Server.GamePort);
-		statusPortConnectionListener = new StatusPortConnectionListener();
+		_gameConnection.Start(Server.GamePort);
+		statusPortConnectionListener = new ConnectionGameStatusListener();
 		statusPortConnectionListener.Start(Server.StatusPort);
-	}
-
-	public Client AddClient(Socket c, GameClientThread thr)
-	{
-		Client cl = new Client(c, thr);
-		long tempID = -1L;
-		try
-		{
-			while (ClientList.ContainsKey(tempID))
-			{
-				tempID--;
-			}
-		}
-		finally
-		{
-			cl.ClientGUID = tempID;
-			AddClient(tempID, cl);
-		}
-		return cl;
-	}
-
-	private void AddClient(long id, Client client)
-	{
-		clientList[id] = client;
-		ClientList = clientList.ToDictionary((KeyValuePair<long, Client> k) => k.Key, (KeyValuePair<long, Client> v) => v.Value);
-	}
-
-	private void RemoveClient(long sender)
-	{
-		clientList.TryRemove(sender, out var _);
-		ClientList = clientList.ToDictionary((KeyValuePair<long, Client> k) => k.Key, (KeyValuePair<long, Client> v) => v.Value);
 	}
 
 	public void SendToGameClient(long clientID, NetworkData data)
 	{
-		if (ClientList.ContainsKey(clientID))
+		if (_clients.ContainsKey(clientID))
 		{
-			data.Sender = 0L;
-			ClientList[clientID].Thread.Send(data);
+			_gameConnection.Send(_clients[clientID], data);
+		}
+		else
+		{
+			Dbg.Error("Tried to send data to nonexistent client", clientID);
 		}
 	}
 
 	public void LogOutRequestListener(NetworkData data)
 	{
-		if (ClientList.ContainsKey(data.Sender))
+		if (_clients.ContainsKey(data.Sender))
 		{
 			LogOutRequest lor = data as LogOutRequest;
 			LogOutPlayer(lor.Sender);
-			ClientList[data.Sender].Thread.ClearEverytingAndSend(new LogOutResponse
+			_gameConnection.ClearEverythingAndSend(_clients[lor.Sender], new LogOutResponse
 			{
 				Sender = 0L,
 				Response = ResponseResult.Success
 			});
 		}
-	}
-
-	public void LogOutPlayer(long GUID)
-	{
-		if (ClientList.ContainsKey(GUID) && ClientList[GUID].Player != null)
+		else
 		{
-			ClientList[GUID].Player.LogoutDisconnectReset();
+			Dbg.Error("Error when logging out player. No client is connected with id", data.Sender);
 		}
 	}
 
-	public void ConnectPlayer(Player player, bool doLogin)
+	public void LogOutPlayer(long guid)
+	{
+		if (_clients.ContainsKey(guid))
+		{
+			_gameConnection.GetPlayer(_clients[guid]).LogoutDisconnectReset();
+		}
+		else
+		{
+			Dbg.Error("Trying to log out player failed", guid);
+		}
+	}
+
+	/// <summary>
+	/// 	Patch a client by properly adding a guid.<br />
+	/// 	A partial client is created when connected, but it doesn't have the proper guid.
+	/// </summary>
+	// TODO: This is stupid
+	internal bool PatchClient(long guid, long sender)
+	{
+		// If client already exists on server, disconnect it.
+		if (_clients.ContainsKey(guid))
+		{
+			try
+			{
+				DisconnectClient(guid);
+				DisconnectClient(sender);
+				return false;
+			}
+			catch (Exception)
+			{
+				int? sc = null;
+				if (_clients.ContainsKey(guid))
+				{
+					DisconnectClient(guid);
+					sc = _clients[guid];
+				}
+
+				if (_clients.ContainsKey(sender))
+				{
+					sc = _clients[sender];
+				}
+
+				if (sc == null)
+				{
+					return false;
+				}
+
+				_gameConnection.PatchClient(sc.Value, guid);
+
+				_clients.Add(guid, sc.Value);
+				_clients.Remove(sender);
+			}
+		}
+
+		// Convert sender into a proper client.
+		if (_clients.ContainsKey(sender))
+		{
+			int sc = _clients[sender];
+
+			_gameConnection.PatchClient(sc, guid);
+
+			_clients.Add(guid, sc);
+			_clients.Remove(sender);
+		}
+
+		return true;
+	}
+
+	// Create a bare client without guid and a player.
+	// Has to be here because _client shouldn't be exposed.
+	internal void AddBareClient(int connectionId)
+	{
+		long tempID = -1L;
+		while (_clients.ContainsKey(tempID))
+		{
+			tempID--;
+		}
+
+		_clients.Add(tempID, connectionId);
+		_gameConnection.AddBareClient(connectionId, tempID);
+	}
+
+	/// <summary>
+	/// 	Remove all references to a client.<br />
+	/// 	This also disconnects the client's player, but does not disconnect the client.
+	/// </summary>
+	public void RemoveClient(long guid)
+	{
+		if (_clients.ContainsKey(guid))
+		{
+			_gameConnection.RemoveClient(_clients[guid]);
+			_clients.Remove(guid);
+		}
+		else
+		{
+			Dbg.Log("Tried to remove non-existent client with guid", guid);
+		}
+	}
+
+	/// <summary>
+	/// 	Get a player with a specified guid.
+	/// </summary>
+	public Player GetPlayer(long guid)
+	{
+		if (_clients.ContainsKey(guid))
+		{
+			return _gameConnection.GetPlayer(_clients[guid]);
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// 	Get a list of all the players on the server.
+	/// </summary>
+	public Player[] GetAllPlayers()
+	{
+		return _gameConnection.GetAllPlayers();
+	}
+
+	public void ConnectPlayer(Player player)
 	{
 		if (!player.PlayerReady || !player.EnvironmentReady)
 		{
 			player.Initialize = true;
 		}
-		if (ClientList.ContainsKey(player.GUID))
+		if (_clients.ContainsKey(player.GUID))
 		{
-			ClientList[player.GUID].Player = player;
-			ClientList[player.GUID].Player.ConnectToNetworkController();
+			player.ConnectToNetworkController();
+			_gameConnection.SetPlayer(_clients[player.GUID], player);
 			LogInResponse lir = new LogInResponse();
 			lir.GUID = player.FakeGuid;
 			lir.Data = new CharacterData
@@ -340,50 +369,26 @@ public class NetworkController
 		}
 	}
 
+	/// <summary>
+	/// 	Send a message to all clients.<br />
+	/// 	You can choose to skip one player.
+	/// </summary>
 	public void SendToAllClients(NetworkData data, long skipPlayerGUID = -1L)
 	{
-		foreach (KeyValuePair<long, Client> client in ClientList)
-		{
-			Player player = client.Value.Player;
-			if (player != null && player.IsAlive && player.EnvironmentReady && player.GUID != skipPlayerGUID)
-			{
-				SendToGameClient(client.Value.Player.GUID, data);
-			}
-		}
+		_gameConnection.SendToAll(data, skipPlayerGUID);
 	}
 
-	public void SendToClientsSubscribedToSenderFirst(NetworkData data, long senderGUID, params SpaceObject[] spaceObjects)
-	{
-		if (spaceObjects.Length == 0)
-		{
-			return;
-		}
-		Player player = ClientList.Select((KeyValuePair<long, Client> m) => m.Value.Player).FirstOrDefault((Player m) => m.GUID == senderGUID);
-		if (player != null)
-		{
-			if (player.IsAlive && player.EnvironmentReady)
-			{
-				if (spaceObjects.Count((SpaceObject m) => m != null && player.IsSubscribedTo(m, checkParent: false)) > 0)
-				{
-					SendToGameClient(player.GUID, data);
-				}
-			}
-			else if (!player.EnvironmentReady && data is ShipStatsMessage && player.IsSubscribedTo((data as ShipStatsMessage).GUID))
-			{
-				player.MessagesReceivedWhileLoading.Enqueue(data as ShipStatsMessage);
-			}
-		}
-		SendToClientsSubscribedTo(data, senderGUID, spaceObjects);
-	}
-
+	/// <summary>
+	/// 	Send a message to all clients subscribed to a space object.<br />
+	/// 	You can choose to skip one player.
+	/// </summary>
 	public void SendToClientsSubscribedTo(NetworkData data, long skipPlalerGUID = -1L, params SpaceObject[] spaceObjects)
 	{
 		if (spaceObjects.Length == 0)
 		{
 			return;
 		}
-		foreach (Player player in from m in ClientList
-			select m.Value.Player into m
+		foreach (Player player in from m in GetAllPlayers()
 			where m != null && m.GUID != skipPlalerGUID
 			select m)
 		{
@@ -418,28 +423,14 @@ public class NetworkController
 	private void OnApplicationQuit()
 	{
 		statusPortConnectionListener.Stop();
-		gameClientConnectionListener.Stop();
-		foreach (KeyValuePair<long, Client> client in ClientList)
-		{
-			client.Value.Thread.Stop();
-			if (client.Value.Player != null)
-			{
-				client.Value.Player.LogoutDisconnectReset();
-				client.Value.Player.DiconnectFromNetworkContoller();
-			}
-		}
-		ClientList.Clear();
+		_gameConnection.Stop();
 	}
 
-	public long GetClientGuid(Client c)
+	/// <summary>
+	/// 	Simple check to see if a client is connected.
+	/// </summary>
+	public bool ContainsClient(long guid)
 	{
-		foreach (KeyValuePair<long, Client> kv in ClientList)
-		{
-			if (kv.Value == c)
-			{
-				return kv.Key;
-			}
-		}
-		throw new Exception("Client not found");
+		return _clients.ContainsKey(guid);
 	}
 }

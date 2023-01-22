@@ -28,5 +28,8 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="protobuf-net" Version="3.1.26" />
     <PackageReference Include="BulletSharp.x64" Version="0.12.0" />
+    <Reference Include="Telepathy">
+     <HintPath>./Telepathy/Telepathy.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

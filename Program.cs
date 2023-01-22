@@ -204,6 +204,7 @@ public static class Program
 		}
 	}
 
+	// Sends a request to the status listener that we should shutdown.
 	private static void ShutdownServerInstance()
 	{
 		int StatusPort = Server.Properties.GetProperty<int>("status_port");
@@ -241,7 +242,7 @@ public static class Program
 			ns.ReadTimeout = 1000;
 			ns.WriteTimeout = 1000;
 			ServerShutDownMessage msg = new ServerShutDownMessage();
-			byte[] buffer = Serializer.Serialize(msg);
+			byte[] buffer = Serializer.Package(msg);
 			ns.Write(buffer, 0, buffer.Length);
 			ns.Flush();
 			ns.Close();

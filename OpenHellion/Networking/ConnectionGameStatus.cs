@@ -7,13 +7,13 @@ using ZeroGravity.Objects;
 
 namespace OpenHellion.Networking;
 
-public class StatusPortThread
+public class ConnectionGameStatus
 {
 	private Socket socket;
 
 	private Thread listeningThread;
 
-	public StatusPortThread(Socket soc)
+	public ConnectionGameStatus(Socket soc)
 	{
 		socket = soc;
 	}
@@ -62,7 +62,7 @@ public class StatusPortThread
 				ServerStatusResponse ssr = Server.Instance.GetServerStatusResponse(req);
 				try
 				{
-					socket.Send(Serializer.Serialize(ssr));
+					socket.Send(Serializer.Package(ssr));
 					return;
 				}
 				catch (ArgumentNullException)
@@ -74,10 +74,10 @@ public class StatusPortThread
 			if (data is DeleteCharacterRequest)
 			{
 				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
-				if (dcr.ServerId == Server.Instance.NetworkController.ServerID)
+				if (dcr.ServerId == NetworkController.ServerID)
 				{
 					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.SteamId);
-					if (!Server.Instance.NetworkController.ClientList.ContainsKey(pl.GUID))
+					if (!NetworkController.Instance.ContainsClient(pl.GUID))
 					{
 						pl.Destroy();
 					}
@@ -87,7 +87,7 @@ public class StatusPortThread
 			{
 				try
 				{
-					socket.Send(Serializer.Serialize(data));
+					socket.Send(Serializer.Package(data));
 					return;
 				}
 				catch (ArgumentNullException)

@@ -138,7 +138,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		dosm.Info.Stats = StatsNew;
 		if (Parent != null)
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedToParents(dosm, Parent, -1L);
+			NetworkController.Instance.SendToClientsSubscribedToParents(dosm, Parent, -1L);
 		}
 		StatsChanged = false;
 		LastStatsSendTime = Server.SolarSystemTime;
@@ -505,7 +505,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			parents.AddRange(oldParent.GetParents(includeMe: true));
 		}
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(dosm, -1L, parents.ToArray());
+		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, parents.ToArray());
 		if (DynamicObjects.Count > 0)
 		{
 			DynamicObjectsInfoMessage doim = new DynamicObjectsInfoMessage();
@@ -524,7 +524,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			}
 			if (doim.Infos.Count > 0)
 			{
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
+				NetworkController.Instance.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
 			}
 		}
 		StatsChanged = false;
@@ -777,7 +777,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
+		NetworkController.Instance.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
 		dobj.SendStatsToClient();
 		return true;
 	}

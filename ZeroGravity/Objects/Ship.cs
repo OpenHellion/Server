@@ -401,7 +401,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				RotationTrust = (CurrRcsRotationThrust.HasValue ? CurrRcsRotationThrust.Value.ToFloatArray() : null)
 			};
 			rcsThrustChanged = false;
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
+			NetworkController.Instance.SendToClientsSubscribedTo(ssm, -1L, this);
 		}
 	}
 
@@ -770,7 +770,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (sendShipStatsMsg)
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, this);
+			NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, this);
 		}
 	}
 
@@ -808,7 +808,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				ShipOne = GUID,
 				ShipTwo = otherShipGUID
 			};
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(scm, -1L, this, (otherShipGUID != -1) ? Server.Instance.GetVessel(otherShipGUID) : null);
+			NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, this, (otherShipGUID != -1) ? Server.Instance.GetVessel(otherShipGUID) : null);
 		}
 	}
 
@@ -1413,7 +1413,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			prevDestructionSolarSystemTime = SelfDestructTimer.DestructionSolarSystemTime;
 			ssm.SelfDestructTime = SelfDestructTimer?.Time;
 		}
-		Server.Instance.NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
+		NetworkController.Instance.SendToClientsSubscribedTo(ssm, -1L, this);
 		foreach (DynamicObject dobj in DynamicObjects.Values.Where((DynamicObject x) => x.Item != null && x.Item.AttachPointType != AttachPointType.None))
 		{
 			if (dobj.Item.AttachPointType == AttachPointType.BatteryRechargePoint && dobj.Item is Battery)
@@ -1777,14 +1777,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			vrr.Time = (float)(RespawnTimeForShip - timePassedSinceRequest);
 			foreach (Player p3 in base.MainVessel.VesselCrew)
 			{
-				Server.Instance.NetworkController.SendToGameClient(p3.GUID, vrr);
+				NetworkController.Instance.SendToGameClient(p3.GUID, vrr);
 			}
 			{
 				foreach (Ship shp3 in base.MainVessel.AllDockedVessels)
 				{
 					foreach (Player pl3 in shp3.VesselCrew)
 					{
-						Server.Instance.NetworkController.SendToGameClient(pl3.GUID, vrr);
+						NetworkController.Instance.SendToGameClient(pl3.GUID, vrr);
 					}
 				}
 				return;
@@ -1801,14 +1801,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
 			foreach (Player p2 in base.MainVessel.VesselCrew)
 			{
-				Server.Instance.NetworkController.SendToGameClient(p2.GUID, vrr);
+				NetworkController.Instance.SendToGameClient(p2.GUID, vrr);
 			}
 			{
 				foreach (Ship shp2 in base.MainVessel.AllDockedVessels)
 				{
 					foreach (Player pl2 in shp2.VesselCrew)
 					{
-						Server.Instance.NetworkController.SendToGameClient(pl2.GUID, vrr);
+						NetworkController.Instance.SendToGameClient(pl2.GUID, vrr);
 					}
 				}
 				return;
@@ -1817,13 +1817,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		vrr.Message = RescueShipMessages.AnotherShipInRange;
 		foreach (Player p in base.MainVessel.VesselCrew)
 		{
-			Server.Instance.NetworkController.SendToGameClient(p.GUID, vrr);
+			NetworkController.Instance.SendToGameClient(p.GUID, vrr);
 		}
 		foreach (Ship shp in base.MainVessel.AllDockedVessels)
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				Server.Instance.NetworkController.SendToGameClient(pl.GUID, vrr);
+				NetworkController.Instance.SendToGameClient(pl.GUID, vrr);
 			}
 		}
 	}
@@ -1857,13 +1857,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		vrr.Message = RescueShipMessages.ShipArrived;
 		foreach (Player p in base.MainVessel.VesselCrew)
 		{
-			Server.Instance.NetworkController.SendToGameClient(p.GUID, vrr);
+			NetworkController.Instance.SendToGameClient(p.GUID, vrr);
 		}
 		foreach (Ship shp in base.MainVessel.AllDockedVessels)
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				Server.Instance.NetworkController.SendToGameClient(pl.GUID, vrr);
+				NetworkController.Instance.SendToGameClient(pl.GUID, vrr);
 			}
 		}
 	}
@@ -2028,7 +2028,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				if (craftingResources != null && craftingResources.Count > 0)
 				{
 					pl.Blueprints.Add(cit);
-					Server.Instance.NetworkController.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
+					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
 					{
 						Blueprints = pl.Blueprints
 					});
@@ -2105,7 +2105,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (retMsg != null)
 		{
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, this);
+			NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, this);
 		}
 	}
 

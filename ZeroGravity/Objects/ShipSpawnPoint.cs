@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenHellion.Networking;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -131,7 +132,7 @@ public class ShipSpawnPoint
 						PlayerSteamID = sender.PlayerId
 					});
 					retMsg.SelfDestructTime = sender.AuthorizedSpawnPoint.Ship.SelfDestructTimer?.Time;
-					Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
+					NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
 				}
 				State = SpawnPointState.Authorized;
 				Player = sender;
@@ -176,7 +177,7 @@ public class ShipSpawnPoint
 					InvitedPlayerSteamID = InvitedPlayerSteamID
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}
@@ -206,7 +207,7 @@ public class ShipSpawnPoint
 					PlayerSteamID = Player.PlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				Server.Instance.NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}

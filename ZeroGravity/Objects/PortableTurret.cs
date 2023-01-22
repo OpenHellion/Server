@@ -88,7 +88,7 @@ internal class PortableTurret : Item
 		if (ptsm.TurretGUID == base.GUID && !isStunned)
 		{
 			targetPlayer = Server.Instance.GetPlayer(ptsm.Sender);
-			Server.Instance.NetworkController.SendToClientsSubscribedTo(ptsm, -1L, targetPlayer.Parent);
+			NetworkController.Instance.SendToClientsSubscribedTo(ptsm, -1L, targetPlayer.Parent);
 			if (ptsm.IsShooting)
 			{
 				Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, DamagePlayer);

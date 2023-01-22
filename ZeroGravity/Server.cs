@@ -308,8 +308,6 @@ public class Server
 
 	private List<UpdateTimer> timers = new List<UpdateTimer>();
 
-	public NetworkController NetworkController;
-
 	public SolarSystem SolarSystem = null;
 
 	private static Server serverInstance = null;
@@ -623,7 +621,6 @@ public class Server
 		IsRunning = true;
 		serverInstance = this;
 		PhysicsController = new BulletPhysicsController();
-		NetworkController = new NetworkController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
 		Console.Title = ServerName + " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
@@ -849,13 +846,13 @@ public class Server
 		Player player = GetPlayer(guid);
 		if (player != null)
 		{
-			NetworkController.ConnectPlayer(player, doLogin: true);
+			NetworkController.Instance.ConnectPlayer(player);
 		}
 		else
 		{
 			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, nativeId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
-			NetworkController.ConnectPlayer(player, doLogin: false);
+			NetworkController.Instance.ConnectPlayer(player);
 		}
 		if (serverAdmins.Contains(player.PlayerId) || serverAdmins.Contains("*"))
 		{
@@ -1132,7 +1129,7 @@ public class Server
 
 	private void LatencyTestListener(NetworkData data)
 	{
-		NetworkController.SendToGameClient(data.Sender, data);
+		NetworkController.Instance.SendToGameClient(data.Sender, data);
 	}
 
 	private void Start()
@@ -1411,13 +1408,13 @@ public class Server
 				{
 					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
 					{
-						NetworkController.SendToGameClient(pl.GUID, tcm);
+						NetworkController.Instance.SendToGameClient(pl.GUID, tcm);
 					}
 				}
 				return;
 			}
 		}
-		NetworkController.SendToAllClients(tcm, tcm.Sender);
+		NetworkController.Instance.SendToAllClients(tcm, tcm.Sender);
 	}
 
 	private void ProcessConsoleCommand(string cmd, Player player)
@@ -1500,7 +1497,7 @@ public class Server
 				{
 					Corpse corpse = new Corpse(player);
 					corpse.LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
-					NetworkController.SendToClientsSubscribedTo(new SpawnObjectsResponse
+					NetworkController.Instance.SendToClientsSubscribedTo(new SpawnObjectsResponse
 					{
 						Data = new List<SpawnObjectResponseData>
 						{
@@ -1762,7 +1759,7 @@ public class Server
 				{
 					msg = msg + ((msg == "") ? "" : "\r\n") + kv.Key + ": " + kv.Value;
 				}
-				NetworkController.SendToGameClient(player.GUID, new ConsoleMessage
+				NetworkController.Instance.SendToGameClient(player.GUID, new ConsoleMessage
 				{
 					Text = msg
 				});
@@ -1795,7 +1792,7 @@ public class Server
 				{
 					player.Stats.GodMode = parts[1] != "0";
 				}
-				NetworkController.SendToGameClient(player.GUID, new ConsoleMessage
+				NetworkController.Instance.SendToGameClient(player.GUID, new ConsoleMessage
 				{
 					Text = "God mode: " + (player.Stats.GodMode ? "ON" : "OFF")
 				});
@@ -1911,7 +1908,7 @@ public class Server
 				foreach (Player pl in _players.Values)
 				{
 					pl.Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
-					NetworkController.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
+					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
 					{
 						Blueprints = pl.Blueprints
 					});
@@ -1953,7 +1950,7 @@ public class Server
 					}
 					msg2 = "Near " + (parent as Pivot).Orbit.Parent.CelestialBody.ToString();
 				}
-				NetworkController.SendToGameClient(player.GUID, new ConsoleMessage
+				NetworkController.Instance.SendToGameClient(player.GUID, new ConsoleMessage
 				{
 					Text = msg2
 				});
@@ -2048,11 +2045,7 @@ public class Server
 	{
 		PlayerSpawnRequest p = data as PlayerSpawnRequest;
 		bool spawnSuccsessful = false;
-		Player pl = null;
-		if (NetworkController.ClientList.ContainsKey(p.Sender))
-		{
-			pl = NetworkController.ClientList[p.Sender].Player;
-		}
+		Player pl = NetworkController.Instance.GetPlayer(data.Sender);
 		if (pl == null)
 		{
 			Dbg.Error("Player spawn request error, player is null", p.Sender);
@@ -2079,12 +2072,14 @@ public class Server
 			spawnResponse.ParentID = parentObj.GUID;
 			spawnResponse.ParentType = parentObj.ObjectType;
 			spawnResponse.MainVesselID = parentObj.GUID;
+
 			SpaceObjectVessel mainVessel = parentObj as SpaceObjectVessel;
 			if (mainVessel != null && mainVessel.IsDocked)
 			{
 				mainVessel = mainVessel.DockedToMainVessel;
 				spawnResponse.MainVesselID = mainVessel.GUID;
 			}
+
 			ArtificialBody mainAb = ((mainVessel != null) ? mainVessel : parentObj);
 			spawnResponse.ParentTransform = new ObjectTransform
 			{
@@ -2093,6 +2088,7 @@ public class Server
 				Forward = mainAb.Forward.ToFloatArray(),
 				Up = mainAb.Up.ToFloatArray()
 			};
+
 			if (mainVessel != null && mainVessel is Ship)
 			{
 				Ship mainShip = mainVessel as Ship;
@@ -2105,6 +2101,7 @@ public class Server
 				spawnResponse.VesselData = mainVessel.VesselData;
 				spawnResponse.MiningPoints = (mainVessel as Asteroid).MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList();
 			}
+
 			if (mainAb.Orbit.IsOrbitValid)
 			{
 				spawnResponse.ParentTransform.Orbit = new OrbitData
@@ -2122,6 +2119,7 @@ public class Server
 					Velocity = mainAb.Orbit.Velocity.ToArray()
 				};
 			}
+
 			if (pl.CurrentSpawnPoint != null && ((pl.CurrentSpawnPoint.IsPlayerInSpawnPoint && pl.CurrentSpawnPoint.Ship == pl.Parent) || (pl.CurrentSpawnPoint.Type == SpawnPointType.SimpleSpawn && pl.CurrentSpawnPoint.Executer == null && !pl.IsAlive)))
 			{
 				spawnResponse.SpawnPointID = pl.CurrentSpawnPoint.SpawnPointID;
@@ -2132,12 +2130,14 @@ public class Server
 				spawnResponse.CharacterTransform.LocalPosition = pl.LocalPosition.ToFloatArray();
 				spawnResponse.CharacterTransform.LocalRotation = pl.LocalRotation.ToFloatArray();
 			}
+
 			List<DynamicObjectDetails> playerObjects = new List<DynamicObjectDetails>();
 			foreach (DynamicObject dobj in pl.DynamicObjects.Values)
 			{
 				playerObjects.Add(dobj.GetDetails());
 			}
 			spawnResponse.DynamicObjects = playerObjects;
+
 			spawnResponse.Health = pl.Health;
 			spawnResponse.IsAdmin = pl.IsAdmin;
 			if (pl.AuthorizedSpawnPoint != null)
@@ -2172,7 +2172,7 @@ public class Server
 			spawnResponse.Blueprints = pl.Blueprints;
 			spawnResponse.NavMapDetails = pl.NavMapDetails;
 		}
-		NetworkController.SendToGameClient(p.Sender, spawnResponse);
+		NetworkController.Instance.SendToGameClient(p.Sender, spawnResponse);
 		SolarSystem.SendMovementMessageToPlayer(pl);
 	}
 
@@ -2197,7 +2197,7 @@ public class Server
 				res.Data.Add(obj.GetSpawnResponseData(pl));
 			}
 		}
-		Instance.NetworkController.SendToGameClient(req.Sender, res);
+		NetworkController.Instance.SendToGameClient(req.Sender, res);
 	}
 
 	private void UpdateDynamicObjectsRespawnTimers(double deltaTime)
@@ -2242,7 +2242,7 @@ public class Server
 				}
 				SpawnObjectsResponse res = new SpawnObjectsResponse();
 				res.Data.Add(dobj.GetSpawnResponseData(null));
-				Instance.NetworkController.SendToClientsSubscribedTo(res, -1L, dos.Parent);
+				NetworkController.Instance.SendToClientsSubscribedTo(res, -1L, dos.Parent);
 			}
 		}
 		toRemove.Clear();
@@ -2250,7 +2250,7 @@ public class Server
 
 	private void UpdateData(double deltaTime)
 	{
-		NetworkController.EventSystem.InvokeQueuedData();
+		EventSystem.Instance.InvokeQueuedData();
 		SolarSystem.UpdateTime(deltaTime);
 		SolarSystem.UpdatePositions();
 		PhysicsController.Update();
@@ -2266,7 +2266,7 @@ public class Server
 		}
 		if (VesselsDataUpdate.Count > 0)
 		{
-			NetworkController.SendToAllClients(new UpdateVesselDataMessage
+			NetworkController.Instance.SendToAllClients(new UpdateVesselDataMessage
 			{
 				VesselsDataUpdate = VesselsDataUpdate.Values.ToList()
 			}, -1L);
@@ -2282,10 +2282,9 @@ public class Server
 			long[] array = _players.Keys.ToArray();
 			foreach (long guid in array)
 			{
-				Instance.NetworkController.LogOutPlayer(guid);
-				Instance.NetworkController.DisconnectClient(guid);
+				NetworkController.Instance.DisconnectClient(guid);
 			}
-			Instance.NetworkController.DisconnectAllClients();
+			NetworkController.Instance.DisconnectAllClients();
 		}
 		catch (Exception)
 		{
@@ -2342,7 +2341,7 @@ public class Server
 			if (vesselExploded)
 			{
 				ves.DamageVesselsInExplosionRadius();
-				NetworkController.SendToClientsSubscribedTo(new DestroyVesselMessage
+				NetworkController.Instance.SendToClientsSubscribedTo(new DestroyVesselMessage
 				{
 					GUID = ves.GUID
 				}, -1L, ves);
@@ -2425,7 +2424,7 @@ public class Server
 			WorldInitialized = true;
 		}
 		Start();
-		NetworkController.Start();
+		NetworkController.Instance.Start();
 		tickMilliseconds = System.Math.Floor(1000.0 / (double)numberOfTicks);
 		lastTime = DateTime.UtcNow;
 #if !HELLION_SP
@@ -2667,7 +2666,7 @@ public class Server
 			if (so != null)
 			{
 				player.SubscribeTo(so);
-				NetworkController.SendToGameClient(req.Sender, so.GetInitializeMessage());
+				NetworkController.Instance.SendToGameClient(req.Sender, so.GetInitializeMessage());
 				if (so is ArtificialBody)
 				{
 					player.UpdateArtificialBodyMovement.Add(so.GUID);
@@ -2764,70 +2763,75 @@ public class Server
 		{
 			return;
 		}
+
+		// Create request.
+		PlayersOnServerResponse res = new PlayersOnServerResponse();
 		if (req.SpawnPointID != null)
 		{
+			// If we are spawning on a spawnpoint.
 			if (ves.SpawnPoints.Find((ShipSpawnPoint m) => m.SpawnPointID == req.SpawnPointID.InSceneID) == null)
 			{
 				return;
 			}
-			PlayersOnServerResponse res2 = new PlayersOnServerResponse();
-			res2.SpawnPointID = new VesselObjectID
+			res.SpawnPointID = new VesselObjectID
 			{
 				InSceneID = req.SpawnPointID.InSceneID,
 				VesselGUID = req.SpawnPointID.VesselGUID
 			};
-			res2.PlayersOnServer = new List<PlayerOnServerData>();
-			foreach (NetworkController.Client cl2 in NetworkController.ClientList.Values)
+
+			res.PlayersOnServer = new List<PlayerOnServerData>();
+			foreach (Player pl in NetworkController.Instance.GetAllPlayers())
 			{
-				if (cl2.Player != null && !cl2.Player.PlayerId.IsNullOrEmpty())
+				if (!pl.PlayerId.IsNullOrEmpty())
 				{
-					res2.PlayersOnServer.Add(new PlayerOnServerData
+					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						PlayerNativeId = cl2.Player.NativeId,
-						PlayerId = cl2.Player.PlayerId,
-						Name = cl2.Player.Name,
-						AlreadyHasInvite = SpawnPointInvites.ContainsKey(cl2.Player.PlayerId)
+						PlayerNativeId = pl.NativeId,
+						PlayerId = pl.PlayerId,
+						Name = pl.Name,
+						AlreadyHasInvite = SpawnPointInvites.ContainsKey(pl.PlayerId)
 					});
 				}
-				if (cl2.Player != null && cl2.Player.PlayerId.IsNullOrEmpty())
+				if (pl.PlayerId.IsNullOrEmpty())
 				{
-					Dbg.Error("Player steam ID is null or empty", cl2.Player.GUID, cl2.Player.Name);
+					Dbg.Error("Player ID is null or empty", pl.GUID, pl.Name);
 				}
 			}
-			NetworkController.SendToGameClient(req.Sender, res2);
 		}
 		else
 		{
+			// If we are not spawning on a spawnpoint.
 			if (req.SecuritySystemID == null)
 			{
 				return;
 			}
-			PlayersOnServerResponse res = new PlayersOnServerResponse();
 			res.SecuritySystemID = new VesselObjectID
 			{
 				InSceneID = 0,
 				VesselGUID = req.SecuritySystemID.VesselGUID
 			};
+
 			res.PlayersOnServer = new List<PlayerOnServerData>();
-			foreach (NetworkController.Client cl in NetworkController.ClientList.Values)
+			foreach (Player pl in NetworkController.Instance.GetAllPlayers())
 			{
-				if (cl.Player != null && !cl.Player.PlayerId.IsNullOrEmpty())
+				if (!pl.PlayerId.IsNullOrEmpty())
 				{
 					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						PlayerNativeId = cl.Player.NativeId,
-						PlayerId = cl.Player.PlayerId,
-						Name = cl.Player.Name,
+						PlayerNativeId = pl.NativeId,
+						PlayerId = pl.PlayerId,
+						Name = pl.Name,
 						AlreadyHasInvite = false
 					});
 				}
-				if (cl.Player != null && cl.Player.PlayerId.IsNullOrEmpty())
+				if (pl.PlayerId.IsNullOrEmpty())
 				{
-					Dbg.Error("Player steam ID is null or empty", cl.Player.GUID, cl.Player.Name);
+					Dbg.Error("Player ID is null or empty", pl.GUID, pl.Name);
 				}
 			}
-			NetworkController.SendToGameClient(req.Sender, res);
 		}
+
+		NetworkController.Instance.SendToGameClient(req.Sender, res);
 	}
 
 	public void AvailableSpawnPointsRequestListener(NetworkData data)
@@ -2836,7 +2840,7 @@ public class Server
 		Player pl = GetPlayer(req.Sender);
 		if (pl != null)
 		{
-			NetworkController.SendToGameClient(req.Sender, new AvailableSpawnPointsResponse
+			NetworkController.Instance.SendToGameClient(req.Sender, new AvailableSpawnPointsResponse
 			{
 				SpawnPoints = GetAvailableSpawnPoints(pl)
 			});
@@ -2867,7 +2871,7 @@ public class Server
 	{
 		NameTagMessage msg = data as NameTagMessage;
 		SpaceObjectVessel vessel = GetVessel(msg.ID.VesselGUID);
-		NetworkController.SendToClientsSubscribedTo(data, -1L, vessel);
+		NetworkController.Instance.SendToClientsSubscribedTo(data, -1L, vessel);
 		try
 		{
 			vessel.NameTags.Find((NameTagData m) => m.InSceneID == msg.ID.InSceneID).NameTagText = msg.NameTagText;
@@ -3025,7 +3029,7 @@ public class Server
 		{
 			if ((restartTime - currentTime).TotalSeconds >= timeToRestart - 2.0)
 			{
-				NetworkController.SendToAllClients(SendSystemMessage(SystemMessagesTypes.RestartServerTime, null), -1L);
+				NetworkController.Instance.SendToAllClients(SendSystemMessage(SystemMessagesTypes.RestartServerTime, null), -1L);
 			}
 			if (timeToRestart == 1800.0)
 			{
@@ -3131,7 +3135,7 @@ public class Server
 			Response = ResponseResult.Success,
 			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
-			CurrentPlayers = NetworkController.CurrentOnlinePlayers(),
+			CurrentPlayers = NetworkController.Instance.CurrentOnlinePlayers(),
 			AlivePlayers = (short)_players.Values.Count((Player m) => m.IsAlive),
 			CharacterData = GetPlayerFromPlayerId(req.SteamId)?.GetCharacterData()
 		};
@@ -3191,7 +3195,7 @@ public class Server
 					ShipOne = item.DynamicObj.Parent.GUID,
 					ShipTwo = -1L
 				};
-				Instance.NetworkController.SendToClientsSubscribedTo(scm, -1L, item.DynamicObj.Parent);
+				NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, item.DynamicObj.Parent);
 			}
 		}
 		Extensions.Invoke(delegate

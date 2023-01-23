@@ -307,7 +307,7 @@ public class NetworkController
 		}
 		else
 		{
-			Dbg.Log("Tried to remove non-existent client with guid", guid);
+			Dbg.Error("Tried to remove non-existent client with guid", guid);
 		}
 	}
 

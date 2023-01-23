@@ -23,6 +23,8 @@ public class ConnectionGameStatus
 		listeningThread = new Thread(Listen);
 		listeningThread.IsBackground = true;
 		listeningThread.Start();
+
+		Dbg.Log("Started server status thread.");
 	}
 
 	public void Stop()

@@ -17,6 +17,4 @@ public class ServerStatusResponse : NetworkData
 	public CharacterData CharacterData;
 
 	public string Description;
-
-	public string NotificationEMail;
 }

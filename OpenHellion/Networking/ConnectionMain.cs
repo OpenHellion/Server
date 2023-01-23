@@ -75,8 +75,8 @@ public static class ConnectionMain
 				}
 				catch (Exception e)
 				{
-					Console.WriteLine("\nException Caught!");
-					Console.WriteLine("Message: {0} ", e.Message);
+					Dbg.Warning("Exception caught when sending get request to main server.");
+					Dbg.Warning("Message: {0} ", e.Message);
 				}
 			});
 		}
@@ -104,8 +104,8 @@ public static class ConnectionMain
 				}
 				catch (Exception e)
 				{
-					Console.WriteLine("\nException Caught!");
-					Console.WriteLine("Message: {0} ", e.Message);
+					Dbg.Warning("Exception caught when sending get request to main server.");
+					Dbg.Warning("Message: {0} ", e.Message);
 				}
 			});
 		}

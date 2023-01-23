@@ -68,7 +68,7 @@ public static class Program
 
 		if (!File.Exists(Server.ConfigDir + "GameServer.ini"))
 		{
-			Console.WriteLine("GameServer.ini not found in folder " + Server.ConfigDir);
+			Dbg.Info("GameServer.ini not found in folder " + Server.ConfigDir);
 			return;
 		}
 
@@ -103,7 +103,7 @@ public static class Program
 		}
 		catch
 		{
-			Console.Out.WriteLine("Invalid 'server_name' field.");
+			Dbg.Error("Invalid 'server_name' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -112,7 +112,7 @@ public static class Program
 		}
 		catch
 		{
-			Console.Out.WriteLine("Invalid 'game_client_port' field.");
+			Dbg.Error("Invalid 'game_client_port' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -121,7 +121,7 @@ public static class Program
 		}
 		catch
 		{
-			Console.Out.WriteLine("Invalid 'status_port' field.");
+			Dbg.Error("Invalid 'status_port' field.");
 			Environment.Exit(0);
 		}
 	}

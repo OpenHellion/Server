@@ -51,6 +51,8 @@ internal class ConnectionGame
 
 		_server.Start(Server.GamePort);
 
+		Dbg.Log("Started server game thread.");
+
 		// TODO: Make singleplayer server only accept local connections.
 	}
 

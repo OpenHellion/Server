@@ -1,4 +1,3 @@
-#define TRACE
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -32,12 +31,18 @@ public static class Dbg
 		{
 		}
 		Trace.Listeners.Clear();
-		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false));
-		writerListener.TraceOutputOptions = TraceOptions.None;
+
+#if !HELLION_SP
+		// Logging to console creates issues for the client if it is singleplayer. Plus it is pointless.
 		ConsoleTraceListener consoleListener = new ConsoleTraceListener(useErrorStream: false);
 		consoleListener.TraceOutputOptions = TraceOptions.None;
-		Trace.Listeners.Add(writerListener);
 		Trace.Listeners.Add(consoleListener);
+#endif
+
+		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false));
+		writerListener.TraceOutputOptions = TraceOptions.None;
+		Trace.Listeners.Add(writerListener);
+
 		Trace.AutoFlush = true;
 	}
 
@@ -108,8 +113,9 @@ public static class Dbg
 	[Conditional("SHOW_ALL_LOGS")]
 	public static void LogIf(bool condition, params object[] values)
 	{
-		if (!condition)
+		if (condition)
 		{
+			Log(values);
 		}
 	}
 

@@ -87,33 +87,33 @@ public static class Serializer
 
 	public static NetworkData Unpackage(Stream str)
 	{
-		byte[] array = new byte[4];
-		int num2 = 0;
-		int num;
+		byte[] bufferSize = new byte[4];
+		int dataReadSize = 0;
+		int size;
 		do
 		{
-			num = str.Read(array, num2, array.Length - num2);
-			if (num == 0)
+			size = str.Read(bufferSize, dataReadSize, bufferSize.Length - dataReadSize);
+			if (size == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
 			}
-			num2 += num;
+			dataReadSize += size;
 		}
-		while (num2 < array.Length);
-		uint num3 = BitConverter.ToUInt32(array, 0);
-		byte[] array2 = new byte[num3];
-		num2 = 0;
+		while (dataReadSize < bufferSize.Length);
+		uint bufferLength = BitConverter.ToUInt32(bufferSize, 0);
+		byte[] buffer = new byte[bufferLength];
+		dataReadSize = 0;
 		do
 		{
-			num = str.Read(array2, num2, array2.Length - num2);
-			if (num == 0)
+			size = str.Read(buffer, dataReadSize, buffer.Length - dataReadSize);
+			if (size == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
 			}
-			num2 += num;
+			dataReadSize += size;
 		}
-		while (num2 < array2.Length);
-		MemoryStream ms = new MemoryStream(array2, 0, array2.Length);
+		while (dataReadSize < buffer.Length);
+		MemoryStream ms = new MemoryStream(buffer, 0, buffer.Length);
 		return Deserialize(ms);
 	}
 
@@ -127,7 +127,7 @@ public static class Serializer
 			{
 				data = data
 			};
-			ProtoBuf.Serializer.Serialize(outMs, ndtw);
+			ProtoBuf.Serializer.Serialize(ms, ndtw);
 		}
 		catch (Exception ex)
 		{
@@ -138,7 +138,7 @@ public static class Serializer
 		{
 			try
 			{
-				ProcessStatistics(data, outMs, sentStatistics);
+				ProcessStatistics(data, ms, sentStatistics);
 			}
 			catch
 			{
@@ -176,6 +176,9 @@ public static class Serializer
 			kv.Value.BytesSinceLastCheck = 0L;
 			totalBytes += kv.Value.ByteSum;
 		}
+
+		printVal = printVal + "-----------------------------------------\nTotal: " + ((float)totalBytes / 1000f).ToString("##,0") + " kB (avg: " + ((double)totalBytes / timeFromReset.TotalSeconds / 1000.0).ToString("##,0") + " kB/s)";
+
 		lastStatisticUpdateTime = DateTime.UtcNow;
 	}
 

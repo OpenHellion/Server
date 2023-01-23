@@ -2443,8 +2443,14 @@ public class Server
 		}
 		SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, UpdateShipSystemsTimer);
 		mainLoopStarted = true;
+
+#if HELLION_SP
+		// Don't change. This gives the single player game the required ports.
 		Console.WriteLine("ports:" + GamePort + "," + StatusPort);
 		Console.WriteLine("ready");
+#endif
+
+		Dbg.Log("Starting main game loop.");
 #if !HELLION_SP
 		Task.Run(delegate
 		{
@@ -2508,7 +2514,9 @@ public class Server
 			{
 				Dbg.Exception(ex);
 			}
+
 #if HELLION_SP
+			// Stop server if player has closed the game.
 			try
 			{
 				if (ParentProcess.GetParentProcess().HasExited)
@@ -2524,6 +2532,9 @@ public class Server
 			}
 #endif
 		}
+
+		// Shutting down...
+		Dbg.Log("Main game loop ended; Shutting down server...");
 		if (SavePersistenceDataOnShutdown)
 		{
 			Persistence.Save();
@@ -3137,7 +3148,7 @@ public class Server
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.Instance.CurrentOnlinePlayers(),
 			AlivePlayers = (short)_players.Values.Count((Player m) => m.IsAlive),
-			CharacterData = GetPlayerFromPlayerId(req.SteamId)?.GetCharacterData()
+			CharacterData = GetPlayerFromPlayerId(req.PlayerId)?.GetCharacterData()
 		};
 	}
 

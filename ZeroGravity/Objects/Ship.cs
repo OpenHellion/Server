@@ -1910,8 +1910,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				return;
 			}
 
-			Dbg.Log(data);
-
 			bool sendSecurityResponse = false;
 
 			// Change name.

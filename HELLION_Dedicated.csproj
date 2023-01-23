@@ -17,11 +17,27 @@
     <PublishRelease>true</PublishRelease>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor|AnyCPU' ">
-    <DefineConstants>build_for_unit_tests;</DefineConstants>
+    <DefineConstants>build_for_unit_tests;DEBUG;SHOW_ALL_LOGS</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;SHOW_ALL_LOGS;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="Data\**"  CopyToPublishDirectory="PreserveNewest" />
-    <None Update="GameServer.ini"  CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Data\**" CopyToPublishDirectory="PreserveNewest" />
+    <Copy Update="GameServer.ini" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />

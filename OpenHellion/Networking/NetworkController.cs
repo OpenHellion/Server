@@ -70,6 +70,18 @@ public class NetworkController
 		_clients.Clear();
 	}
 
+	public void Tick()
+	{
+		if (_gameConnection != null)
+		{
+			_gameConnection.Tick();
+		}
+		else
+		{
+			Dbg.Warning("Tried to tick before game connection has been created.");
+		}
+	}
+
 	public void SendCharacterSpawnToOtherPlayers(Player spawnedPlayer)
 	{
 		if (!_clients.ContainsKey(spawnedPlayer.GUID))
@@ -105,6 +117,7 @@ public class NetworkController
 	public void LogInRequestListener(NetworkData data)
 	{
 		LogInRequest req = data as LogInRequest;
+		Dbg.Log("Executing log in request.");
 
 		if (Instance.CurrentOnlinePlayers() >= Server.Instance.MaxPlayers)
 		{
@@ -173,13 +186,17 @@ public class NetworkController
 		{
 			Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
 		}
+		else
+		{
+			Dbg.Error("Could not patch client.");
+		}
 	}
 
 	public void Start()
 	{
-		_gameConnection.Start(Server.GamePort);
 		statusPortConnectionListener = new ConnectionGameStatusListener();
 		statusPortConnectionListener.Start(Server.StatusPort);
+		_gameConnection.Start(Server.GamePort);
 	}
 
 	public void SendToGameClient(long clientID, NetworkData data)
@@ -243,18 +260,21 @@ public class NetworkController
 			catch (Exception)
 			{
 				int? sc = null;
+				long? usedId = null;
 				if (_clients.ContainsKey(guid))
 				{
 					DisconnectClient(guid);
 					sc = _clients[guid];
+					usedId = guid;
 				}
 
 				if (_clients.ContainsKey(sender))
 				{
 					sc = _clients[sender];
+					usedId = sender;
 				}
 
-				if (sc == null)
+				if (!sc.HasValue || !usedId.HasValue)
 				{
 					return false;
 				}
@@ -262,19 +282,19 @@ public class NetworkController
 				_gameConnection.PatchClient(sc.Value, guid);
 
 				_clients.Add(guid, sc.Value);
-				_clients.Remove(sender);
+				_clients.Remove(usedId.Value);
 			}
 		}
 
 		// Convert sender into a proper client.
-		if (_clients.ContainsKey(sender))
+		long? tempId = _clients.Values.Single(entry => entry == (int) sender);
+		if (tempId.HasValue)
 		{
-			int sc = _clients[sender];
+			// Sender is connection id.
+			_gameConnection.PatchClient((int) sender, guid);
 
-			_gameConnection.PatchClient(sc, guid);
-
-			_clients.Add(guid, sc);
-			_clients.Remove(sender);
+			_clients.Add(guid, (int) sender);
+			_clients.Remove(tempId.Value);
 		}
 
 		return true;
@@ -296,7 +316,8 @@ public class NetworkController
 
 	/// <summary>
 	/// 	Remove all references to a client.<br />
-	/// 	This also disconnects the client's player, but does not disconnect the client.
+	/// 	This also disconnects the client's player, but does not disconnect the client. <br />
+	/// 	Used by the disconnect function.
 	/// </summary>
 	public void RemoveClient(long guid)
 	{
@@ -367,6 +388,10 @@ public class NetworkController
 			lir.VesselDecayRateMultiplier = Server.VesselDecayRateMultiplier;
 			SendToGameClient(player.GUID, lir);
 		}
+		else
+		{
+			Dbg.Error("Client list doesn't contain player", player.Name);
+		}
 	}
 
 	/// <summary>
@@ -422,8 +447,25 @@ public class NetworkController
 
 	private void OnApplicationQuit()
 	{
+		DisconnectAllClients();
 		statusPortConnectionListener.Stop();
 		_gameConnection.Stop();
+	}
+
+	// Second part of disconnecting. Called by OnDisconnect in ConnectionGame.
+	// Has to be here because _client shouldn't be exposed.
+	internal void OnDisconnect(int connectionId)
+	{
+		// Get guid by searching through the values.
+		if (_clients.ContainsValue(connectionId))
+		{
+			long guid = _clients.Values.Single(entry => entry == connectionId);
+			_clients.Remove(guid);
+		}
+		else
+		{
+			Dbg.Error("Tried to disconnect client not in client list.");
+		}
 	}
 
 	/// <summary>

@@ -41,10 +41,10 @@ public class ConnectionGameStatus
 			{
 				return;
 			}
-			string address = socket.RemoteEndPoint.ToString().Split(":".ToCharArray(), 2)[0];
-			if (data is ServerShutDownMessage)
+			else if (data is ServerShutDownMessage)
 			{
-				if (Server.Instance.IsAddressAutorized(address))
+				string ipAddress = socket.RemoteEndPoint.ToString().Split(":".ToCharArray(), 2)[0];
+				if (Server.Instance.IsAddressAutorized(ipAddress))
 				{
 					ServerShutDownMessage msg = data as ServerShutDownMessage;
 					Server.Restart = msg.Restrat;
@@ -58,7 +58,7 @@ public class ConnectionGameStatus
 				}
 				return;
 			}
-			if (data is ServerStatusRequest)
+			else if (data is ServerStatusRequest)
 			{
 				ServerStatusRequest req = data as ServerStatusRequest;
 				ServerStatusResponse ssr = Server.Instance.GetServerStatusResponse(req);
@@ -73,7 +73,7 @@ public class ConnectionGameStatus
 					throw;
 				}
 			}
-			if (data is DeleteCharacterRequest)
+			else if (data is DeleteCharacterRequest)
 			{
 				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
 				if (dcr.ServerId == NetworkController.ServerID)

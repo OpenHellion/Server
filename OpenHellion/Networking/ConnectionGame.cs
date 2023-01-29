@@ -44,16 +44,25 @@ internal class ConnectionGame
 
 	internal void Start(int port)
 	{
-		_server = new(2000);
-		_server.OnConnected = OnConnected;
-		_server.OnData = OnData;
-		_server.OnDisconnected = OnDisconnected;
+		Telepathy.Log.Info = Dbg.Info;
+		Telepathy.Log.Warning = Dbg.Warning;
+		Telepathy.Log.Error = Dbg.Error;
+
+		_server = new(30000)
+		{
+			OnConnected = OnConnected,
+			OnData = OnData,
+			OnDisconnected = OnDisconnected,
+			SendQueueLimit = 1000,
+			ReceiveQueueLimit = 1000
+		};
+
+		_server.SendQueueLimit = 1000;
+		_server.ReceiveQueueLimit = 1000;
 
 		_server.Start(Server.GamePort);
 
 		Dbg.Log("Started server game thread.");
-
-		// TODO: Make singleplayer server only accept local connections.
 	}
 
 	/// <summary>
@@ -97,8 +106,8 @@ internal class ConnectionGame
 		}
 	}
 
-	[Obsolete]
 	// Intends to clear all data in the queue to send a request, but we don't have access to the queue.
+	// TODO: Fix this.
 	internal void ClearEverythingAndSend(int connectionId, NetworkData data)
 	{
 		Send(connectionId, data);
@@ -161,6 +170,7 @@ internal class ConnectionGame
 	}
 
 	// Create a bare client with a temporary id.
+	// Partial implementation of the corresponding function in NetworkController.
 	internal void AddBareClient(int connectionId, long tempId)
 	{
 		Client cl = new Client();
@@ -168,18 +178,16 @@ internal class ConnectionGame
 		_clientConnections.Add(connectionId, cl);
 	}
 
-	// Remove client and disconnect player.
+	// Remove client and disconnect player, but doesn't disconnect the client from the server.
+	// Used by the disconnect function.
 	internal void RemoveClient(int connectionId)
 	{
 		if (_clientConnections.ContainsKey(connectionId))
 		{
 			// If there is a player, make sure it has been disconnected.
 			ConnectionGame.Client cl = _clientConnections[connectionId];
-			if (cl.Player != null)
-			{
-				cl.Player.LogoutDisconnectReset();
-				cl.Player.DiconnectFromNetworkContoller();
-			}
+			cl.Player?.LogoutDisconnectReset();
+			cl.Player?.DiconnectFromNetworkContoller();
 
 			// Remove it.
 			_clientConnections.Remove(connectionId);
@@ -232,7 +240,18 @@ internal class ConnectionGame
 
 	private void OnConnected(int connectionId)
 	{
-		Dbg.Info("Client connected", Server.IsRunning, connectionId);
+		string ipAddress = _server.GetClientAddress(connectionId);
+#if HELLION_SP
+		if (!ipAddress.Contains("127.0.0.1"))
+		{
+			Dbg.Error("Non-local client with ip", ipAddress, "tried to connect to server.");
+			_server.Disconnect(connectionId);
+			return;
+		}
+#endif
+
+		Dbg.Info("Client connected", Server.IsRunning, connectionId, ipAddress);
+
 		try
 		{
 			NetworkController.Instance.AddBareClient(connectionId);
@@ -247,35 +266,37 @@ internal class ConnectionGame
 	{
 		try
 		{
-			NetworkData data = Serializer.Unpackage(new MemoryStream(message.Array));
-			if (data != null)
+			NetworkData networkData = Serializer.Unpackage(new MemoryStream(message.Array));
+			if (networkData != null)
 			{
 				if (_clientConnections[connectionId].Player != null)
 				{
-					data.Sender = _clientConnections[connectionId].Player.GUID;
+					networkData.Sender = _clientConnections[connectionId].Player.GUID;
 				}
 				else
 				{
-					data.Sender = connectionId;
+					networkData.Sender = connectionId;
 				}
-				EventSystem.Instance.Invoke(data);
+
+				EventSystem.Instance.Invoke(networkData);
 			}
 		}
 		catch (Exception ex)
 		{
 			Dbg.Exception(ex);
-			Disconnect(connectionId);
+			NetworkController.Instance.DisconnectClient(connectionId);
 		}
 	}
 
 	private void OnDisconnected(int connectionId)
 	{
-		if (_clientConnections[connectionId] != null && _clientConnections[connectionId].Player != null)
+		if (_clientConnections.TryGetValue(connectionId, out Client client))
 		{
-			_clientConnections[connectionId].Player.RemovePlayerFromTrigger();
+			client.Player?.RemovePlayerFromTrigger();
+			_clientConnections.Remove(connectionId);
+			NetworkController.Instance.OnDisconnect(connectionId);
 		}
 
-		_clientConnections.Remove(connectionId);
-		Dbg.Info("Finished game client connection listener thread", Server.IsRunning, connectionId);
+		Dbg.Info("Client disconnected", Server.IsRunning, connectionId);
 	}
 }

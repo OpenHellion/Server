@@ -2445,7 +2445,7 @@ public class Server
 		mainLoopStarted = true;
 
 #if HELLION_SP
-		// Don't change. This gives the single player game the required ports.
+		// Don't change. This gives the single player game the required connection info.
 		Console.WriteLine("ports:" + GamePort + "," + StatusPort);
 		Console.WriteLine("ready");
 #endif
@@ -2463,8 +2463,12 @@ public class Server
 			{
 				DateTime currentTime = DateTime.UtcNow;
 				TimeSpan span = currentTime - lastTime;
+
+				// Actual main loop. Functionaly go here.
 				if (span.TotalMilliseconds >= tickMilliseconds)
 				{
+					NetworkController.Instance.Tick();
+
 					AddRemovePlayers();
 					if (printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
 					{

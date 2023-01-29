@@ -49,7 +49,7 @@ public static class Serializer
 	/// <summary>
 	/// 	For deserialisation of data not sent through network.
 	/// </summary>
-	public static NetworkData Deserialize(MemoryStream ms)
+	private static NetworkData Deserialize(MemoryStream ms)
 	{
 		NetworkData networkData = null;
 		ms.Position = 0L;

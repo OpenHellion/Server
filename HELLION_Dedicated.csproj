@@ -37,7 +37,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="Data\**" CopyToPublishDirectory="PreserveNewest" />
-    <Copy Update="GameServer.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="GameServer.ini" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />

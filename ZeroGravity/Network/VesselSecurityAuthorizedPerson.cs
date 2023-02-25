@@ -8,8 +8,6 @@ public class VesselSecurityAuthorizedPerson
 {
 	public AuthorizedPersonRank Rank;
 
-	public long GUID;
-
 	public string PlayerNativeId;
 
 	public string PlayerId;

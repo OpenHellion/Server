@@ -322,7 +322,6 @@ public class SpawnRule
 			{
 				AuthorizedPerson ap = new AuthorizedPerson
 				{
-					PlayerGUID = questTrigger.Quest.Player.GUID,
 					Name = questTrigger.Quest.Player.Name,
 					Rank = AuthorizedPersonRank.Crewman,
 					PlayerId = questTrigger.Quest.Player.PlayerId,
@@ -332,7 +331,7 @@ public class SpawnRule
 				List<SpaceObjectVessel> vessels = mainVessels.SelectMany((SpaceObjectVessel m) => m.AllVessels).ToList();
 				foreach (SpaceObjectVessel vessel in vessels)
 				{
-					if (vessel.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson m) => m.PlayerGUID == questTrigger.Quest.Player.GUID) == null)
+					if (vessel.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson m) => m.PlayerId == questTrigger.Quest.Player.PlayerId) == null)
 					{
 						vessel.AuthorizedPersonel.Add(ap);
 					}

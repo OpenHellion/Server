@@ -568,7 +568,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		AuthorizedVesselsResponse avr = new AuthorizedVesselsResponse
 		{
 			GUIDs = (from m in Server.Instance.AllVessels
-				where m.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson n) => n.PlayerGUID == GUID) != null
+				where m.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson n) => n.PlayerId == PlayerId) != null
 				select m.GUID).ToArray()
 		};
 		NetworkController.Instance.SendToGameClient(GUID, avr);
@@ -1369,7 +1369,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 						{
 							CheckPlayersDistance = 1000.0
 						};
-						vessel.AuthorizedPersonel.RemoveAll((AuthorizedPerson m) => m.PlayerGUID == GUID);
+						vessel.AuthorizedPersonel.RemoveAll((AuthorizedPerson m) => m.PlayerId == PlayerId);
 					}
 				}
 			}

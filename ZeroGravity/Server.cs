@@ -292,21 +292,21 @@ public class Server
 
 	public static double CelestialBodyDeathDistance = 10000.0;
 
-	private Dictionary<long, SpaceObject> _objects = new Dictionary<long, SpaceObject>();
+	private Dictionary<long, SpaceObject> m_objects = new Dictionary<long, SpaceObject>();
 
-	private Dictionary<long, Player> _players = new Dictionary<long, Player>();
+	private Dictionary<long, Player> m_players = new Dictionary<long, Player>();
 
-	private ConcurrentBag<Player> playersToAdd = new ConcurrentBag<Player>();
+	private ConcurrentBag<Player> m_playersToAdd = new ConcurrentBag<Player>();
 
-	private ConcurrentBag<Player> playersToRemove = new ConcurrentBag<Player>();
+	private ConcurrentBag<Player> m_playersToRemove = new ConcurrentBag<Player>();
 
-	private Dictionary<long, SpaceObjectVessel> _vessels = new Dictionary<long, SpaceObjectVessel>();
+	private Dictionary<long, SpaceObjectVessel> m_vessels = new Dictionary<long, SpaceObjectVessel>();
 
-	private Dictionary<long, DynamicObject> _updateableDynamicObjects = new Dictionary<long, DynamicObject>();
+	private Dictionary<long, DynamicObject> m_updateableDynamicObjects = new Dictionary<long, DynamicObject>();
 
-	private List<UpdateTimer> timersToRemove = new List<UpdateTimer>();
+	private List<UpdateTimer> m_timersToRemove = new List<UpdateTimer>();
 
-	private List<UpdateTimer> timers = new List<UpdateTimer>();
+	private List<UpdateTimer> m_timers = new List<UpdateTimer>();
 
 	public SolarSystem SolarSystem = null;
 
@@ -473,9 +473,9 @@ public class Server
 
 	public static string LoadPersistenceFromFile = null;
 
-	public Dictionary<long, SpaceObjectVessel>.ValueCollection AllVessels => _vessels.Values;
+	public Dictionary<long, SpaceObjectVessel>.ValueCollection AllVessels => m_vessels.Values;
 
-	public Dictionary<long, Player>.ValueCollection AllPlayers => _players.Values;
+	public Dictionary<long, Player>.ValueCollection AllPlayers => m_players.Values;
 
 	public static Server Instance => serverInstance;
 
@@ -487,23 +487,23 @@ public class Server
 
 	public bool DoesObjectExist(long guid)
 	{
-		return _objects.ContainsKey(guid);
+		return m_objects.ContainsKey(guid);
 	}
 
 	public SpaceObject GetObject(long guid)
 	{
-		if (_objects.ContainsKey(guid))
+		if (m_objects.ContainsKey(guid))
 		{
-			return _objects[guid];
+			return m_objects[guid];
 		}
 		return null;
 	}
 
 	public SpaceObjectTransferable GetTransferable(long guid)
 	{
-		if (_objects.ContainsKey(guid) && _objects[guid] is SpaceObjectTransferable)
+		if (m_objects.ContainsKey(guid) && m_objects[guid] is SpaceObjectTransferable)
 		{
-			return _objects[guid] as SpaceObjectTransferable;
+			return m_objects[guid] as SpaceObjectTransferable;
 		}
 		return null;
 	}
@@ -514,7 +514,7 @@ public class Server
 	public Player GetPlayer(long guid)
 	{
 		Player player = null;
-		_players.TryGetValue(guid, out player);
+		m_players.TryGetValue(guid, out player);
 		return player;
 	}
 
@@ -532,23 +532,23 @@ public class Server
 	/// </summary>
 	public Player GetPlayerFromNativeId(string nativeId)
 	{
-		return _players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
+		return m_players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
 	}
 
 	public SpaceObjectVessel GetVessel(long guid)
 	{
-		if (_vessels.ContainsKey(guid))
+		if (m_vessels.ContainsKey(guid))
 		{
-			return _vessels[guid];
+			return m_vessels[guid];
 		}
 		return null;
 	}
 
 	public Item GetItem(long guid)
 	{
-		if (_objects.ContainsKey(guid) && _objects[guid] is DynamicObject)
+		if (m_objects.ContainsKey(guid) && m_objects[guid] is DynamicObject)
 		{
-			return (_objects[guid] as DynamicObject).Item;
+			return (m_objects[guid] as DynamicObject).Item;
 		}
 		return null;
 	}
@@ -557,61 +557,61 @@ public class Server
 	{
 		if (mainLoopStarted)
 		{
-			playersToAdd.Add(player);
+			m_playersToAdd.Add(player);
 			return;
 		}
-		_players[player.GUID] = player;
-		_objects[player.FakeGuid] = player;
+		m_players[player.GUID] = player;
+		m_objects[player.FakeGuid] = player;
 	}
 
 	public void Add(SpaceObjectVessel vessel)
 	{
-		_vessels[vessel.GUID] = vessel;
-		_objects[vessel.GUID] = vessel;
+		m_vessels[vessel.GUID] = vessel;
+		m_objects[vessel.GUID] = vessel;
 	}
 
 	public void Add(DynamicObject dobj)
 	{
-		_objects[dobj.GUID] = dobj;
+		m_objects[dobj.GUID] = dobj;
 		if (dobj.Item != null && dobj.Item is IUpdateable)
 		{
-			_updateableDynamicObjects[dobj.GUID] = dobj;
+			m_updateableDynamicObjects[dobj.GUID] = dobj;
 		}
 	}
 
 	public void Add(Corpse corpse)
 	{
-		_objects[corpse.GUID] = corpse;
+		m_objects[corpse.GUID] = corpse;
 	}
 
 	public void Remove(Player player)
 	{
 		if (mainLoopStarted)
 		{
-			playersToRemove.Add(player);
+			m_playersToRemove.Add(player);
 			return;
 		}
-		_players.Remove(player.GUID);
-		_objects.Remove(player.FakeGuid);
+		m_players.Remove(player.GUID);
+		m_objects.Remove(player.FakeGuid);
 	}
 
 	public void Remove(SpaceObjectVessel vessel)
 	{
-		_vessels.Remove(vessel.GUID);
-		_objects.Remove(vessel.GUID);
+		m_vessels.Remove(vessel.GUID);
+		m_objects.Remove(vessel.GUID);
 	}
 
 	public void Remove(DynamicObject dobj)
 	{
-		_objects.Remove(dobj.GUID);
-		_updateableDynamicObjects.Remove(dobj.GUID);
+		m_objects.Remove(dobj.GUID);
+		m_updateableDynamicObjects.Remove(dobj.GUID);
 	}
 
 	public void Remove(Corpse corpse)
 	{
-		if (_objects.ContainsKey(corpse.GUID))
+		if (m_objects.ContainsKey(corpse.GUID))
 		{
-			_objects.Remove(corpse.GUID);
+			m_objects.Remove(corpse.GUID);
 		}
 	}
 
@@ -911,7 +911,6 @@ public class Server
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
-							PlayerGUID = pl.GUID,
 							PlayerId = pl.PlayerId,
 							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
@@ -936,7 +935,6 @@ public class Server
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
-							PlayerGUID = pl.GUID,
 							PlayerId = pl.PlayerId,
 							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
@@ -955,7 +953,6 @@ public class Server
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
-							PlayerGUID = pl.GUID,
 							PlayerId = pl.PlayerId,
 							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
@@ -1396,7 +1393,7 @@ public class Server
 	public void TextChatMessageListener(NetworkData data)
 	{
 		TextChatMessage tcm = data as TextChatMessage;
-		Player player = _players[tcm.Sender];
+		Player player = m_players[tcm.Sender];
 		tcm.GUID = player.FakeGuid;
 		tcm.Name = player.Name;
 		if (tcm.MessageText.Length > 250)
@@ -1407,7 +1404,7 @@ public class Server
 		{
 			Vector3D playerGlobalPos = player.Parent.Position + player.Position;
 			{
-				foreach (Player pl in _players.Values)
+				foreach (Player pl in m_players.Values)
 				{
 					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
 					{
@@ -1745,7 +1742,7 @@ public class Server
 				{
 					foreach (SpaceObjectVessel ves in artificialBodies)
 					{
-						foreach (Item item in from m in _objects.Values
+						foreach (Item item in from m in m_objects.Values
 							where m is DynamicObject && (m as DynamicObject).Parent == ves && (m as DynamicObject).Item != null
 							select (m as DynamicObject).Item)
 						{
@@ -1804,7 +1801,7 @@ public class Server
 			if (parts[0] == "teleport" && parts.Length == 2)
 			{
 				ArtificialBody target = null;
-				Player p = _players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
+				Player p = m_players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
 				if (p != null && p.Parent is ArtificialBody)
 				{
 					target = ((!(p.Parent is SpaceObjectVessel)) ? (p.Parent as ArtificialBody) : (p.Parent as SpaceObjectVessel).MainVessel);
@@ -1908,7 +1905,7 @@ public class Server
 			}
 			if (parts[0] == "resetblueprints")
 			{
-				foreach (Player pl in _players.Values)
+				foreach (Player pl in m_players.Values)
 				{
 					pl.Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
 					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
@@ -2229,7 +2226,7 @@ public class Server
 				continue;
 			}
 			DynamicObjectsRespawnList.Remove(dos);
-			if (_vessels.ContainsKey(dos.Parent.GUID))
+			if (m_vessels.ContainsKey(dos.Parent.GUID))
 			{
 				DynamicObject dobj = new DynamicObject(dos.Data, dos.Parent, -1L);
 				if (dos.Data.AttachPointInSceneId > 0 && dobj.Item != null)
@@ -2282,7 +2279,7 @@ public class Server
 		Dbg.Info("REMOVING ALL WORLD OBJECTS");
 		try
 		{
-			long[] array = _players.Keys.ToArray();
+			long[] array = m_players.Keys.ToArray();
 			foreach (long guid in array)
 			{
 				NetworkController.Instance.DisconnectClient(guid);
@@ -2292,8 +2289,8 @@ public class Server
 		catch (Exception)
 		{
 		}
-		_players.Clear();
-		_objects.Clear();
+		m_players.Clear();
+		m_objects.Clear();
 		ArtificialBody[] artificialBodies = Instance.SolarSystem.GetArtificialBodies();
 		foreach (ArtificialBody ab in artificialBodies)
 		{
@@ -2310,7 +2307,7 @@ public class Server
 				Instance.SolarSystem.RemoveArtificialBody(ab);
 			}
 		}
-		_vessels.Clear();
+		m_vessels.Clear();
 		WorldInitialized = false;
 	}
 
@@ -2387,7 +2384,7 @@ public class Server
 				DestroyArtificialBody(dv, destroyChildren: true, vesselExploded: true);
 			}
 		}
-		foreach (DynamicObject dobj in _updateableDynamicObjects.Values)
+		foreach (DynamicObject dobj in m_updateableDynamicObjects.Values)
 		{
 			(dobj.Item as IUpdateable).Update(deltaTime);
 		}
@@ -2403,7 +2400,7 @@ public class Server
 
 	private void PrintObjectsDebug(double time)
 	{
-		Dbg.Info("Server stats, objects", _objects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+		Dbg.Info("Server stats, objects", m_objects.Count, "players", m_players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 	}
 
 	public void MainLoop()
@@ -2475,27 +2472,27 @@ public class Server
 					AddRemovePlayers();
 					if (printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
 					{
-						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", tickMilliseconds, "objects", _objects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", tickMilliseconds, "objects", m_objects.Count, "players", m_players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 						lastServerTickedWithoutSleepTime = currentTime;
 					}
 					hadSleep = false;
 					DeltaTime = span.TotalSeconds;
 					UpdateData(span.TotalSeconds);
 					lastTime = currentTime;
-					foreach (UpdateTimer timer2 in timers)
+					foreach (UpdateTimer timer2 in m_timers)
 					{
 						timer2.AddTime(DeltaTime);
 					}
-					if (timersToRemove.Count > 0)
+					if (m_timersToRemove.Count > 0)
 					{
-						foreach (UpdateTimer timer in timersToRemove)
+						foreach (UpdateTimer timer in m_timersToRemove)
 						{
 							if (timer.OnTick == null)
 							{
-								timers.Remove(timer);
+								m_timers.Remove(timer);
 							}
 						}
-						timersToRemove.Clear();
+						m_timersToRemove.Clear();
 					}
 					SpawnManager.UpdateTimers(DeltaTime);
 					if (PersistenceSaveInterval > 0.0 || manualSave)
@@ -2588,18 +2585,18 @@ public class Server
 
 	private void AddRemovePlayers()
 	{
-		foreach (Player player2 in playersToAdd)
+		foreach (Player player2 in m_playersToAdd)
 		{
-			_players[player2.GUID] = player2;
-			_objects[player2.FakeGuid] = player2;
+			m_players[player2.GUID] = player2;
+			m_objects[player2.FakeGuid] = player2;
 		}
-		playersToAdd = new ConcurrentBag<Player>();
-		foreach (Player player in playersToRemove)
+		m_playersToAdd = new ConcurrentBag<Player>();
+		foreach (Player player in m_playersToRemove)
 		{
-			_players.Remove(player.GUID);
-			_objects.Remove(player.FakeGuid);
+			m_players.Remove(player.GUID);
+			m_objects.Remove(player.FakeGuid);
 		}
-		playersToRemove = new ConcurrentBag<Player>();
+		m_playersToRemove = new ConcurrentBag<Player>();
 	}
 
 	public static void RestartServer(bool clean)
@@ -2703,20 +2700,20 @@ public class Server
 			{
 				break;
 			}
-			if (_players.ContainsKey(req.Sender))
+			if (m_players.ContainsKey(req.Sender))
 			{
-				_players[req.Sender].UnsubscribeFrom(so);
+				m_players[req.Sender].UnsubscribeFrom(so);
 			}
 		}
 	}
 
 	public void SubscribeToTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = timers.Find((UpdateTimer x) => x.Step == step);
+		UpdateTimer timer = m_timers.Find((UpdateTimer x) => x.Step == step);
 		if (timer == null)
 		{
 			timer = new UpdateTimer(step);
-			timers.Add(timer);
+			m_timers.Add(timer);
 		}
 		UpdateTimer updateTimer = timer;
 		updateTimer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Combine(updateTimer.OnTick, del);
@@ -2724,13 +2721,13 @@ public class Server
 
 	public void UnsubscribeFromTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = timers.Find((UpdateTimer x) => x.Step == step);
+		UpdateTimer timer = m_timers.Find((UpdateTimer x) => x.Step == step);
 		if (timer != null)
 		{
 			timer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Remove(timer.OnTick, del);
 			if (timer.OnTick == null)
 			{
-				timersToRemove.Add(timer);
+				m_timersToRemove.Add(timer);
 			}
 		}
 	}
@@ -3025,7 +3022,7 @@ public class Server
 	public Asteroid GetRandomAsteroid()
 	{
 		List<Asteroid> asteroids = new List<Asteroid>();
-		foreach (KeyValuePair<long, SpaceObjectVessel> item in _vessels)
+		foreach (KeyValuePair<long, SpaceObjectVessel> item in m_vessels)
 		{
 			if (item.Value is Asteroid)
 			{
@@ -3094,7 +3091,7 @@ public class Server
 			try
 			{
 				updatingShipSystems = true;
-				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>(_vessels.Values);
+				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>(m_vessels.Values);
 				foreach (SpaceObjectVessel current in list)
 				{
 					current.UpdateVesselSystems();
@@ -3154,7 +3151,7 @@ public class Server
 			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.Instance.CurrentOnlinePlayers(),
-			AlivePlayers = (short)_players.Values.Count((Player m) => m.IsAlive),
+			AlivePlayers = (short)m_players.Values.Count((Player m) => m.IsAlive),
 			CharacterData = GetPlayerFromPlayerId(req.PlayerId)?.GetCharacterData()
 		};
 	}

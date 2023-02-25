@@ -180,7 +180,6 @@ public class NetworkController
 			return;
 		}
 
-		// TODO: Guid could probably be replaced with player id.
 		long guid = GUIDFactory.PlayerIdToGuid(req.PlayerId);
 		if (PatchClient(guid, req.Sender))
 		{

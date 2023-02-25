@@ -872,8 +872,8 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			{
 				PlayerNativeId = per.PlayerNativeId,
 				PlayerId = per.PlayerId,
-				GUID = (pl?.FakeGuid ?? 0),
-				Name = ((pl != null) ? pl.Name : per.Name),
+				GUID = pl?.FakeGuid ?? 0,
+				Name = (pl != null) ? pl.Name : per.Name,
 				Rank = per.Rank
 			});
 		}

@@ -31,82 +31,81 @@ namespace OpenHellion.Networking;
 /// </summary>
 public static class ConnectionMain
 {
-		public static string IpAddress = "localhost";
-		public static ushort Port = 6001;
+	public static string IpAddress = "localhost";
+	public static ushort Port = 6001;
 
-		public static string Address {
-			get {
-				return "http://" + IpAddress + ":" + Port;
+	public static string Address {
+		get {
+			return "http://" + IpAddress + ":" + Port;
+		}
+	}
+
+	/// <summary>
+	/// 	Send a request to get data from the main server.
+	/// </summary>
+	public static void Get<T>(MSMessage message, Action<T> callback)
+	{
+		Task.Run(async () =>
+		{
+			try {
+				// Create new client and request and load it with data.
+				HttpClient httpClient = new HttpClient();
+				HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
+				request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
+
+				Dbg.Log("Sending data to:", request.RequestUri);
+
+				// Send message and get result.
+				HttpResponseMessage result = await httpClient.SendAsync(request);
+
+				// Read data as string.
+				string str = await result.Content.ReadAsStringAsync();
+
+				Dbg.Log("Data:", str);
+
+				// Make object out of data.
+				callback(Json.Deserialize<T>(str));
+
+				// Clean up.
+				httpClient.Dispose();
+				request.Dispose();
+				result.Dispose();
 			}
-		}
-
-		public delegate void SendCallback<T>(T data);
-
-		/// <summary>
-		/// 	Send a request to get data from the main server.
-		/// </summary>
-		public static void Get<T>(MSMessage message, SendCallback<T> callback)
-		{
-			Task.Run(async () =>
+			catch (Exception e)
 			{
-				try {
-					// Create new client and request and load it with data.
-					HttpClient httpClient = new HttpClient();
-					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
-					request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
+				Dbg.Warning("Exception caught when sending get request to main server.");
+				Dbg.Warning("Message: {0} ", e.Message);
+				callback(default);
+			}
+		});
+	}
 
-					Dbg.Log("Sending data to:", request.RequestUri);
-
-					// Send message and get result.
-					HttpResponseMessage result = await httpClient.SendAsync(request);
-
-					// Read data as string.
-					string str = await result.Content.ReadAsStringAsync();
-
-					Dbg.Log("Data:", str);
-
-					// Make object out of data.
-					callback(Json.Deserialize<T>(str));
-
-					// Clean up.
-					httpClient.Dispose();
-					request.Dispose();
-					result.Dispose();
-				}
-				catch (Exception e)
-				{
-					Dbg.Warning("Exception caught when sending get request to main server.");
-					Dbg.Warning("Message: {0} ", e.Message);
-				}
-			});
-		}
-
-		/// <summary>
-		/// 	Send a request to get data from the main server without a callback.
-		/// </summary>
-		public static void Send(MSMessage message)
+	/// <summary>
+	/// 	Send a request to get data from the main server without a callback.
+	/// </summary>
+	public static void Send(MSMessage message)
+	{
+		Task.Run(async () =>
 		{
-			Task.Run(async () =>
+			try
 			{
-				try
-				{
-					HttpClient httpClient = new HttpClient();
-					HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
-					request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
+				HttpClient httpClient = new HttpClient();
+				HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
+				request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
 
-					// Send message.
-					HttpResponseMessage result = await httpClient.SendAsync(request);
+				// Send message.
+				HttpResponseMessage result = await httpClient.SendAsync(request);
 
-					// Clean up.
-					httpClient.Dispose();
-					request.Dispose();
-					result.Dispose();
-				}
-				catch (Exception e)
-				{
-					Dbg.Warning("Exception caught when sending get request to main server.");
-					Dbg.Warning("Message: {0} ", e.Message);
-				}
-			});
-		}
+				// Clean up.
+				httpClient.Dispose();
+				request.Dispose();
+				result.Dispose();
+			}
+			catch (Exception e)
+			{
+				Dbg.Warning("Exception caught when sending get request to main server.");
+				Dbg.Warning("Message: {0} ", e.Message);
+			}
+		});
+	}
 }

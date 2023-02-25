@@ -907,12 +907,13 @@ public class Server
 					foundShip.Forward = forward;
 					foundShip.Up = up;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							PlayerNativeId = pl.PlayerId,
+							PlayerId = pl.PlayerId,
+							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -931,12 +932,13 @@ public class Server
 					foundShip.Forward = forward2;
 					foundShip.Up = up2;
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							PlayerNativeId = pl.PlayerId,
+							PlayerId = pl.PlayerId,
+							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -949,12 +951,13 @@ public class Server
 				if (foundShip != null)
 				{
 					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerNativeId == pl.PlayerId) == null)
+					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
 					{
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerGUID = pl.GUID,
-							PlayerNativeId = pl.PlayerId,
+							PlayerId = pl.PlayerId,
+							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});

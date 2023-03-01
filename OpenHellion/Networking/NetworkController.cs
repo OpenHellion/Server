@@ -10,11 +10,11 @@ namespace OpenHellion.Networking;
 
 public class NetworkController
 {
-	private ConnectionGame _gameConnection;
+	private GSConnection _gameConnection;
 
 	private Dictionary<long, int> _clients = new();
 
-	private ConnectionGameStatusListener statusPortConnectionListener;
+	private StatusConnectionListener statusPortConnectionListener;
 
 	public static string ServerID = null;
 
@@ -36,7 +36,7 @@ public class NetworkController
 
 	public NetworkController()
 	{
-		_gameConnection = new ConnectionGame();
+		_gameConnection = new GSConnection();
 		EventSystem.AddListener(typeof(LogInRequest), LogInRequestListener);
 		EventSystem.AddListener(typeof(LogOutRequest), LogOutRequestListener);
 	}
@@ -193,7 +193,7 @@ public class NetworkController
 
 	public void Start()
 	{
-		statusPortConnectionListener = new ConnectionGameStatusListener();
+		statusPortConnectionListener = new StatusConnectionListener();
 		statusPortConnectionListener.Start(Server.StatusPort);
 		_gameConnection.Start(Server.GamePort);
 	}

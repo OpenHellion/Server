@@ -6,7 +6,7 @@ using ZeroGravity;
 
 namespace OpenHellion.Networking;
 
-public class ConnectionGameStatusListener
+public class StatusConnectionListener
 {
 	private volatile bool runThread;
 
@@ -25,9 +25,11 @@ public class ConnectionGameStatusListener
 		runThread = true;
 		tcpListener = new TcpListener(new IPEndPoint(IPAddress.Any, port));
 		tcpListener.Start();
-		listeningThread = new Thread(Listen);
-		listeningThread.IsBackground = true;
-		listeningThread.Priority = ThreadPriority.AboveNormal;
+		listeningThread = new Thread(Listen)
+		{
+			IsBackground = true,
+			Priority = ThreadPriority.AboveNormal
+		};
 		listeningThread.Start();
 	}
 
@@ -42,7 +44,7 @@ public class ConnectionGameStatusListener
 				{
 					break;
 				}
-				ConnectionGameStatus connection = new ConnectionGameStatus(soc);
+				StatusConnection connection = new StatusConnection(soc);
 				connection.Start();
 			}
 			catch (Exception)

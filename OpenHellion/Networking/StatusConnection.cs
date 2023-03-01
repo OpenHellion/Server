@@ -7,13 +7,13 @@ using ZeroGravity.Objects;
 
 namespace OpenHellion.Networking;
 
-public class ConnectionGameStatus
+public class StatusConnection
 {
 	private Socket socket;
 
 	private Thread listeningThread;
 
-	public ConnectionGameStatus(Socket soc)
+	public StatusConnection(Socket soc)
 	{
 		socket = soc;
 	}

@@ -1,4 +1,4 @@
-// ConnectionGame.cs
+// GSConnection.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -13,7 +13,7 @@
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
@@ -29,7 +29,7 @@ namespace OpenHellion.Networking;
 /// 	This works as an abstraction layer between the controller and the networking library.
 /// 	Most funcions in this method is absracted by the <c>NetworkController</c>
 /// </summary>
-internal class ConnectionGame
+internal class GSConnection
 {
 	public class Client
 	{
@@ -48,7 +48,7 @@ internal class ConnectionGame
 		Telepathy.Log.Warning = Dbg.Warning;
 		Telepathy.Log.Error = Dbg.Error;
 
-		_server = new(30000)
+		_server = new(80000)
 		{
 			OnConnected = OnConnected,
 			OnData = OnData,
@@ -185,7 +185,7 @@ internal class ConnectionGame
 		if (_clientConnections.ContainsKey(connectionId))
 		{
 			// If there is a player, make sure it has been disconnected.
-			ConnectionGame.Client cl = _clientConnections[connectionId];
+			GSConnection.Client cl = _clientConnections[connectionId];
 			cl.Player?.LogoutDisconnectReset();
 			cl.Player?.DiconnectFromNetworkContoller();
 

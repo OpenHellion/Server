@@ -1,4 +1,4 @@
-// ConnectionMain.cs
+// MSConnection.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -29,7 +29,7 @@ namespace OpenHellion.Networking;
 /// 	Handles connections to the main server.<br />
 /// 	Since the main server uses an REST api, the requests execute a callback.
 /// </summary>
-public static class ConnectionMain
+public static class MSConnection
 {
 	public static string IpAddress = "localhost";
 	public static ushort Port = 6001;

@@ -742,8 +742,8 @@ public class Server
 #if HELLION_SP
 		CheckAndFixPorts();
 #endif
-		Properties.GetProperty("main_server_ip", ref ConnectionMain.IpAddress);
-		Properties.GetProperty("main_server_port", ref ConnectionMain.Port);
+		Properties.GetProperty("main_server_ip", ref MSConnection.IpAddress);
+		Properties.GetProperty("main_server_port", ref MSConnection.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
@@ -1156,7 +1156,7 @@ public class Server
 		EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
 #if !HELLION_SP
-		ConnectionMain.Get<CheckInResponse>(new CheckInRequest
+		MSConnection.Get<CheckInResponse>(new CheckInRequest
 		{
 			//ServerID = NetworkController.ServerID,
 			//ServerName = ServerName,
@@ -2898,7 +2898,7 @@ public class Server
 
 	public void SendCheckInMessage(double amount)
 	{
-		ConnectionMain.Send(new CheckInMessage
+		MSConnection.Send(new CheckInMessage
 		{
 			ServerId = NetworkController.ServerID
 		});

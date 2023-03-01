@@ -1186,20 +1186,22 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			HairType = HairType,
 			NativeId = NativeId,
 			PlayerId = PlayerId,
-			ParentID = ((Parent != null) ? Parent.GUID : (-1)),
-			ParentType = ((Parent != null) ? Parent.ObjectType : SpaceObjectType.None),
+			ParentID = (Parent != null) ? Parent.GUID : (-1),
+			ParentType = (Parent != null) ? Parent.ObjectType : SpaceObjectType.None,
 			DynamicObjects = dods,
 			AnimationStatsMask = AnimationStatsMask,
 			LockedToTriggerID = LockedToTriggerID
 		};
 		if (IsAlive || !checkAlive || CurrentSpawnPoint == null)
 		{
-			details.TransformData = new CharacterTransformData();
-			details.TransformData.LocalPosition = LocalPosition.ToFloatArray();
-			details.TransformData.LocalRotation = LocalRotation.ToFloatArray();
-			details.TransformData.MouseLook = MouseLook;
-			details.TransformData.FreeLookX = FreeLookX;
-			details.TransformData.FreeLookY = FreeLookY;
+			details.TransformData = new CharacterTransformData
+			{
+				LocalPosition = LocalPosition.ToFloatArray(),
+				LocalRotation = LocalRotation.ToFloatArray(),
+				MouseLook = MouseLook,
+				FreeLookX = FreeLookX,
+				FreeLookY = FreeLookY
+			};
 		}
 		else
 		{

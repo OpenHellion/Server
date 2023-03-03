@@ -1,8 +1,16 @@
 {
-    "msbuild": {
-        "Configuration": "Editor"
-    },
 	"FormattingOptions": {
-		"EnableEditorConfigSupport": false
+		"EnableEditorConfigSupport": true,
+		"OrganizeImports": true
+	},
+	"RoslynExtensionsOptions": {
+		"EnableEditorConfigSupport": true,
+		"EnableAnalyzersSupport": true,
+		"enableDecompilationSupport": true,
+		"enableImportCompletion": true,
+		"LocationPaths": ["./NuGet/microsoft.unity.analyzers.1.15.0/analyzers/dotnet/cs"]
+	},
+	"msbuild": {
+		"Configuration": "Editor"
 	}
 }

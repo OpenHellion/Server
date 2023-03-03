@@ -10,49 +10,49 @@ namespace OpenHellion.Networking;
 
 public class NetworkController
 {
-	private GSConnection _gameConnection;
+	private GSConnection m_GameConnection;
 
-	private Dictionary<long, int> _clients = new();
+	private Dictionary<long, int> m_Clients = new();
 
-	private StatusConnectionListener statusPortConnectionListener;
+	private StatusConnectionListener m_StatusPortConnectionListener;
 
 	public static string ServerID = null;
 
-	private static NetworkController s_instance;
+	private static NetworkController s_Instance;
 	public static NetworkController Instance
 	{
 		get
 		{
-			if (s_instance == null)
+			if (s_Instance == null)
 			{
 				Dbg.Info("Creating new network controller instance.");
-				s_instance = new NetworkController();
-				return s_instance;
+				s_Instance = new NetworkController();
+				return s_Instance;
 			}
 
-			return s_instance;
+			return s_Instance;
 		}
 	}
 
 	public NetworkController()
 	{
-		_gameConnection = new GSConnection();
+		m_GameConnection = new GSConnection();
 		EventSystem.AddListener(typeof(LogInRequest), LogInRequestListener);
 		EventSystem.AddListener(typeof(LogOutRequest), LogOutRequestListener);
 	}
 
 	public short CurrentOnlinePlayers()
 	{
-		return (short)_clients.Count;
+		return (short)m_Clients.Count;
 	}
 
 	public void DisconnectClient(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (m_Clients.ContainsKey(guid))
 		{
 			RemoveClient(guid);
 
-			_gameConnection.Disconnect(_clients[guid]);
+			m_GameConnection.Disconnect(m_Clients[guid]);
 		}
 		else
 		{
@@ -66,15 +66,15 @@ public class NetworkController
 	/// </summary>
 	public void DisconnectAllClients()
 	{
-		_gameConnection.DisconnectAll();
-		_clients.Clear();
+		m_GameConnection.DisconnectAll();
+		m_Clients.Clear();
 	}
 
 	public void Tick()
 	{
-		if (_gameConnection != null)
+		if (m_GameConnection != null)
 		{
-			_gameConnection.Tick();
+			m_GameConnection.Tick();
 		}
 		else
 		{
@@ -84,7 +84,7 @@ public class NetworkController
 
 	public void SendCharacterSpawnToOtherPlayers(Player spawnedPlayer)
 	{
-		if (!_clients.ContainsKey(spawnedPlayer.GUID))
+		if (!m_Clients.ContainsKey(spawnedPlayer.GUID))
 		{
 			return;
 		}
@@ -193,16 +193,16 @@ public class NetworkController
 
 	public void Start()
 	{
-		statusPortConnectionListener = new StatusConnectionListener();
-		statusPortConnectionListener.Start(Server.StatusPort);
-		_gameConnection.Start(Server.GamePort);
+		m_StatusPortConnectionListener = new StatusConnectionListener();
+		m_StatusPortConnectionListener.Start(Server.StatusPort);
+		m_GameConnection.Start(Server.GamePort);
 	}
 
 	public void SendToGameClient(long clientID, NetworkData data)
 	{
-		if (_clients.ContainsKey(clientID))
+		if (m_Clients.ContainsKey(clientID))
 		{
-			_gameConnection.Send(_clients[clientID], data);
+			m_GameConnection.Send(m_Clients[clientID], data);
 		}
 		else
 		{
@@ -212,11 +212,11 @@ public class NetworkController
 
 	public void LogOutRequestListener(NetworkData data)
 	{
-		if (_clients.ContainsKey(data.Sender))
+		if (m_Clients.ContainsKey(data.Sender))
 		{
 			LogOutRequest lor = data as LogOutRequest;
 			LogOutPlayer(lor.Sender);
-			_gameConnection.ClearEverythingAndSend(_clients[lor.Sender], new LogOutResponse
+			m_GameConnection.ClearEverythingAndSend(m_Clients[lor.Sender], new LogOutResponse
 			{
 				Sender = 0L,
 				Response = ResponseResult.Success
@@ -230,9 +230,9 @@ public class NetworkController
 
 	public void LogOutPlayer(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (m_Clients.ContainsKey(guid))
 		{
-			_gameConnection.GetPlayer(_clients[guid]).LogoutDisconnectReset();
+			m_GameConnection.GetPlayer(m_Clients[guid]).LogoutDisconnectReset();
 		}
 		else
 		{
@@ -245,55 +245,32 @@ public class NetworkController
 	/// 	A partial client is created when connected, but it doesn't have the proper guid.
 	/// </summary>
 	// TODO: This is stupid
-	internal bool PatchClient(long guid, long sender)
+	internal bool PatchClient(long guid, long connectionId)
 	{
 		// If client already exists on server, disconnect it.
-		if (_clients.ContainsKey(guid))
+		if (m_Clients.ContainsKey(guid))
 		{
 			try
 			{
 				DisconnectClient(guid);
-				DisconnectClient(sender);
 				return false;
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				int? sc = null;
-				long? usedId = null;
-				if (_clients.ContainsKey(guid))
-				{
-					DisconnectClient(guid);
-					sc = _clients[guid];
-					usedId = guid;
-				}
-
-				if (_clients.ContainsKey(sender))
-				{
-					sc = _clients[sender];
-					usedId = sender;
-				}
-
-				if (!sc.HasValue || !usedId.HasValue)
-				{
-					return false;
-				}
-
-				_gameConnection.PatchClient(sc.Value, guid);
-
-				_clients.Add(guid, sc.Value);
-				_clients.Remove(usedId.Value);
+				Dbg.Error("Couldn't disconnect client when patching:", ex);
+				return false;
 			}
 		}
 
 		// Convert sender into a proper client.
-		long? tempId = _clients.Values.Single(entry => entry == (int) sender);
-		if (tempId.HasValue)
+		long? temporaryId = m_Clients.FirstOrDefault(entry => entry.Value == (int) connectionId).Key;
+		if (temporaryId.HasValue)
 		{
 			// Sender is connection id.
-			_gameConnection.PatchClient((int) sender, guid);
+			m_GameConnection.PatchClient((int) connectionId, guid);
 
-			_clients.Add(guid, (int) sender);
-			_clients.Remove(tempId.Value);
+			m_Clients.Remove(temporaryId.Value);
+			m_Clients.Add(guid, (int) connectionId);
 		}
 
 		return true;
@@ -303,14 +280,14 @@ public class NetworkController
 	// Has to be here because _client shouldn't be exposed.
 	internal void AddBareClient(int connectionId)
 	{
-		long tempID = -1L;
-		while (_clients.ContainsKey(tempID))
+		long temporaryID = -1L;
+		while (m_Clients.ContainsKey(temporaryID))
 		{
-			tempID--;
+			temporaryID--;
 		}
 
-		_clients.Add(tempID, connectionId);
-		_gameConnection.AddBareClient(connectionId, tempID);
+		m_Clients.Add(temporaryID, connectionId);
+		m_GameConnection.AddBareClient(connectionId, temporaryID);
 	}
 
 	/// <summary>
@@ -320,10 +297,10 @@ public class NetworkController
 	/// </summary>
 	public void RemoveClient(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (m_Clients.ContainsKey(guid))
 		{
-			_gameConnection.RemoveClient(_clients[guid]);
-			_clients.Remove(guid);
+			m_GameConnection.RemoveClient(m_Clients[guid]);
+			m_Clients.Remove(guid);
 		}
 		else
 		{
@@ -336,9 +313,9 @@ public class NetworkController
 	/// </summary>
 	public Player GetPlayer(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (m_Clients.ContainsKey(guid))
 		{
-			return _gameConnection.GetPlayer(_clients[guid]);
+			return m_GameConnection.GetPlayer(m_Clients[guid]);
 		}
 
 		return null;
@@ -349,7 +326,7 @@ public class NetworkController
 	/// </summary>
 	public Player[] GetAllPlayers()
 	{
-		return _gameConnection.GetAllPlayers();
+		return m_GameConnection.GetAllPlayers();
 	}
 
 	public void ConnectPlayer(Player player)
@@ -358,10 +335,10 @@ public class NetworkController
 		{
 			player.Initialize = true;
 		}
-		if (_clients.ContainsKey(player.GUID))
+		if (m_Clients.ContainsKey(player.GUID))
 		{
 			player.ConnectToNetworkController();
-			_gameConnection.SetPlayer(_clients[player.GUID], player);
+			m_GameConnection.SetPlayer(m_Clients[player.GUID], player);
 			LogInResponse lir = new LogInResponse();
 			lir.GUID = player.FakeGuid;
 			lir.Data = new CharacterData
@@ -399,7 +376,7 @@ public class NetworkController
 	/// </summary>
 	public void SendToAllClients(NetworkData data, long skipPlayerGUID = -1L)
 	{
-		_gameConnection.SendToAll(data, skipPlayerGUID);
+		m_GameConnection.SendToAll(data, skipPlayerGUID);
 	}
 
 	/// <summary>
@@ -447,19 +424,19 @@ public class NetworkController
 	private void OnApplicationQuit()
 	{
 		DisconnectAllClients();
-		statusPortConnectionListener.Stop();
-		_gameConnection.Stop();
+		m_StatusPortConnectionListener.Stop();
+		m_GameConnection.Stop();
 	}
 
 	// Second part of disconnecting. Called by OnDisconnect in ConnectionGame.
 	// Has to be here because _client shouldn't be exposed.
 	internal void OnDisconnect(int connectionId)
 	{
-		// Get guid by searching through the values.
-		if (_clients.ContainsValue(connectionId))
+		// Get a single guid from the array's values, and remove the guid from this array.
+		if (m_Clients.ContainsValue(connectionId))
 		{
-			long guid = _clients.Values.Single(entry => entry == connectionId);
-			_clients.Remove(guid);
+			long guid = m_Clients.FirstOrDefault(entry => entry.Value == connectionId).Key;
+			m_Clients.Remove(guid);
 		}
 		else
 		{
@@ -472,6 +449,6 @@ public class NetworkController
 	/// </summary>
 	public bool ContainsClient(long guid)
 	{
-		return _clients.ContainsKey(guid);
+		return m_Clients.ContainsKey(guid);
 	}
 }

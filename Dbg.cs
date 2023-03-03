@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 public static class Dbg
 {
@@ -34,13 +35,17 @@ public static class Dbg
 
 #if !HELLION_SP
 		// Logging to console creates issues for the client if it is singleplayer. Plus it is pointless.
-		ConsoleTraceListener consoleListener = new ConsoleTraceListener(useErrorStream: false);
-		consoleListener.TraceOutputOptions = TraceOptions.None;
+		ConsoleTraceListener consoleListener = new ConsoleTraceListener(useErrorStream: false)
+		{
+			TraceOutputOptions = TraceOptions.None
+		};
 		Trace.Listeners.Add(consoleListener);
 #endif
 
-		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false));
-		writerListener.TraceOutputOptions = TraceOptions.None;
+		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false))
+		{
+			TraceOutputOptions = TraceOptions.None
+		};
 		Trace.Listeners.Add(writerListener);
 
 		Trace.AutoFlush = true;
@@ -61,16 +66,6 @@ public static class Dbg
 		catch
 		{
 		}
-	}
-
-	private static string ObjectParamsToString(params object[] values)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-		return message;
 	}
 
 	private static string GetString(object value)
@@ -95,7 +90,7 @@ public static class Dbg
 		}
 		else
 		{
-			WriteToLog(ObjectParamsToString(values));
+			WriteToLog(string.Join(" ", values));
 		}
 	}
 
@@ -119,61 +114,6 @@ public static class Dbg
 		}
 	}
 
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogArray(object[] values, int printLimit = 10)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length && i < printLimit; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-	}
-
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogArray(short[] values, int printLimit = 10)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length && i < printLimit; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-	}
-
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogArray(int[] values, int printLimit = 10)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length && i < printLimit; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-	}
-
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogArray(float[] values, int printLimit = 10)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length && i < printLimit; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-	}
-
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogArray(double[] values, int printLimit = 10)
-	{
-		string message = "";
-		for (int i = 0; i < values.Length && i < printLimit; i++)
-		{
-			message = message + ((i > 0) ? ", " : "") + GetString(values[i]);
-		}
-	}
-
 	public static void UnformattedMessage(string message)
 	{
 		Trace.WriteLine(message);
@@ -192,7 +132,7 @@ public static class Dbg
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + ObjectParamsToString(values));
+			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + string.Join(" ", values));
 		}
 	}
 
@@ -209,7 +149,7 @@ public static class Dbg
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[WARNING] " + ObjectParamsToString(values));
+			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[WARNING] " + string.Join(" ", values));
 		}
 	}
 
@@ -226,7 +166,7 @@ public static class Dbg
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + ObjectParamsToString(values));
+			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + string.Join(" ", values));
 		}
 	}
 

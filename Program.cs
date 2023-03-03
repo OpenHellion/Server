@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using ZeroGravity;
@@ -32,11 +33,11 @@ public static class Program
 		Dbg.OutputDir = Server.ConfigDir;
 		Dbg.Initialize();
 
+		Dbg.Log("Starting server with args:", string.Join(" ", args));
+
 #if HELLION_SP
 		if (!ParentProcess.FileName.ToLower().Contains("hellion") && !ParentProcess.FileName.ToLower().Contains("unity"))
 		{
-			//Process.Start("steam://run/588210");
-
 			Dbg.Error("This executable is for creating the single player server, and has to be executed by either the Unity Editor or the Hellion distributable. That means you can't launch this manually.");
 			return;
 		}

@@ -13,31 +13,31 @@ namespace ZeroGravity;
 
 public class Persistence
 {
-	public static string PersistanceFileName = "hellion_{0}.save";
+	private const string k_PersistanceFileName = "hellion_{0}.save";
 
-	public static int CurrentSaveType = 1;
+	private const int k_CurrentSaveType = 1;
 
-	public int SaveType;
+	private int m_SaveType;
 
-	public double SolarSystemTime;
+	private double m_SolarSystemTime;
 
-	public SaveFileAuxData AuxData;
+	private SaveFileAuxData m_AuxData;
 
-	public HashSet<PersistenceObjectData> Ships;
+	private HashSet<PersistenceObjectData> m_Ships;
 
-	public HashSet<PersistenceObjectData> Asteroids;
+	private HashSet<PersistenceObjectData> m_Asteroids;
 
-	public HashSet<PersistenceObjectData> Players;
+	private HashSet<PersistenceObjectData> m_Players;
 
-	public HashSet<PersistenceObjectData> RespawnObjects;
+	private HashSet<PersistenceObjectData> m_RespawnObjects;
 
-	public HashSet<PersistenceObjectData> SpawnPoints;
+	private HashSet<PersistenceObjectData> m_SpawnPoints;
 
-	public HashSet<PersistenceObjectData> ArenaControllers;
+	private HashSet<PersistenceObjectData> m_ArenaControllers;
 
-	public PersistenceObjectData DoomControllerData;
+	private PersistenceObjectData m_DoomControllerData;
 
-	public PersistenceObjectData SpawnManagerData;
+	private PersistenceObjectData m_SpawnManagerData;
 
 	private static void SaveVesselPersistence(ref Persistence per, SpaceObjectVessel ves)
 	{
@@ -47,11 +47,11 @@ public class Persistence
 		}
 		if (ves.ObjectType == SpaceObjectType.Ship)
 		{
-			per.Ships.Add((ves as IPersistantObject).GetPersistenceData());
+			per.m_Ships.Add((ves as IPersistantObject).GetPersistenceData());
 		}
 		else if (ves.ObjectType == SpaceObjectType.Asteroid)
 		{
-			per.Asteroids.Add((ves as IPersistantObject).GetPersistenceData());
+			per.m_Asteroids.Add((ves as IPersistantObject).GetPersistenceData());
 		}
 		if (ves.DockedVessels != null && ves.DockedVessels.Count > 0)
 		{
@@ -84,14 +84,14 @@ public class Persistence
 			Forward = obj.Data.Forward,
 			Up = obj.Data.Up,
 			AuxData = obj.Data.AuxData,
-			RespawnTime = ((obj.Data.SpawnSettings.Length != 0) ? obj.Data.SpawnSettings[0].RespawnTime : (-1f)),
+			RespawnTime = (obj.Data.SpawnSettings.Length != 0) ? obj.Data.SpawnSettings[0].RespawnTime : (-1f),
 			Timer = obj.Timer
 		};
 		if (obj.APDetails != null)
 		{
 			data.AttachPointID = obj.APDetails.InSceneID;
 		}
-		per.RespawnObjects.Add(data);
+		per.m_RespawnObjects.Add(data);
 	}
 
 	private static void SaveSpawnPointPeristence(ref Persistence per, ShipSpawnPoint sp)
@@ -108,23 +108,25 @@ public class Persistence
 			data.PlayerGUID = sp.Player.GUID;
 			data.IsPlayerInSpawnPoint = sp.IsPlayerInSpawnPoint;
 		}
-		per.SpawnPoints.Add(data);
+		per.m_SpawnPoints.Add(data);
 	}
 
 	public static void Save(string filename = null, SaveFileAuxData auxData = null)
 	{
 		try
 		{
-			Persistence per = new Persistence();
-			per.SaveType = CurrentSaveType;
-			per.SolarSystemTime = Server.Instance.SolarSystem.CurrentTime;
-			per.AuxData = auxData;
-			per.Ships = new HashSet<PersistenceObjectData>();
-			per.Asteroids = new HashSet<PersistenceObjectData>();
-			per.Players = new HashSet<PersistenceObjectData>();
-			per.RespawnObjects = new HashSet<PersistenceObjectData>();
-			per.SpawnPoints = new HashSet<PersistenceObjectData>();
-			per.ArenaControllers = new HashSet<PersistenceObjectData>();
+			Persistence per = new Persistence
+			{
+				m_SaveType = k_CurrentSaveType,
+				m_SolarSystemTime = Server.Instance.SolarSystem.CurrentTime,
+				m_AuxData = auxData,
+				m_Ships = new HashSet<PersistenceObjectData>(),
+				m_Asteroids = new HashSet<PersistenceObjectData>(),
+				m_Players = new HashSet<PersistenceObjectData>(),
+				m_RespawnObjects = new HashSet<PersistenceObjectData>(),
+				m_SpawnPoints = new HashSet<PersistenceObjectData>(),
+				m_ArenaControllers = new HashSet<PersistenceObjectData>()
+			};
 			foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 			{
 				if (!ves.IsDocked && ves.StabilizeToTargetObj == null && (ves.ObjectType == SpaceObjectType.Ship || ves.ObjectType == SpaceObjectType.Asteroid))
@@ -136,7 +138,7 @@ public class Persistence
 			{
 				if (pl != null)
 				{
-					per.Players.Add(((IPersistantObject)pl).GetPersistenceData());
+					per.m_Players.Add(pl.GetPersistenceData());
 				}
 			}
 			foreach (Server.DynamicObjectsRespawn obj in Server.Instance.DynamicObjectsRespawnList)
@@ -156,10 +158,10 @@ public class Persistence
 			}
 			foreach (DeathMatchArenaController dmac in Server.Instance.DeathMatchArenaControllers)
 			{
-				per.ArenaControllers.Add(dmac.GetPersistenceData());
+				per.m_ArenaControllers.Add(dmac.GetPersistenceData());
 			}
-			per.DoomControllerData = Server.Instance.DoomedShipController.GetPersistenceData();
-			per.SpawnManagerData = SpawnManager.GetPersistenceData();
+			per.m_DoomControllerData = Server.Instance.DoomedShipController.GetPersistenceData();
+			per.m_SpawnManagerData = SpawnManager.GetPersistenceData();
 			DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 			FileInfo[] Files = d.GetFiles("*.save");
 #if !HELLION_SP
@@ -174,7 +176,7 @@ public class Persistence
 #endif
 			if (filename == null)
 			{
-				filename = string.Format(PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
+				filename = string.Format(k_PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 			}
 			Json.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), Json.Formatting.Indented);
 		}
@@ -200,20 +202,22 @@ public class Persistence
 				InSceneID = data.AttachPointID.Value
 			};
 		}
-		DynamicObjectSceneData dynamicObjectSceneData = new DynamicObjectSceneData();
-		dynamicObjectSceneData.ItemID = data.ItemID;
-		dynamicObjectSceneData.Position = data.Position;
-		dynamicObjectSceneData.Forward = data.Forward;
-		dynamicObjectSceneData.Up = data.Up;
-		dynamicObjectSceneData.AttachPointInSceneId = (data.AttachPointID.HasValue ? data.AttachPointID.Value : (-1));
-		dynamicObjectSceneData.AuxData = data.AuxData;
-		dynamicObjectSceneData.SpawnSettings = new DynaminObjectSpawnSettings[1]
+		DynamicObjectSceneData dynamicObjectSceneData = new DynamicObjectSceneData
 		{
-			new DynaminObjectSpawnSettings
+			ItemID = data.ItemID,
+			Position = data.Position,
+			Forward = data.Forward,
+			Up = data.Up,
+			AttachPointInSceneId = data.AttachPointID.HasValue ? data.AttachPointID.Value : (-1),
+			AuxData = data.AuxData,
+			SpawnSettings = new DynaminObjectSpawnSettings[1]
 			{
-				RespawnTime = data.RespawnTime,
-				SpawnChance = -1f,
-				Tag = ""
+				new DynaminObjectSpawnSettings
+				{
+					RespawnTime = data.RespawnTime,
+					SpawnChance = -1f,
+					Tag = ""
+				}
 			}
 		};
 		DynamicObjectSceneData sceneData = dynamicObjectSceneData;
@@ -237,12 +241,12 @@ public class Persistence
 			sp.Type = data.SpawnType;
 			if (data.PlayerGUID.HasValue)
 			{
-				Player pl = (sp.Player = Server.Instance.GetPlayer(data.PlayerGUID.Value));
+				sp.Player = Server.Instance.GetPlayer(data.PlayerGUID.Value);
 				sp.IsPlayerInSpawnPoint = data.IsPlayerInSpawnPoint.Value;
-				pl.IsInsideSpawnPoint = sp.IsPlayerInSpawnPoint;
+				sp.Player.IsInsideSpawnPoint = sp.IsPlayerInSpawnPoint;
 				if (sp.IsPlayerInSpawnPoint || sp.State == SpawnPointState.Authorized)
 				{
-					pl.SetSpawnPoint(sp);
+					sp.Player.SetSpawnPoint(sp);
 				}
 			}
 		}
@@ -257,62 +261,62 @@ public class Persistence
 		DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 		FileInfo[] files = d.GetFiles("*.save");
 		FileInfo loadFromFile = null;
-		loadFromFile = ((filename == null) ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower()));
+		loadFromFile = (filename == null) ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower());
 		if (loadFromFile != null)
 		{
-			Persistence per = Json.Load<Persistence>(loadFromFile.FullName);
-			Server.Instance.SolarSystem.CalculatePositionsAfterTime(per.SolarSystemTime);
-			if (per.Asteroids != null)
+			Persistence persistence = Json.Load<Persistence>(loadFromFile.FullName);
+			Server.Instance.SolarSystem.CalculatePositionsAfterTime(persistence.m_SolarSystemTime);
+			if (persistence.m_Asteroids != null)
 			{
-				foreach (PersistenceObjectData data6 in per.Asteroids)
+				foreach (PersistenceObjectData asteroidData in persistence.m_Asteroids)
 				{
-					Asteroid ast = new Asteroid(data6.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
-					ast.LoadPersistenceData(data6);
+					Asteroid ast = new Asteroid(asteroidData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
+					ast.LoadPersistenceData(asteroidData);
 				}
 			}
-			if (per.Ships != null)
+			if (persistence.m_Ships != null)
 			{
-				foreach (PersistenceObjectData data5 in per.Ships)
+				foreach (PersistenceObjectData shipData in persistence.m_Ships)
 				{
-					Ship sh = new Ship(data5.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
-					sh.LoadPersistenceData(data5);
+					Ship sh = new Ship(shipData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
+					sh.LoadPersistenceData(shipData);
 				}
 			}
-			if (per.Players != null)
+			if (persistence.m_Players != null)
 			{
-				foreach (PersistenceObjectDataPlayer data4 in per.Players)
+				foreach (PersistenceObjectDataPlayer playerData in persistence.m_Players.Cast<PersistenceObjectDataPlayer>())
 				{
-					Player pl = new Player(data4.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", "", data4.Gender, data4.HeadType, data4.HairType, addToServerList: false);
-					pl.LoadPersistenceData(data4);
+					Player player = new Player(playerData.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", "", playerData.Gender, playerData.HeadType, playerData.HairType, addToServerList: false);
+					player.LoadPersistenceData(playerData);
 				}
 			}
-			if (per.RespawnObjects != null)
+			if (persistence.m_RespawnObjects != null)
 			{
-				foreach (PersistenceObjectDataRespawnObject data3 in per.RespawnObjects)
+				foreach (PersistenceObjectDataRespawnObject respawnObjectData in persistence.m_RespawnObjects.Cast<PersistenceObjectDataRespawnObject>())
 				{
-					LoadRespawnObjectPersistence(data3);
+					LoadRespawnObjectPersistence(respawnObjectData);
 				}
 			}
-			if (per.SpawnPoints != null)
+			if (persistence.m_SpawnPoints != null)
 			{
-				foreach (PersistenceObjectDataSpawnPoint data2 in per.SpawnPoints)
+				foreach (PersistenceObjectDataSpawnPoint spawnPointData in persistence.m_SpawnPoints.Cast<PersistenceObjectDataSpawnPoint>())
 				{
-					LoadSpawnPointPeristence(data2);
+					LoadSpawnPointPeristence(spawnPointData);
 				}
 			}
-			if (per.ArenaControllers != null)
+			if (persistence.m_ArenaControllers != null)
 			{
-				foreach (PersistenceArenaControllerData data in per.ArenaControllers)
+				foreach (PersistenceArenaControllerData arenaControllerData in persistence.m_ArenaControllers.Cast<PersistenceArenaControllerData>())
 				{
 					DeathMatchArenaController arenaController = new DeathMatchArenaController();
-					arenaController.LoadPersistenceData(data);
+					arenaController.LoadPersistenceData(arenaControllerData);
 				}
 			}
-			if (per.DoomControllerData != null)
+			if (persistence.m_DoomControllerData != null)
 			{
-				Server.Instance.DoomedShipController.LoadPersistenceData(per.DoomControllerData);
+				Server.Instance.DoomedShipController.LoadPersistenceData(persistence.m_DoomControllerData);
 			}
-			SpawnManager.LoadPersistenceData(per.SpawnManagerData);
+			SpawnManager.LoadPersistenceData(persistence.m_SpawnManagerData);
 			return true;
 		}
 		return false;
@@ -345,22 +349,24 @@ public class Persistence
 			{
 				auxData = ObjectCopier.DeepCopy(dod.DefaultAuxData);
 			}
-			DynamicObjectSceneData dynamicObjectSceneData = new DynamicObjectSceneData();
-			dynamicObjectSceneData.ItemID = persistenceData.ItemID;
-			dynamicObjectSceneData.Position = (persistenceData.RespawnTime.HasValue ? persistenceData.RespawnPosition : persistenceData.LocalPosition);
-			dynamicObjectSceneData.Forward = (persistenceData.RespawnTime.HasValue ? persistenceData.RespawnForward : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Forward).ToFloatArray());
-			dynamicObjectSceneData.Up = (persistenceData.RespawnTime.HasValue ? persistenceData.RespawnUp : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Up).ToFloatArray());
-			dynamicObjectSceneData.AttachPointInSceneId = apInSceneID;
-			dynamicObjectSceneData.AuxData = ((persistenceData.RespawnAuxData != null) ? persistenceData.RespawnAuxData : auxData);
-			dynamicObjectSceneData.SpawnSettings = ((!persistenceData.RespawnTime.HasValue) ? null : new DynaminObjectSpawnSettings[1]
+			DynamicObjectSceneData dynamicObjectSceneData = new DynamicObjectSceneData
 			{
-				new DynaminObjectSpawnSettings
+				ItemID = persistenceData.ItemID,
+				Position = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnPosition : persistenceData.LocalPosition,
+				Forward = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnForward : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Forward).ToFloatArray(),
+				Up = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnUp : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Up).ToFloatArray(),
+				AttachPointInSceneId = apInSceneID,
+				AuxData = (persistenceData.RespawnAuxData != null) ? persistenceData.RespawnAuxData : auxData,
+				SpawnSettings = (!persistenceData.RespawnTime.HasValue) ? null : new DynaminObjectSpawnSettings[1]
 				{
-					RespawnTime = persistenceData.RespawnTime.Value,
-					SpawnChance = -1f,
-					Tag = ""
+					new DynaminObjectSpawnSettings
+					{
+						RespawnTime = persistenceData.RespawnTime.Value,
+						SpawnChance = -1f,
+						Tag = ""
+					}
 				}
-			});
+			};
 			DynamicObjectSceneData sceneData = dynamicObjectSceneData;
 			if (persistenceData is PersistenceObjectDataItem)
 			{
@@ -384,7 +390,7 @@ public class Persistence
 			{
 				dobj.LoadPersistenceData(persistenceData);
 			}
-			foreach (PersistenceObjectDataDynamicObject childData in persistenceData.ChildObjects)
+			foreach (PersistenceObjectDataDynamicObject childData in persistenceData.ChildObjects.Cast<PersistenceObjectDataDynamicObject>())
 			{
 				CreateDynamicObject(childData, dobj, structureSceneData);
 			}

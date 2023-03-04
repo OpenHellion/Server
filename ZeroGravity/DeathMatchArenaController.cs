@@ -48,7 +48,6 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public static Vector3D NewSaraPos(SpaceObjectVessel v)
 	{
-		double rad = v.Radius;
 		double a = MathHelper.RandomRange(0.0, System.Math.PI * 2.0);
 		double b = MathHelper.RandomRange(0.0, System.Math.PI);
 		double r = MathHelper.RandomRange(v.Radius + 50.0, v.Radius + 150.0);
@@ -64,14 +63,16 @@ public class DeathMatchArenaController : IPersistantObject
 			CurrentSpawnedShip = SpawnSara(MainVessel, NewSaraPos(MainVessel), arenaAsteroidID);
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, SpawnShipCallback);
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_min, DistanceCallback);
-			List<SpaceObjectVessel> allShips = new List<SpaceObjectVessel>(MainVessel.AllDockedVessels);
-			allShips.Add(MainVessel);
+			List<SpaceObjectVessel> allShips = new List<SpaceObjectVessel>(MainVessel.AllDockedVessels)
+			{
+				MainVessel
+			};
 		}
 	}
 
 	public void DistanceCallback(double dbl)
 	{
-		double distanceSquared = ((CurrentSpawnedShip == null) ? double.MaxValue : CurrentSpawnedShip.Position.DistanceSquared(MainVessel.Position));
+		double distanceSquared = (CurrentSpawnedShip == null) ? double.MaxValue : CurrentSpawnedShip.Position.DistanceSquared(MainVessel.Position);
 		if (distanceSquared > SquaredDistanceThreshold)
 		{
 			CurrentSpawnedShip = null;
@@ -82,12 +83,14 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public PersistenceObjectData GetPersistenceData()
 	{
-		PersistenceArenaControllerData data = new PersistenceArenaControllerData();
-		data.MainShipGUID = MainVessel.GUID;
-		data.CurrentSpawnedShipGUID = ((CurrentSpawnedShip == null) ? (-1) : CurrentSpawnedShip.GUID);
-		data.RespawnTimeForShip = RespawnTimeForShip;
-		data.SquaredDistanceThreshold = SquaredDistanceThreshold;
-		data.timePassedSince = timePassedSince;
+		PersistenceArenaControllerData data = new PersistenceArenaControllerData
+		{
+			MainShipGUID = MainVessel.GUID,
+			CurrentSpawnedShipGUID = ((CurrentSpawnedShip == null) ? (-1) : CurrentSpawnedShip.GUID),
+			RespawnTimeForShip = RespawnTimeForShip,
+			SquaredDistanceThreshold = SquaredDistanceThreshold,
+			timePassedSince = timePassedSince
+		};
 		return data;
 	}
 

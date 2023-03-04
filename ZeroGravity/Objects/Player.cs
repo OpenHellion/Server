@@ -1481,12 +1481,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		try
 		{
-			PersistenceObjectDataPlayer data = persistenceData as PersistenceObjectDataPlayer;
-			if (data == null)
+			if (persistenceData is not PersistenceObjectDataPlayer)
 			{
 				Dbg.Warning("PersistenceObjectDataPlayer data is null", GUID);
 				return;
 			}
+
+			PersistenceObjectDataPlayer data = persistenceData as PersistenceObjectDataPlayer;
 			GUID = data.GUID;
 			FakeGuid = data.FakeGUID;
 			LocalPosition = data.LocalPosition.ToVector3D();
@@ -1505,18 +1506,18 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			gravity = data.Gravity;
 			LocalVelocity = data.Velocity.ToVector3D();
 			CoreTemperature = data.CoreTemperature;
-			SpaceObject papa = null;
+			SpaceObject parent = null;
 			if (data.ParentType == SpaceObjectType.PlayerPivot)
 			{
-				papa = new Pivot(this, data.ParentPosition.ToVector3D(), data.ParentVelocity.ToVector3D());
+				parent = new Pivot(this, data.ParentPosition.ToVector3D(), data.ParentVelocity.ToVector3D());
 			}
 			else if (data.ParentGUID != -1)
 			{
-				papa = Server.Instance.GetObject(data.ParentGUID);
+				parent = Server.Instance.GetObject(data.ParentGUID);
 			}
-			if (papa != null)
+			if (parent != null)
 			{
-				Parent = papa;
+				Parent = parent;
 				if (data.CurrentRoomID.HasValue && Parent is SpaceObjectVessel)
 				{
 					CurrentRoom = (Parent as SpaceObjectVessel).Rooms.FirstOrDefault((Room m) => m.ID.InSceneID == data.CurrentRoomID.Value);
@@ -1524,9 +1525,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			else
 			{
-				if (data.ParentGUID != -1 && papa == null)
+				if (data.ParentGUID != -1 && parent == null)
 				{
-					Dbg.Error("Player papa object not found, SAVE MIGHT BE CORRUPTED", GUID, data.ParentGUID, data.ParentType);
+					Dbg.Error("Player parent object not found, SAVE MIGHT BE CORRUPTED", GUID, data.ParentGUID, data.ParentType);
 					return;
 				}
 				Parent = null;
@@ -1534,7 +1535,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			if (Parent != null)
 			{
-				foreach (PersistenceObjectDataDynamicObject dobjData in data.ChildObjects)
+				foreach (PersistenceObjectDataDynamicObject dobjData in data.ChildObjects.Cast<PersistenceObjectDataDynamicObject>())
 				{
 					Persistence.CreateDynamicObject(dobjData, this);
 				}

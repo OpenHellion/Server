@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Newtonsoft.Json;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -17,29 +18,7 @@ public class Persistence
 
 	private const int k_CurrentSaveType = 1;
 
-	private int m_SaveType;
-
-	private double m_SolarSystemTime;
-
-	private SaveFileAuxData m_AuxData;
-
-	private HashSet<PersistenceObjectData> m_Ships;
-
-	private HashSet<PersistenceObjectData> m_Asteroids;
-
-	private HashSet<PersistenceObjectData> m_Players;
-
-	private HashSet<PersistenceObjectData> m_RespawnObjects;
-
-	private HashSet<PersistenceObjectData> m_SpawnPoints;
-
-	private HashSet<PersistenceObjectData> m_ArenaControllers;
-
-	private PersistenceObjectData m_DoomControllerData;
-
-	private PersistenceObjectData m_SpawnManagerData;
-
-	private static void SaveVesselPersistence(ref Persistence per, SpaceObjectVessel ves)
+	private static void SaveVesselPersistence(ref PersistenceObject per, SpaceObjectVessel ves)
 	{
 		if (ves.IsDebrisFragment)
 		{
@@ -47,11 +26,11 @@ public class Persistence
 		}
 		if (ves.ObjectType == SpaceObjectType.Ship)
 		{
-			per.m_Ships.Add((ves as IPersistantObject).GetPersistenceData());
+			per.Ships.Add((ves as IPersistantObject).GetPersistenceData());
 		}
 		else if (ves.ObjectType == SpaceObjectType.Asteroid)
 		{
-			per.m_Asteroids.Add((ves as IPersistantObject).GetPersistenceData());
+			per.Asteroids.Add((ves as IPersistantObject).GetPersistenceData());
 		}
 		if (ves.DockedVessels != null && ves.DockedVessels.Count > 0)
 		{
@@ -73,7 +52,7 @@ public class Persistence
 		}
 	}
 
-	private static void SaveRespawnObjectPersistence(ref Persistence per, Server.DynamicObjectsRespawn obj)
+	private static void SaveRespawnObjectPersistence(ref PersistenceObject per, Server.DynamicObjectsRespawn obj)
 	{
 		PersistenceObjectDataRespawnObject data = new PersistenceObjectDataRespawnObject
 		{
@@ -91,10 +70,10 @@ public class Persistence
 		{
 			data.AttachPointID = obj.APDetails.InSceneID;
 		}
-		per.m_RespawnObjects.Add(data);
+		per.RespawnObjects.Add(data);
 	}
 
-	private static void SaveSpawnPointPeristence(ref Persistence per, ShipSpawnPoint sp)
+	private static void SaveSpawnPointPeristence(ref PersistenceObject per, ShipSpawnPoint sp)
 	{
 		PersistenceObjectDataSpawnPoint data = new PersistenceObjectDataSpawnPoint
 		{
@@ -108,25 +87,26 @@ public class Persistence
 			data.PlayerGUID = sp.Player.GUID;
 			data.IsPlayerInSpawnPoint = sp.IsPlayerInSpawnPoint;
 		}
-		per.m_SpawnPoints.Add(data);
+		per.SpawnPoints.Add(data);
 	}
 
 	public static void Save(string filename = null, SaveFileAuxData auxData = null)
 	{
 		try
 		{
-			Persistence per = new Persistence
+			PersistenceObject per = new PersistenceObject
 			{
-				m_SaveType = k_CurrentSaveType,
-				m_SolarSystemTime = Server.Instance.SolarSystem.CurrentTime,
-				m_AuxData = auxData,
-				m_Ships = new HashSet<PersistenceObjectData>(),
-				m_Asteroids = new HashSet<PersistenceObjectData>(),
-				m_Players = new HashSet<PersistenceObjectData>(),
-				m_RespawnObjects = new HashSet<PersistenceObjectData>(),
-				m_SpawnPoints = new HashSet<PersistenceObjectData>(),
-				m_ArenaControllers = new HashSet<PersistenceObjectData>()
+				SaveType = k_CurrentSaveType,
+				SolarSystemTime = Server.Instance.SolarSystem.CurrentTime,
+				AuxData = auxData,
+				Ships = new HashSet<PersistenceObjectData>(),
+				Asteroids = new HashSet<PersistenceObjectData>(),
+				Players = new HashSet<PersistenceObjectData>(),
+				RespawnObjects = new HashSet<PersistenceObjectData>(),
+				SpawnPoints = new HashSet<PersistenceObjectData>(),
+				ArenaControllers = new HashSet<PersistenceObjectData>()
 			};
+
 			foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 			{
 				if (!ves.IsDocked && ves.StabilizeToTargetObj == null && (ves.ObjectType == SpaceObjectType.Ship || ves.ObjectType == SpaceObjectType.Asteroid))
@@ -134,17 +114,20 @@ public class Persistence
 					SaveVesselPersistence(ref per, ves);
 				}
 			}
+
 			foreach (Player pl in Server.Instance.AllPlayers)
 			{
 				if (pl != null)
 				{
-					per.m_Players.Add(pl.GetPersistenceData());
+					per.Players.Add(pl.GetPersistenceData());
 				}
 			}
+
 			foreach (Server.DynamicObjectsRespawn obj in Server.Instance.DynamicObjectsRespawnList)
 			{
 				SaveRespawnObjectPersistence(ref per, obj);
 			}
+
 			foreach (SpaceObjectVessel ves2 in Server.Instance.AllVessels)
 			{
 				if (ves2.SpawnPoints == null || ves2.SpawnPoints.Count <= 0)
@@ -156,12 +139,13 @@ public class Persistence
 					SaveSpawnPointPeristence(ref per, sp);
 				}
 			}
+
 			foreach (DeathMatchArenaController dmac in Server.Instance.DeathMatchArenaControllers)
 			{
-				per.m_ArenaControllers.Add(dmac.GetPersistenceData());
+				per.ArenaControllers.Add(dmac.GetPersistenceData());
 			}
-			per.m_DoomControllerData = Server.Instance.DoomedShipController.GetPersistenceData();
-			per.m_SpawnManagerData = SpawnManager.GetPersistenceData();
+			per.DoomControllerData = Server.Instance.DoomedShipController.GetPersistenceData();
+			per.SpawnManagerData = SpawnManager.GetPersistenceData();
 			DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 			FileInfo[] Files = d.GetFiles("*.save");
 #if !HELLION_SP
@@ -178,6 +162,7 @@ public class Persistence
 			{
 				filename = string.Format(k_PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 			}
+
 			Json.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), Json.Formatting.Indented);
 		}
 		catch (Exception ex)
@@ -264,59 +249,59 @@ public class Persistence
 		loadFromFile = (filename == null) ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower());
 		if (loadFromFile != null)
 		{
-			Persistence persistence = Json.Load<Persistence>(loadFromFile.FullName);
-			Server.Instance.SolarSystem.CalculatePositionsAfterTime(persistence.m_SolarSystemTime);
-			if (persistence.m_Asteroids != null)
+			PersistenceObject persistence = Json.Load<PersistenceObject>(loadFromFile.FullName);
+			Server.Instance.SolarSystem.CalculatePositionsAfterTime(persistence.SolarSystemTime);
+			if (persistence.Asteroids != null)
 			{
-				foreach (PersistenceObjectData asteroidData in persistence.m_Asteroids)
+				foreach (PersistenceObjectData asteroidData in persistence.Asteroids)
 				{
 					Asteroid ast = new Asteroid(asteroidData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
 					ast.LoadPersistenceData(asteroidData);
 				}
 			}
-			if (persistence.m_Ships != null)
+			if (persistence.Ships != null)
 			{
-				foreach (PersistenceObjectData shipData in persistence.m_Ships)
+				foreach (PersistenceObjectData shipData in persistence.Ships)
 				{
 					Ship sh = new Ship(shipData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
 					sh.LoadPersistenceData(shipData);
 				}
 			}
-			if (persistence.m_Players != null)
+			if (persistence.Players != null)
 			{
-				foreach (PersistenceObjectDataPlayer playerData in persistence.m_Players.Cast<PersistenceObjectDataPlayer>())
+				foreach (PersistenceObjectDataPlayer playerData in persistence.Players.Cast<PersistenceObjectDataPlayer>())
 				{
 					Player player = new Player(playerData.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", "", playerData.Gender, playerData.HeadType, playerData.HairType, addToServerList: false);
 					player.LoadPersistenceData(playerData);
 				}
 			}
-			if (persistence.m_RespawnObjects != null)
+			if (persistence.RespawnObjects != null)
 			{
-				foreach (PersistenceObjectDataRespawnObject respawnObjectData in persistence.m_RespawnObjects.Cast<PersistenceObjectDataRespawnObject>())
+				foreach (PersistenceObjectDataRespawnObject respawnObjectData in persistence.RespawnObjects.Cast<PersistenceObjectDataRespawnObject>())
 				{
 					LoadRespawnObjectPersistence(respawnObjectData);
 				}
 			}
-			if (persistence.m_SpawnPoints != null)
+			if (persistence.SpawnPoints != null)
 			{
-				foreach (PersistenceObjectDataSpawnPoint spawnPointData in persistence.m_SpawnPoints.Cast<PersistenceObjectDataSpawnPoint>())
+				foreach (PersistenceObjectDataSpawnPoint spawnPointData in persistence.SpawnPoints.Cast<PersistenceObjectDataSpawnPoint>())
 				{
 					LoadSpawnPointPeristence(spawnPointData);
 				}
 			}
-			if (persistence.m_ArenaControllers != null)
+			if (persistence.ArenaControllers != null)
 			{
-				foreach (PersistenceArenaControllerData arenaControllerData in persistence.m_ArenaControllers.Cast<PersistenceArenaControllerData>())
+				foreach (PersistenceArenaControllerData arenaControllerData in persistence.ArenaControllers.Cast<PersistenceArenaControllerData>())
 				{
 					DeathMatchArenaController arenaController = new DeathMatchArenaController();
 					arenaController.LoadPersistenceData(arenaControllerData);
 				}
 			}
-			if (persistence.m_DoomControllerData != null)
+			if (persistence.DoomControllerData != null)
 			{
-				Server.Instance.DoomedShipController.LoadPersistenceData(persistence.m_DoomControllerData);
+				Server.Instance.DoomedShipController.LoadPersistenceData(persistence.DoomControllerData);
 			}
-			SpawnManager.LoadPersistenceData(persistence.m_SpawnManagerData);
+			SpawnManager.LoadPersistenceData(persistence.SpawnManagerData);
 			return true;
 		}
 		return false;
@@ -402,4 +387,30 @@ public class Persistence
 			return null;
 		}
 	}
+}
+
+[JsonObject(MissingMemberHandling = MissingMemberHandling.Error)]
+public struct PersistenceObject
+{
+	public int SaveType;
+
+	public double SolarSystemTime;
+
+	public SaveFileAuxData AuxData;
+
+	public HashSet<PersistenceObjectData> Ships;
+
+	public HashSet<PersistenceObjectData> Asteroids;
+
+	public HashSet<PersistenceObjectData> Players;
+
+	public HashSet<PersistenceObjectData> RespawnObjects;
+
+	public HashSet<PersistenceObjectData> SpawnPoints;
+
+	public HashSet<PersistenceObjectData> ArenaControllers;
+
+	public PersistenceObjectData DoomControllerData;
+
+	public PersistenceObjectData SpawnManagerData;
 }

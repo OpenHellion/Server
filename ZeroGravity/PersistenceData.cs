@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ZeroGravity;
 
+// TODO: Got some very strange logic going on here.
 public abstract class PersistenceData
 {
 	public string __ObjectType => GetType().ToString();

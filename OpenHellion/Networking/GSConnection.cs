@@ -55,12 +55,12 @@ internal class GSConnection
 			OnDisconnected = OnDisconnected,
 			SendQueueLimit = 1000,
 			ReceiveQueueLimit = 1000
+#if DEBUG
+			,SendTimeout = 0
+#endif
 		};
 
-		_server.SendQueueLimit = 1000;
-		_server.ReceiveQueueLimit = 1000;
-
-		_server.Start(Server.GamePort);
+		_server.Start(port);
 
 		Dbg.Log("Started server game thread.");
 	}

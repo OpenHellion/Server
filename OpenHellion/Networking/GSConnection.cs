@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using ZeroGravity;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -31,16 +32,10 @@ namespace OpenHellion.Networking;
 /// </summary>
 internal class GSConnection
 {
-	public class Client
-	{
-		public long ClientGUID;
 
-		public Player Player = null;
-	}
+	private readonly Dictionary<int, Player> m_ClientConnections = new();
 
-	private Dictionary<int, Client> _clientConnections = new();
-
-	private Telepathy.Server _server;
+	private Telepathy.Server m_Server;
 
 	internal void Start(int port)
 	{
@@ -48,19 +43,19 @@ internal class GSConnection
 		Telepathy.Log.Warning = Dbg.Warning;
 		Telepathy.Log.Error = Dbg.Error;
 
-		_server = new(80000)
+		m_Server = new(80000)
 		{
 			OnConnected = OnConnected,
 			OnData = OnData,
 			OnDisconnected = OnDisconnected,
 			SendQueueLimit = 1000,
 			ReceiveQueueLimit = 1000
-#if DEBUG
+#if DEBUG || HELLION_SP
 			,SendTimeout = 0
 #endif
 		};
 
-		_server.Start(port);
+		m_Server.Start(port);
 
 		Dbg.Log("Started server game thread.");
 	}
@@ -76,7 +71,7 @@ internal class GSConnection
 			ArraySegment<byte> binary = new(Serializer.Package(data));
 
 			// Send data to server.
-			bool success = _server.Send(connectionId, binary);
+			bool success = m_Server.Send(connectionId, binary);
 
 			if (!success)
 			{
@@ -96,12 +91,12 @@ internal class GSConnection
 	// Request to send to all clients.
 	internal void SendToAll(NetworkData data, long skipPlayerGUID = -1L)
 	{
-		foreach (KeyValuePair<int, Client> client in _clientConnections)
+		foreach (KeyValuePair<int, Player> pl in m_ClientConnections)
 		{
-			Player player = client.Value.Player;
+			Player player = pl.Value;
 			if (player != null && player.IsAlive && player.EnvironmentReady && player.GUID != skipPlayerGUID)
 			{
-				Send(client.Key, data);
+				Send(pl.Key, data);
 			}
 		}
 	}
@@ -116,93 +111,65 @@ internal class GSConnection
 	// Disconnect a client with the provided id.
 	internal void Disconnect(int connectionId)
 	{
-		if (_clientConnections.ContainsKey(connectionId))
+		if (m_ClientConnections.ContainsKey(connectionId))
 		{
-			_server.Disconnect(connectionId);
+			// If there is a player, make sure it has been disconnected.
+			Player player = m_ClientConnections[connectionId];
+			player?.LogoutDisconnectReset();
+			player?.DiconnectFromNetworkContoller();
 
+			// Remove it.
+			m_ClientConnections.Remove(connectionId);
 		}
 		else
 		{
-			Dbg.Error("Tried to disconnect client with wrong id.");
+			Dbg.Error("Tried to remove non-existent player with connection id", connectionId);
 		}
+
+		m_Server.Disconnect(connectionId);
 	}
 
 	// Disconnects all clients.
 	internal void DisconnectAll()
 	{
 		// Loop through all client and do the neccecary actions for them to exit.
-		foreach (KeyValuePair<int, Client> client in _clientConnections)
+		foreach (KeyValuePair<int, Player> pl in m_ClientConnections)
 		{
-			_server.Disconnect(client.Key);
-			if (client.Value.Player != null)
+			m_Server.Disconnect(pl.Key);
+			if (pl.Value != null)
 			{
-				client.Value.Player.LogoutDisconnectReset();
-				client.Value.Player.DiconnectFromNetworkContoller();
+				pl.Value.LogoutDisconnectReset();
+				pl.Value.DiconnectFromNetworkContoller();
 			}
 		}
 
 		// Clean.
-		_clientConnections.Clear();
+		m_ClientConnections.Clear();
 	}
 
 	internal void Tick()
 	{
-		_server.Tick(50);
+		m_Server.Tick(50);
 	}
 
 	internal void Stop()
 	{
 		NetworkController.Instance.DisconnectAllClients();
-		_server.Stop();
-	}
-
-	// Add guid to an already existing client.
-	internal void PatchClient(int connectionId, long guid)
-	{
-		if (_clientConnections.ContainsKey(connectionId))
-		{
-			_clientConnections[connectionId].ClientGUID = guid;
-		}
-		else
-		{
-			Dbg.Error("Trying to add client to connections with id failed", connectionId, guid);
-		}
+		m_Server.Stop();
 	}
 
 	// Create a bare client with a temporary id.
 	// Partial implementation of the corresponding function in NetworkController.
-	internal void AddBareClient(int connectionId, long tempId)
+	internal void AddBareClient(int connectionId)
 	{
-		Client cl = new Client();
-		cl.ClientGUID = tempId;
-		_clientConnections.Add(connectionId, cl);
-	}
-
-	// Remove client and disconnect player, but doesn't disconnect the client from the server.
-	// Used by the disconnect function.
-	internal void RemoveClient(int connectionId)
-	{
-		if (_clientConnections.ContainsKey(connectionId))
-		{
-			// If there is a player, make sure it has been disconnected.
-			GSConnection.Client cl = _clientConnections[connectionId];
-			cl.Player?.LogoutDisconnectReset();
-			cl.Player?.DiconnectFromNetworkContoller();
-
-			// Remove it.
-			_clientConnections.Remove(connectionId);
-		}
-		else
-		{
-			Dbg.Error("Tried to remove non-existent client with connection id", connectionId);
-		}
+		m_ClientConnections.Add(connectionId, null);
 	}
 
 	internal void SetPlayer(int connectionId, Player player)
 	{
-		if (_clientConnections.ContainsKey(connectionId))
+		if (m_ClientConnections.ContainsKey(connectionId))
 		{
-			_clientConnections[connectionId].Player = player;
+			m_ClientConnections[connectionId] = player;
 		}
 		else
 		{
@@ -212,9 +179,9 @@ internal class GSConnection
 
 	internal Player GetPlayer(int connectionId)
 	{
-		if (_clientConnections.ContainsKey(connectionId) && _clientConnections[connectionId].Player != null)
+		if (m_ClientConnections.ContainsKey(connectionId) && m_ClientConnections[connectionId] != null)
 		{
-			return _clientConnections[connectionId].Player;
+			return m_ClientConnections[connectionId];
 		}
 		else
 		{
@@ -226,31 +193,22 @@ internal class GSConnection
 
 	internal Player[] GetAllPlayers()
 	{
-		List<Player> list = new();
-		foreach (Client client in _clientConnections.Values)
-		{
-			if (client.Player != null)
-			{
-				list.Add(client.Player);
-			}
-		}
-
-		return list.ToArray();
+		return m_ClientConnections.Values.ToList().ToArray();
 	}
 
 	private void OnConnected(int connectionId)
 	{
-		string ipAddress = _server.GetClientAddress(connectionId);
+		string ipAddress = m_Server.GetClientAddress(connectionId);
 #if HELLION_SP
 		if (!ipAddress.Contains("127.0.0.1"))
 		{
 			Dbg.Error("Non-local client with ip", ipAddress, "tried to connect to server.");
-			_server.Disconnect(connectionId);
+			m_Server.Disconnect(connectionId);
 			return;
 		}
 #endif
 
-		Dbg.Info("Client connected", Server.IsRunning, connectionId, ipAddress);
+		Dbg.Log("Client connected", connectionId, ipAddress);
 
 		try
 		{
@@ -269,9 +227,9 @@ internal class GSConnection
 			NetworkData networkData = Serializer.Unpackage(new MemoryStream(message.Array));
 			if (networkData != null)
 			{
-				if (_clientConnections[connectionId].Player != null)
+				if (m_ClientConnections[connectionId] != null)
 				{
-					networkData.Sender = _clientConnections[connectionId].Player.GUID;
+					networkData.Sender = m_ClientConnections[connectionId].GUID;
 				}
 				else
 				{
@@ -290,10 +248,10 @@ internal class GSConnection
 
 	private void OnDisconnected(int connectionId)
 	{
-		if (_clientConnections.TryGetValue(connectionId, out Client client))
+		if (m_ClientConnections.TryGetValue(connectionId, out Player player))
 		{
-			client.Player?.RemovePlayerFromTrigger();
-			_clientConnections.Remove(connectionId);
+			player.RemovePlayerFromTrigger();
+			m_ClientConnections.Remove(connectionId);
 			NetworkController.Instance.OnDisconnect(connectionId);
 		}
 

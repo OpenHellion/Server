@@ -50,9 +50,10 @@ public class NetworkController
 	{
 		if (m_Clients.ContainsKey(guid))
 		{
-			RemoveClient(guid);
-
 			m_GameConnection.Disconnect(m_Clients[guid]);
+			m_Clients.Remove(guid);
+
+			Dbg.Log("Disconnecting user", guid);
 		}
 		else
 		{
@@ -117,7 +118,7 @@ public class NetworkController
 	public void LogInRequestListener(NetworkData data)
 	{
 		LogInRequest req = data as LogInRequest;
-		Dbg.Log("Executing log in request.");
+		Dbg.Log("Recieved login request for player with PlayerId", req.PlayerId);
 
 		if (Instance.CurrentOnlinePlayers() >= Server.Instance.MaxPlayers)
 		{
@@ -155,7 +156,7 @@ public class NetworkController
 #endif
 		if (req.Password == null)
 		{
-			req.Password = "";
+			req.Password = string.Empty;
 		}
 
 		// Password check.
@@ -266,18 +267,17 @@ public class NetworkController
 		long? temporaryId = m_Clients.FirstOrDefault(entry => entry.Value == (int) connectionId).Key;
 		if (temporaryId.HasValue)
 		{
-			// Sender is connection id.
-			m_GameConnection.PatchClient((int) connectionId, guid);
-
 			m_Clients.Remove(temporaryId.Value);
 			m_Clients.Add(guid, (int) connectionId);
+
+			Dbg.Log("Converted client shell into proper client.");
 		}
 
 		return true;
 	}
 
 	// Create a bare client without guid and a player.
-	// Has to be here because _client shouldn't be exposed.
+	// Has to be here because m_Clients shouldn't be exposed.
 	internal void AddBareClient(int connectionId)
 	{
 		long temporaryID = -1L;
@@ -287,25 +287,7 @@ public class NetworkController
 		}
 
 		m_Clients.Add(temporaryID, connectionId);
-		m_GameConnection.AddBareClient(connectionId, temporaryID);
-	}
-
-	/// <summary>
-	/// 	Remove all references to a client.<br />
-	/// 	This also disconnects the client's player, but does not disconnect the client. <br />
-	/// 	Used by the disconnect function.
-	/// </summary>
-	public void RemoveClient(long guid)
-	{
-		if (m_Clients.ContainsKey(guid))
-		{
-			m_GameConnection.RemoveClient(m_Clients[guid]);
-			m_Clients.Remove(guid);
-		}
-		else
-		{
-			Dbg.Error("Tried to remove non-existent client with guid", guid);
-		}
+		m_GameConnection.AddBareClient(connectionId);
 	}
 
 	/// <summary>
@@ -335,33 +317,42 @@ public class NetworkController
 		{
 			player.Initialize = true;
 		}
+
+		Dbg.Log("Connecting player", player.Name, player.GUID);
 		if (m_Clients.ContainsKey(player.GUID))
 		{
 			player.ConnectToNetworkController();
 			m_GameConnection.SetPlayer(m_Clients[player.GUID], player);
-			LogInResponse lir = new LogInResponse();
-			lir.GUID = player.FakeGuid;
-			lir.Data = new CharacterData
+
+			LogInResponse lir = new LogInResponse
 			{
-				Name = player.Name,
-				Gender = player.Gender,
-				HairType = player.HairType,
-				HeadType = player.HeadType
+				GUID = player.FakeGuid,
+				Data = new CharacterData
+				{
+					Name = player.Name,
+					Gender = player.Gender,
+					HairType = player.HairType,
+					HeadType = player.HeadType
+				},
+				ServerTime = Server.Instance.SolarSystem.CurrentTime,
+				IsAlive = player.IsAlive,
+				CanContinue = player.AuthorizedSpawnPoint != null,
+				DebrisFields = Server.Instance.GetDebrisFieldsDetails(),
+				ItemsIngredients = StaticData.ItemsIngredients,
+				Quests = StaticData.QuestsData,
+				ExposureRange = StaticData.SolarSystem.ExposureRange,
+				VesselExposureValues = StaticData.SolarSystem.VesselExposureValues,
+				PlayerExposureValues = StaticData.SolarSystem.PlayerExposureValues,
+				VesselDecayRateMultiplier = Server.VesselDecayRateMultiplier
 			};
-			lir.ServerTime = Server.Instance.SolarSystem.CurrentTime;
-			lir.IsAlive = player.IsAlive;
-			lir.CanContinue = player.AuthorizedSpawnPoint != null;
+
 			if (!player.IsAlive)
 			{
 				lir.SpawnPointsList = Server.Instance.GetAvailableSpawnPoints(player);
 			}
-			lir.DebrisFields = Server.Instance.GetDebrisFieldsDetails();
-			lir.ItemsIngredients = StaticData.ItemsIngredients;
-			lir.Quests = StaticData.QuestsData;
-			lir.ExposureRange = StaticData.SolarSystem.ExposureRange;
-			lir.VesselExposureValues = StaticData.SolarSystem.VesselExposureValues;
-			lir.PlayerExposureValues = StaticData.SolarSystem.PlayerExposureValues;
-			lir.VesselDecayRateMultiplier = Server.VesselDecayRateMultiplier;
+
+			Dbg.Log("Sent login response.");
+
 			SendToGameClient(player.GUID, lir);
 		}
 		else
@@ -395,7 +386,7 @@ public class NetworkController
 		{
 			if (player.IsAlive && player.EnvironmentReady)
 			{
-				if (spaceObjects.Count((SpaceObject m) => m != null && player.IsSubscribedTo(m, checkParent: false)) > 0)
+				if (spaceObjects.Any((SpaceObject m) => m != null && player.IsSubscribedTo(m, checkParent: false)))
 				{
 					SendToGameClient(player.GUID, data);
 				}
@@ -409,8 +400,11 @@ public class NetworkController
 
 	public void SendToClientsSubscribedToParents(NetworkData data, SpaceObject spaceObject, long skipPlalerGUID = -1L, int depth = 4)
 	{
-		List<SpaceObject> parents = new List<SpaceObject>();
-		parents.Add(spaceObject);
+		List<SpaceObject> parents = new List<SpaceObject>
+		{
+			spaceObject
+		};
+
 		SpaceObject tmpParent = spaceObject.Parent;
 		while (tmpParent != null && depth > 0)
 		{

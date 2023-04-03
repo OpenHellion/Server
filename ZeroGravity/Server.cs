@@ -294,7 +294,7 @@ public class Server
 
 	private Dictionary<long, SpaceObject> m_objects = new Dictionary<long, SpaceObject>();
 
-	private Dictionary<long, Player> m_players = new Dictionary<long, Player>();
+	private Dictionary<long, Player> m_Players = new Dictionary<long, Player>();
 
 	private ConcurrentBag<Player> m_playersToAdd = new ConcurrentBag<Player>();
 
@@ -475,7 +475,7 @@ public class Server
 
 	public Dictionary<long, SpaceObjectVessel>.ValueCollection AllVessels => m_vessels.Values;
 
-	public Dictionary<long, Player>.ValueCollection AllPlayers => m_players.Values;
+	public Dictionary<long, Player>.ValueCollection AllPlayers => m_Players.Values;
 
 	public static Server Instance => serverInstance;
 
@@ -513,8 +513,7 @@ public class Server
 	/// </summary>
 	public Player GetPlayer(long guid)
 	{
-		Player player = null;
-		m_players.TryGetValue(guid, out player);
+		m_Players.TryGetValue(guid, out Player player);
 		return player;
 	}
 
@@ -532,7 +531,7 @@ public class Server
 	/// </summary>
 	public Player GetPlayerFromNativeId(string nativeId)
 	{
-		return m_players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
+		return m_Players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
 	}
 
 	public SpaceObjectVessel GetVessel(long guid)
@@ -560,7 +559,7 @@ public class Server
 			m_playersToAdd.Add(player);
 			return;
 		}
-		m_players[player.GUID] = player;
+		m_Players[player.GUID] = player;
 		m_objects[player.FakeGuid] = player;
 	}
 
@@ -591,7 +590,7 @@ public class Server
 			m_playersToRemove.Add(player);
 			return;
 		}
-		m_players.Remove(player.GUID);
+		m_Players.Remove(player.GUID);
 		m_objects.Remove(player.FakeGuid);
 	}
 
@@ -843,6 +842,12 @@ public class Server
 		{
 			InitializeWorld();
 		}
+
+		foreach (Player pl in m_Players.Values)
+		{
+			Dbg.Log(pl.Name, pl.GUID);
+		}
+
 		Player player = GetPlayer(guid);
 		if (player != null)
 		{
@@ -850,10 +855,13 @@ public class Server
 		}
 		else
 		{
+			Dbg.Log("Creating new player for client with guid:", guid);
+
 			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, nativeId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
 			NetworkController.Instance.ConnectPlayer(player);
 		}
+
 		if (serverAdmins.Contains(player.PlayerId) || serverAdmins.Contains("*"))
 		{
 			player.IsAdmin = true;
@@ -1393,7 +1401,7 @@ public class Server
 	public void TextChatMessageListener(NetworkData data)
 	{
 		TextChatMessage tcm = data as TextChatMessage;
-		Player player = m_players[tcm.Sender];
+		Player player = m_Players[tcm.Sender];
 		tcm.GUID = player.FakeGuid;
 		tcm.Name = player.Name;
 		if (tcm.MessageText.Length > 250)
@@ -1404,7 +1412,7 @@ public class Server
 		{
 			Vector3D playerGlobalPos = player.Parent.Position + player.Position;
 			{
-				foreach (Player pl in m_players.Values)
+				foreach (Player pl in m_Players.Values)
 				{
 					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
 					{
@@ -1801,7 +1809,7 @@ public class Server
 			if (parts[0] == "teleport" && parts.Length == 2)
 			{
 				ArtificialBody target = null;
-				Player p = m_players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
+				Player p = m_Players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
 				if (p != null && p.Parent is ArtificialBody)
 				{
 					target = ((!(p.Parent is SpaceObjectVessel)) ? (p.Parent as ArtificialBody) : (p.Parent as SpaceObjectVessel).MainVessel);
@@ -1905,7 +1913,7 @@ public class Server
 			}
 			if (parts[0] == "resetblueprints")
 			{
-				foreach (Player pl in m_players.Values)
+				foreach (Player pl in m_Players.Values)
 				{
 					pl.Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
 					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
@@ -2279,7 +2287,7 @@ public class Server
 		Dbg.Info("REMOVING ALL WORLD OBJECTS");
 		try
 		{
-			long[] array = m_players.Keys.ToArray();
+			long[] array = m_Players.Keys.ToArray();
 			foreach (long guid in array)
 			{
 				NetworkController.Instance.DisconnectClient(guid);
@@ -2289,7 +2297,7 @@ public class Server
 		catch (Exception)
 		{
 		}
-		m_players.Clear();
+		m_Players.Clear();
 		m_objects.Clear();
 		ArtificialBody[] artificialBodies = Instance.SolarSystem.GetArtificialBodies();
 		foreach (ArtificialBody ab in artificialBodies)
@@ -2400,7 +2408,7 @@ public class Server
 
 	private void PrintObjectsDebug(double time)
 	{
-		Dbg.Info("Server stats, objects", m_objects.Count, "players", m_players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+		Dbg.Info("Server stats, objects", m_objects.Count, "players", m_Players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 	}
 
 	public void MainLoop()
@@ -2472,7 +2480,7 @@ public class Server
 					AddRemovePlayers();
 					if (printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
 					{
-						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", tickMilliseconds, "objects", m_objects.Count, "players", m_players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", tickMilliseconds, "objects", m_objects.Count, "players", m_Players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 						lastServerTickedWithoutSleepTime = currentTime;
 					}
 					hadSleep = false;
@@ -2587,13 +2595,13 @@ public class Server
 	{
 		foreach (Player player2 in m_playersToAdd)
 		{
-			m_players[player2.GUID] = player2;
+			m_Players[player2.GUID] = player2;
 			m_objects[player2.FakeGuid] = player2;
 		}
 		m_playersToAdd = new ConcurrentBag<Player>();
 		foreach (Player player in m_playersToRemove)
 		{
-			m_players.Remove(player.GUID);
+			m_Players.Remove(player.GUID);
 			m_objects.Remove(player.FakeGuid);
 		}
 		m_playersToRemove = new ConcurrentBag<Player>();
@@ -2700,9 +2708,9 @@ public class Server
 			{
 				break;
 			}
-			if (m_players.ContainsKey(req.Sender))
+			if (m_Players.ContainsKey(req.Sender))
 			{
-				m_players[req.Sender].UnsubscribeFrom(so);
+				m_Players[req.Sender].UnsubscribeFrom(so);
 			}
 		}
 	}
@@ -3151,7 +3159,7 @@ public class Server
 			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.Instance.CurrentOnlinePlayers(),
-			AlivePlayers = (short)m_players.Values.Count((Player m) => m.IsAlive),
+			AlivePlayers = (short)m_Players.Values.Count((Player m) => m.IsAlive),
 			CharacterData = GetPlayerFromPlayerId(req.PlayerId)?.GetCharacterData()
 		};
 	}

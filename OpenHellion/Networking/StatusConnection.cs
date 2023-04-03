@@ -78,7 +78,7 @@ public class StatusConnection
 				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
 				if (dcr.ServerId == NetworkController.ServerID)
 				{
-					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.SteamId);
+					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.PlayerId);
 					if (!NetworkController.Instance.ContainsClient(pl.GUID))
 					{
 						pl.Destroy();

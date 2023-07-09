@@ -525,15 +525,6 @@ public class Server
 		return GetPlayer(GUIDFactory.PlayerIdToGuid(playerId));
 	}
 
-	/// <summary>
-	/// 	Gets a player from a specified native id.<br />
-	/// 	Warning: This is pretty slow, as it searches through all players.
-	/// </summary>
-	public Player GetPlayerFromNativeId(string nativeId)
-	{
-		return m_Players.Values.ToList().Find((Player m) => m.NativeId == nativeId);
-	}
-
 	public SpaceObjectVessel GetVessel(long guid)
 	{
 		if (m_vessels.ContainsKey(guid))
@@ -836,7 +827,7 @@ public class Server
 		}
 	}
 
-	public void LoginPlayer(long guid, string playerId, string nativeId, CharacterData characterData)
+	public void LoginPlayer(long guid, string playerId, CharacterData characterData)
 	{
 		if (!WorldInitialized)
 		{
@@ -857,7 +848,7 @@ public class Server
 		{
 			Dbg.Log("Creating new player for client with guid:", guid);
 
-			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, nativeId, characterData.Gender, characterData.HeadType, characterData.HairType);
+			player = new Player(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
 			NetworkController.Instance.ConnectPlayer(player);
 		}
@@ -920,7 +911,6 @@ public class Server
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerId = pl.PlayerId,
-							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -944,7 +934,6 @@ public class Server
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerId = pl.PlayerId,
-							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -962,7 +951,6 @@ public class Server
 						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
 						{
 							PlayerId = pl.PlayerId,
-							PlayerNativeId = pl.NativeId,
 							Name = pl.Name,
 							Rank = AuthorizedPersonRank.CommandingOfficer
 						});
@@ -2809,7 +2797,6 @@ public class Server
 				{
 					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						PlayerNativeId = pl.NativeId,
 						PlayerId = pl.PlayerId,
 						Name = pl.Name,
 						AlreadyHasInvite = SpawnPointInvites.ContainsKey(pl.PlayerId)
@@ -2841,7 +2828,6 @@ public class Server
 				{
 					res.PlayersOnServer.Add(new PlayerOnServerData
 					{
-						PlayerNativeId = pl.NativeId,
 						PlayerId = pl.PlayerId,
 						Name = pl.Name,
 						AlreadyHasInvite = false
@@ -2973,49 +2959,49 @@ public class Server
 		}
 	}
 
-	public void ClearSpawnPointInvitation(string steamID)
+	public void ClearSpawnPointInvitation(string playerId)
 	{
-		if (SpawnPointInvites.ContainsKey(steamID))
+		if (SpawnPointInvites.ContainsKey(playerId))
 		{
-			SpawnPointInvites[steamID].SpawnPoint.SetInvitation("", "", sendMessage: true);
-			SpawnPointInvites.Remove(steamID);
+			SpawnPointInvites[playerId].SpawnPoint.SetInvitation("", "", sendMessage: true);
+			SpawnPointInvites.Remove(playerId);
 		}
 	}
 
-	public void CreateSpawnPointInvitation(ShipSpawnPoint sp, string steamID, string playerName)
+	public void CreateSpawnPointInvitation(ShipSpawnPoint sp, string playerId, string playerName)
 	{
-		SpawnPointInvites.Add(steamID, new SpawnPointInviteData
+		SpawnPointInvites.Add(playerId, new SpawnPointInviteData
 		{
 			SpawnPoint = sp,
 			InviteTimer = SpawnPointInviteTimer
 		});
-		sp.SetInvitation(steamID, playerName, sendMessage: true);
+		sp.SetInvitation(playerId, playerName, sendMessage: true);
 	}
 
-	public bool PlayerInviteChanged(ShipSpawnPoint sp, string invitedPlayerSteamID, string invitedPlayerName, Player sender)
+	public bool PlayerInviteChanged(ShipSpawnPoint sp, string invitedPlayerId, string invitedPlayerName, Player sender)
 	{
-		if (!invitedPlayerSteamID.IsNullOrEmpty())
+		if (!invitedPlayerId.IsNullOrEmpty())
 		{
-			if (SpawnPointInvites.ContainsKey(invitedPlayerSteamID) && SpawnPointInvites[invitedPlayerSteamID].SpawnPoint == sp && sp.InvitedPlayerSteamID == invitedPlayerSteamID)
+			if (SpawnPointInvites.ContainsKey(invitedPlayerId) && SpawnPointInvites[invitedPlayerId].SpawnPoint == sp && sp.InvitedPlayerId == invitedPlayerId)
 			{
 				return false;
 			}
-			if (SpawnPointInvites.ContainsKey(invitedPlayerSteamID))
+			if (SpawnPointInvites.ContainsKey(invitedPlayerId))
 			{
-				ClearSpawnPointInvitation(invitedPlayerSteamID);
+				ClearSpawnPointInvitation(invitedPlayerId);
 			}
-			if (!sp.InvitedPlayerSteamID.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(sp.InvitedPlayerSteamID))
+			if (!sp.InvitedPlayerId.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(sp.InvitedPlayerId))
 			{
-				ClearSpawnPointInvitation(sp.InvitedPlayerSteamID);
+				ClearSpawnPointInvitation(sp.InvitedPlayerId);
 			}
-			CreateSpawnPointInvitation(sp, invitedPlayerSteamID, invitedPlayerName);
+			CreateSpawnPointInvitation(sp, invitedPlayerId, invitedPlayerName);
 			return true;
 		}
-		if (!sp.InvitedPlayerSteamID.IsNullOrEmpty())
+		if (!sp.InvitedPlayerId.IsNullOrEmpty())
 		{
-			if (SpawnPointInvites.ContainsKey(sp.InvitedPlayerSteamID))
+			if (SpawnPointInvites.ContainsKey(sp.InvitedPlayerId))
 			{
-				ClearSpawnPointInvitation(sp.InvitedPlayerSteamID);
+				ClearSpawnPointInvitation(sp.InvitedPlayerId);
 			}
 			else
 			{

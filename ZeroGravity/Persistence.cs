@@ -271,7 +271,7 @@ public class Persistence
 			{
 				foreach (PersistenceObjectDataPlayer playerData in persistence.Players.Cast<PersistenceObjectDataPlayer>())
 				{
-					Player player = new Player(playerData.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", "", playerData.Gender, playerData.HeadType, playerData.HairType, addToServerList: false);
+					Player player = new Player(playerData.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", playerData.Gender, playerData.HeadType, playerData.HairType, addToServerList: false);
 					player.LoadPersistenceData(playerData);
 				}
 			}

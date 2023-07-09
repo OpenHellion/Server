@@ -134,7 +134,7 @@ public class NetworkController
 		// TODO: Ignoring this for now.
 		if (req.ClientHash != Server.CombinedHash)
 		{
-			Dbg.Warning("Server/client hash mismatch.", req.ServerID, ServerID);
+			Dbg.Info("Server/client hash mismatch.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
 			{
 				Response = ResponseResult.ClientVersionError
@@ -146,7 +146,7 @@ public class NetworkController
 #if !HELLION_SP
 		if (req.ServerID != ServerID)
 		{
-			Dbg.Warning("LogInRequest server ID doesn't match this server ID.", req.ServerID, ServerID);
+			Dbg.Info("LogInRequest server ID doesn't match this server ID.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
 			{
 				Response = ResponseResult.Error
@@ -162,7 +162,7 @@ public class NetworkController
 		// Password check.
 		if (req.Password != Server.Instance.ServerPassword)
 		{
-			Dbg.Warning("LogInRequest server password doesn't match this server's password.", req.ServerID, ServerID);
+			Dbg.Info("LogInRequest server password doesn't match this server's password.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
 			{
 				Response = ResponseResult.WrongPassword
@@ -173,7 +173,7 @@ public class NetworkController
 		// Check if player id is valid.
 		if (!Guid.TryParse(req.PlayerId, out _))
 		{
-			Dbg.Warning("Player id isn't valid.", req.ServerID, ServerID);
+			Dbg.Info("Player id isn't valid.", req.ServerID, ServerID);
 			SendToGameClient(req.Sender, new LogInResponse
 			{
 				Response = ResponseResult.Error
@@ -184,7 +184,7 @@ public class NetworkController
 		long guid = GUIDFactory.PlayerIdToGuid(req.PlayerId);
 		if (PatchClient(guid, req.Sender))
 		{
-			Server.Instance.LoginPlayer(guid, req.PlayerId, req.NativeId, req.CharacterData);
+			Server.Instance.LoginPlayer(guid, req.PlayerId, req.CharacterData);
 		}
 		else
 		{

@@ -324,8 +324,7 @@ public class SpawnRule
 				{
 					Name = questTrigger.Quest.Player.Name,
 					Rank = AuthorizedPersonRank.Crewman,
-					PlayerId = questTrigger.Quest.Player.PlayerId,
-					PlayerNativeId = questTrigger.Quest.Player.NativeId
+					PlayerId = questTrigger.Quest.Player.PlayerId
 				};
 				QuestTrigger.QuestTriggerID qtid = questTrigger.GetQuestTriggerID();
 				List<SpaceObjectVessel> vessels = mainVessels.SelectMany((SpaceObjectVessel m) => m.AllVessels).ToList();

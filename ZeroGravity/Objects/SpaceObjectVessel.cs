@@ -445,7 +445,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			foreach (ShipSpawnPoint point in SpawnPoints)
 			{
-				if ((point.Player == null && point.Type == SpawnPointType.SimpleSpawn) || point.Player == pl || point.InvitedPlayerSteamID == pl.PlayerId)
+				if ((point.Player == null && point.Type == SpawnPointType.SimpleSpawn) || point.Player == pl || point.InvitedPlayerId == pl.PlayerId)
 				{
 					return point;
 				}
@@ -745,7 +745,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (commander != null && commander.PlayerId != pl.PlayerId)
 			{
-				AddModifyPlayerPosition(commander.PlayerNativeId, commander.PlayerId, commander.Name, AuthorizedPersonRank.Crewman);
+				AddModifyPlayerPosition(commander.PlayerId, commander.Name, AuthorizedPersonRank.Crewman);
 			}
 
 			addModifyPlayer = true;
@@ -754,7 +754,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (officer != null && officer.PlayerId != pl.PlayerId)
 			{
-				AddModifyPlayerPosition(officer.PlayerNativeId, officer.PlayerId, officer.Name, AuthorizedPersonRank.Crewman);
+				AddModifyPlayerPosition(officer.PlayerId, officer.Name, AuthorizedPersonRank.Crewman);
 			}
 
 			addModifyPlayer = true;
@@ -766,7 +766,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 		if (addModifyPlayer)
 		{
-			AddModifyPlayerPosition(pl.NativeId, pl.PlayerId, name, rank);
+			AddModifyPlayerPosition(pl.PlayerId, name, rank);
 			CopyAuthorizedPersonelListToChildren();
 
 			return true;
@@ -775,13 +775,12 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		return false;
 	}
 
-	private void AddModifyPlayerPosition(string nativeId, string playerId, string name, AuthorizedPersonRank rank)
+	private void AddModifyPlayerPosition(string playerId, string name, AuthorizedPersonRank rank)
 	{
 		AuthorizedPerson existing = AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == playerId);
 		if (existing != null)
 		{
 			existing.Rank = rank;
-			existing.PlayerNativeId = nativeId;
 			existing.PlayerId = playerId;
 			existing.Name = name;
 		}
@@ -790,7 +789,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			AuthorizedPersonel.Add(new AuthorizedPerson
 			{
 				Rank = rank,
-				PlayerNativeId = nativeId,
 				PlayerId = playerId,
 				Name = name
 			});
@@ -868,7 +866,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			Player pl = Server.Instance.GetPlayerFromPlayerId(per.PlayerId);
 			authPersonel.Add(new VesselSecurityAuthorizedPerson
 			{
-				PlayerNativeId = per.PlayerNativeId,
 				PlayerId = per.PlayerId,
 				Name = (pl != null) ? pl.Name : per.Name,
 				Rank = per.Rank
@@ -1721,7 +1718,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				NewType = sp.Type,
 				PlayerGUID = ((sp.Player != null) ? sp.Player.FakeGuid : (-1)),
 				PlayerName = ((sp.Player != null) ? sp.Player.Name : null),
-				PlayerSteamID = ((sp.Player != null) ? sp.Player.PlayerId : null)
+				PlayerId = ((sp.Player != null) ? sp.Player.PlayerId : null)
 			});
 		}
 		ss.EmblemId = EmblemId;

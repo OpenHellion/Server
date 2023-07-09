@@ -15,7 +15,7 @@ public class ShipSpawnPoint
 
 	public bool IsPlayerInSpawnPoint;
 
-	public string InvitedPlayerSteamID;
+	public string InvitedPlayerId;
 
 	public string InvitedPlayerName;
 
@@ -43,17 +43,17 @@ public class ShipSpawnPoint
 			}
 			State = SpawnPointState.Locked;
 			Player = sender;
-			if (!Server.Instance.PlayerInviteChanged(this, stats.InvitedPlayerSteamID, stats.InvitedPlayerName, sender))
+			if (!Server.Instance.PlayerInviteChanged(this, stats.InvitedPlayerId, stats.InvitedPlayerName, sender))
 			{
 				return new SpawnPointStats
 				{
 					InSceneID = SpawnPointID,
 					NewState = State,
-					PlayerGUID = ((Player != null) ? Player.FakeGuid : (-1)),
-					PlayerName = ((Player != null) ? Player.Name : ""),
-					PlayerSteamID = ((Player != null) ? Player.PlayerId : ""),
+					PlayerGUID = (Player is not null) ? Player.FakeGuid : (-1),
+					PlayerName = (Player is not null) ? Player.Name : "",
+					PlayerId = (Player is not null) ? Player.PlayerId : "",
 					InvitedPlayerName = InvitedPlayerName,
-					InvitedPlayerSteamID = InvitedPlayerSteamID
+					InvitedPlayerId = InvitedPlayerId
 				};
 			}
 			return null;
@@ -66,7 +66,7 @@ public class ShipSpawnPoint
 		{
 			State = SpawnPointState.Unlocked;
 			Player = null;
-			if (InvitedPlayerSteamID.IsNullOrEmpty())
+			if (InvitedPlayerId.IsNullOrEmpty())
 			{
 				return new SpawnPointStats
 				{
@@ -85,7 +85,7 @@ public class ShipSpawnPoint
 			{
 				Use = true
 			});
-			if (InvitedPlayerSteamID.IsNullOrEmpty())
+			if (InvitedPlayerId.IsNullOrEmpty())
 			{
 				return new SpawnPointStats
 				{
@@ -108,7 +108,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = sender.FakeGuid,
 					PlayerName = sender.Name,
-					PlayerSteamID = sender.PlayerId
+					PlayerId = sender.PlayerId
 				};
 			}
 			if (stats.NewState == SpawnPointState.Authorized)
@@ -129,7 +129,7 @@ public class ShipSpawnPoint
 						NewState = sender.AuthorizedSpawnPoint.State,
 						PlayerGUID = sender.FakeGuid,
 						PlayerName = sender.Name,
-						PlayerSteamID = sender.PlayerId
+						PlayerId = sender.PlayerId
 					});
 					retMsg.SelfDestructTime = sender.AuthorizedSpawnPoint.Ship.SelfDestructTimer?.Time;
 					NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
@@ -143,7 +143,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = sender.FakeGuid,
 					PlayerName = sender.Name,
-					PlayerSteamID = sender.PlayerId
+					PlayerId = sender.PlayerId
 				};
 			}
 		}
@@ -152,9 +152,9 @@ public class ShipSpawnPoint
 
 	public void SetInvitation(string id, string name, bool sendMessage)
 	{
-		if (!(id == InvitedPlayerSteamID) && (!InvitedPlayerSteamID.IsNullOrEmpty() || !id.IsNullOrEmpty()))
+		if (!(id == InvitedPlayerId) && (!InvitedPlayerId.IsNullOrEmpty() || !id.IsNullOrEmpty()))
 		{
-			InvitedPlayerSteamID = id;
+			InvitedPlayerId = id;
 			InvitedPlayerName = name;
 			if (sendMessage)
 			{
@@ -169,12 +169,12 @@ public class ShipSpawnPoint
 				{
 					InSceneID = SpawnPointID,
 					NewState = State,
-					PlayerGUID = ((Player != null) ? Player.FakeGuid : (-1)),
-					PlayerName = ((Player != null) ? Player.Name : ""),
-					PlayerSteamID = ((Player != null) ? Player.PlayerId : ""),
+					PlayerGUID = (Player is not null) ? Player.FakeGuid : (-1),
+					PlayerName = (Player is not null) ? Player.Name : "",
+					PlayerId = (Player is not null) ? Player.PlayerId : "",
 					PlayerInvite = true,
 					InvitedPlayerName = InvitedPlayerName,
-					InvitedPlayerSteamID = InvitedPlayerSteamID
+					InvitedPlayerId = InvitedPlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
 				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);
@@ -204,7 +204,7 @@ public class ShipSpawnPoint
 					NewState = State,
 					PlayerGUID = Player.FakeGuid,
 					PlayerName = Player.Name,
-					PlayerSteamID = Player.PlayerId
+					PlayerId = Player.PlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
 				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);

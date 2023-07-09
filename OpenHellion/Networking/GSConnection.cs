@@ -52,6 +52,7 @@ internal class GSConnection
 			ReceiveQueueLimit = 1000
 #if DEBUG || HELLION_SP
 			,SendTimeout = 0
+			,ReceiveTimeout = 0
 #endif
 		};
 

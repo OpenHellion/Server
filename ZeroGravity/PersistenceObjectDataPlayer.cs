@@ -27,8 +27,6 @@ public class PersistenceObjectDataPlayer : PersistenceObjectData
 
 	public string PlayerId;
 
-	public string NativeId;
-
 	public Gender Gender;
 
 	public byte HeadType;

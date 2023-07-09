@@ -25,8 +25,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public string Name;
 
-	public string NativeId;
-
 	public string PlayerId;
 
 	public Gender Gender;
@@ -273,13 +271,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public bool AffectsQuantity => false;
 
-	public Player(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, string nativeId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
+	public Player(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
 		: base(guid, localPosition, localRotation)
 	{
 		FakeGuid = GUIDFactory.NextPlayerFakeGUID();
 		Name = name;
 		PlayerId = playerId;
-		NativeId = nativeId;
 		Gender = gender;
 		HeadType = headType;
 		HairType = hairType;
@@ -1184,7 +1181,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			Gender = Gender,
 			HeadType = HeadType,
 			HairType = HairType,
-			NativeId = NativeId,
 			PlayerId = PlayerId,
 			ParentID = (Parent != null) ? Parent.GUID : (-1),
 			ParentType = (Parent != null) ? Parent.ObjectType : SpaceObjectType.None,
@@ -1443,7 +1439,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		data.IsAlive = IsAlive;
 		data.Name = Name;
 		data.PlayerId = PlayerId;
-		data.NativeId = NativeId;
 		data.Gender = Gender;
 		data.HeadType = HeadType;
 		data.HairType = HairType;
@@ -1495,7 +1490,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			IsAlive = data.IsAlive;
 			Name = data.Name;
 			PlayerId = data.PlayerId;
-			NativeId = data.NativeId;
 			Gender = data.Gender;
 			HeadType = data.HeadType;
 			HairType = data.HairType;

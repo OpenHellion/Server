@@ -18,11 +18,11 @@ public class SpawnPointStats
 
 	public string PlayerName;
 
-	public string PlayerSteamID;
+	public string PlayerId;
 
 	public bool? PlayerInvite;
 
-	public string InvitedPlayerSteamID;
+	public string InvitedPlayerId;
 
 	public string InvitedPlayerName;
 }

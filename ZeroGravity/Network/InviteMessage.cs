@@ -9,7 +9,5 @@ public class InviteMessage : NetworkData
 
 	public long ServerId;
 
-	public string Password;
-
 	public VesselObjectID SpawnPointId;
 }

@@ -336,12 +336,6 @@ public class Server
 
 	private float solarSystemStartTime = -1f;
 
-	public string ServerPassword = "";
-
-	public string ServerName = "Hellion Game Server";
-
-	public string Description = "";
-
 	public int MaxPlayers = 100;
 
 	public static int MaxNumberOfSaveFiles = 10;
@@ -613,13 +607,13 @@ public class Server
 		PhysicsController = new BulletPhysicsController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
-		Console.Title = ServerName + " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
+		Console.Title = "(id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
 		Stopwatch stopWatch = new Stopwatch();
 		stopWatch.Start();
 		Thread.Sleep(1);
 		stopWatch.Stop();
 		long maxTicks = (long)(1000.0 / stopWatch.Elapsed.TotalMilliseconds);
-		Dbg.UnformattedMessage(string.Format("==============================================================================\r\n\tServer name: {5}\r\n\tServer ID: {1}\r\n\tGame port: {6}\r\n\tStatus port: {7}\r\n\tStart date: {0}\r\n\tServer ticks: {2}{4}\r\n\tMax server ticks (not precise): {3}\r\n==============================================================================", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), (NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", ServerName, GamePort, StatusPort));
+		Dbg.UnformattedMessage(string.Format("==============================================================================\r\n\tServer ID: {1}\r\n\tGame port: {5}\r\n\tStatus port: {6}\r\n\tStart date: {0}\r\n\tServer ticks: {2}{4}\r\n\tMax server ticks (not precise): {3}\r\n==============================================================================", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), (NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", GamePort, StatusPort));
 		StaticData.LoadData();
 	}
 
@@ -745,14 +739,6 @@ public class Server
 		}
 		Properties.GetProperty("solar_system_time", ref solarSystemStartTime);
 		Properties.GetProperty("save_interval", ref PersistenceSaveInterval);
-		Properties.GetProperty("server_password", ref ServerPassword);
-		Properties.GetProperty("server_name", ref ServerName);
-		Properties.GetProperty("description", ref Description);
-		if (Description.Length > 500)
-		{
-			Description = Description.Substring(0, 497) + "...";
-			Dbg.Error("Server description too long. Maximum length is 500 characters.");
-		}
 		Properties.GetProperty("max_players", ref MaxPlayers);
 		Properties.GetProperty("number_of_save_files", ref MaxNumberOfSaveFiles);
 		MaxNumberOfSaveFiles = MathHelper.Clamp(MaxNumberOfSaveFiles, 1, 100);
@@ -1155,7 +1141,6 @@ public class Server
 		MSConnection.Get<CheckInResponse>(new CheckInRequest
 		{
 			//ServerID = NetworkController.ServerID,
-			//ServerName = ServerName,
 			Region = Region.Europe,
 			GamePort = GamePort,
 			StatusPort = StatusPort,
@@ -2735,7 +2720,7 @@ public class Server
 			if (NetworkController.ServerID != data.ServerId)
 			{
 				NetworkController.ServerID = data.ServerId;
-				Console.Title = ServerName + " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
+				Console.Title = " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
 				Dbg.UnformattedMessage("==============================================================================\r\n\tServer ID: " + NetworkController.ServerID + "\r\n==============================================================================\r\n");
 				try
 				{
@@ -3142,10 +3127,8 @@ public class Server
 		return new ServerStatusResponse
 		{
 			Response = ResponseResult.Success,
-			Description = (req.SendDetails ? Description : null),
 			MaxPlayers = (short)MaxPlayers,
 			CurrentPlayers = NetworkController.Instance.CurrentOnlinePlayers(),
-			AlivePlayers = (short)m_Players.Values.Count((Player m) => m.IsAlive),
 			CharacterData = GetPlayerFromPlayerId(req.PlayerId)?.GetCharacterData()
 		};
 	}

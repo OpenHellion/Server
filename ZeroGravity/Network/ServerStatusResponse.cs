@@ -10,11 +10,7 @@ public class ServerStatusResponse : NetworkData
 
 	public short CurrentPlayers;
 
-	public short AlivePlayers;
-
 	public short MaxPlayers;
 
 	public CharacterData CharacterData;
-
-	public string Description;
 }

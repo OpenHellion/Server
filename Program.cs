@@ -97,18 +97,6 @@ public static class Program
 	{
 		try
 		{
-			if (Server.Properties.GetProperty<string>("server_name").Trim().IsNullOrEmpty())
-			{
-				throw new Exception();
-			}
-		}
-		catch
-		{
-			Dbg.Error("Invalid 'server_name' field.");
-			Environment.Exit(0);
-		}
-		try
-		{
 			Server.Properties.GetProperty<ushort>("game_client_port");
 		}
 		catch

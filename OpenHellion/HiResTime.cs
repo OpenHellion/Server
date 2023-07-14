@@ -51,7 +51,7 @@ public static class HiResTime
 
 	public static void Stop()
 	{
-		_stopwatch.Stop();
+		_stopwatch?.Stop();
 		_stopwatch = null;
 	}
 }

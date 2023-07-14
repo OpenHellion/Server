@@ -154,21 +154,6 @@ public class NetworkController
 			return;
 		}
 #endif
-		if (req.Password == null)
-		{
-			req.Password = string.Empty;
-		}
-
-		// Password check.
-		if (req.Password != Server.Instance.ServerPassword)
-		{
-			Dbg.Info("LogInRequest server password doesn't match this server's password.", req.ServerID, ServerID);
-			SendToGameClient(req.Sender, new LogInResponse
-			{
-				Response = ResponseResult.WrongPassword
-			});
-			return;
-		}
 
 		// Check if player id is valid.
 		if (!Guid.TryParse(req.PlayerId, out _))

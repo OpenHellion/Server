@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenHellion.IO;
 using ZeroGravity.Math;
 using ZeroGravity.Objects;
 using ZeroGravity.ShipComponents;
@@ -284,7 +285,7 @@ public class StationBlueprint
 		string fileName = configDir + "Data/Stations/" + blueprintName + ".json";
 		try
 		{
-			StationBlueprint sb = Json.Load<StationBlueprint>(fileName);
+			StationBlueprint sb = JsonSerialiser.Load<StationBlueprint>(fileName);
 			SpaceObjectVessel mainVessel2 = sb.AssembleStation(name.IsNullOrEmpty() ? sb.Name : name, tag, spawnRuleOrbit, nearArtificialBodyGUID, AsteroidResourcesMultiplier);
 			list.Add(mainVessel2);
 			mainVessel2.UpdateVesselData();
@@ -294,7 +295,7 @@ public class StationBlueprint
 		{
 			try
 			{
-				StationBlueprint[] sbs = Json.Load<StationBlueprint[]>(fileName);
+				StationBlueprint[] sbs = JsonSerialiser.Load<StationBlueprint[]>(fileName);
 				SpaceObjectVessel mainVessel = null;
 				StationBlueprint[] array = sbs;
 				foreach (StationBlueprint sb2 in array)

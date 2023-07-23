@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using Newtonsoft.Json;
 
-namespace ZeroGravity;
+namespace OpenHellion.IO;
 
-public static class Json
+public static class JsonSerialiser
 {
 	public enum Formatting
 	{

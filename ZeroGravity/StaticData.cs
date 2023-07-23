@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using OpenHellion.IO;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 
@@ -121,15 +122,15 @@ public static class StaticData
 
 	public static void LoadData()
 	{
-		string dir = ((!Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data")) ? Server.ConfigDir : "");
-		_SolarSystem = Json.Load<SolarSystemData>(dir + "Data/SolarSystem.json");
-		_StructuresDataList = Json.Load<List<StructureSceneData>>(dir + "Data/Structures.json");
+		string dir = (!Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data")) ? Server.ConfigDir : "";
+		_SolarSystem = JsonSerialiser.Load<SolarSystemData>(dir + "Data/SolarSystem.json");
+		_StructuresDataList = JsonSerialiser.Load<List<StructureSceneData>>(dir + "Data/Structures.json");
 		_CollisionDataList = new Dictionary<string, ServerCollisionData>();
-		_AsteroidDataList = Json.Load<List<AsteroidSceneData>>(dir + "Data/Asteroids.json");
-		_ItemsIngredients = Json.Load<List<ItemIngredientsData>>(dir + "Data/ItemsIngredients.json");
-		_QuestsData = Json.Load<List<QuestData>>(dir + "Data/Quests.json");
+		_AsteroidDataList = JsonSerialiser.Load<List<AsteroidSceneData>>(dir + "Data/Asteroids.json");
+		_ItemsIngredients = JsonSerialiser.Load<List<ItemIngredientsData>>(dir + "Data/ItemsIngredients.json");
+		_QuestsData = JsonSerialiser.Load<List<QuestData>>(dir + "Data/Quests.json");
 		_DefaultBlueprints = new List<ItemCompoundType>();
-		List<DynamicObjectData> tmpDynamicObjectDataList = Json.Load<List<DynamicObjectData>>(dir + "Data/DynamicObjects.json");
+		List<DynamicObjectData> tmpDynamicObjectDataList = JsonSerialiser.Load<List<DynamicObjectData>>(dir + "Data/DynamicObjects.json");
 		_DynamicObjectsDataList = new Dictionary<short, DynamicObjectData>();
 		foreach (DynamicObjectData data in tmpDynamicObjectDataList)
 		{
@@ -143,7 +144,7 @@ public static class StaticData
 		{
 			if (!_CollisionDataList.ContainsKey(a2.Collision))
 			{
-				a2.Colliders = Json.Load<ServerCollisionData>(dir + "Data/Collision/" + a2.Collision + ".json");
+				a2.Colliders = JsonSerialiser.Load<ServerCollisionData>(dir + "Data/Collision/" + a2.Collision + ".json");
 				_CollisionDataList.Add(a2.Collision, a2.Colliders);
 			}
 		}
@@ -151,7 +152,7 @@ public static class StaticData
 		{
 			if (a != null && a.Collision != null && !_CollisionDataList.ContainsKey(a.Collision))
 			{
-				a.Colliders = Json.Load<ServerCollisionData>(dir + "Data/Collision/" + a.Collision + ".json");
+				a.Colliders = JsonSerialiser.Load<ServerCollisionData>(dir + "Data/Collision/" + a.Collision + ".json");
 				_CollisionDataList.Add(a.Collision, a.Colliders);
 			}
 		}

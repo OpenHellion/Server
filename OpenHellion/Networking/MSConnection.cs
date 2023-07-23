@@ -20,8 +20,8 @@ using System;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using OpenHellion.IO;
 using OpenHellion.Networking.Message.MainServer;
-using ZeroGravity;
 
 namespace OpenHellion.Networking;
 
@@ -64,7 +64,7 @@ public static class MSConnection
 				Dbg.Log("Data:", str);
 
 				// Make object out of data.
-				callback(Json.Deserialize<T>(str));
+				callback(JsonSerialiser.Deserialize<T>(str));
 
 				// Clean up.
 				httpClient.Dispose();

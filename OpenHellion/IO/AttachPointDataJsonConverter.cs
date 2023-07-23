@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ZeroGravity.Data;
 
-namespace ZeroGravity;
+namespace OpenHellion.IO;
 
 public class AttachPointDataJsonConverter : JsonConverter
 {

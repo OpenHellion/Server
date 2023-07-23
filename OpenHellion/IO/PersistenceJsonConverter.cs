@@ -1,19 +1,15 @@
 using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using ZeroGravity.Data;
+using ZeroGravity;
 
-namespace ZeroGravity;
+namespace OpenHellion.IO;
 
-public class AuxDataJsonConverter : JsonConverter
+public class PersistenceJsonConverter : JsonConverter
 {
 	public override bool CanConvert(Type objectType)
 	{
-		if (objectType == typeof(DynamicObjectAuxData) || objectType == typeof(SystemAuxData))
-		{
-			return true;
-		}
-		return false;
+		return objectType == typeof(PersistenceData) || objectType == typeof(PersistenceObjectData);
 	}
 
 	public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
@@ -24,16 +20,8 @@ public class AuxDataJsonConverter : JsonConverter
 		}
 		try
 		{
-			if (objectType == typeof(DynamicObjectAuxData))
-			{
-				JObject jo = JObject.Load(reader);
-				return DynamicObjectAuxData.GetJsonData(jo, serializer);
-			}
-			if (objectType == typeof(SystemAuxData))
-			{
-				JObject jo2 = JObject.Load(reader);
-				return SystemAuxData.GetJsonData(jo2, serializer);
-			}
+			JObject jo = JObject.Load(reader);
+			return PersistenceData.GetData(jo, serializer);
 		}
 		catch (Exception ex)
 		{

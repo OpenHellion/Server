@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json;
+using OpenHellion.IO;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -163,7 +164,7 @@ public class Persistence
 				filename = string.Format(k_PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 			}
 
-			Json.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), Json.Formatting.Indented);
+			JsonSerialiser.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), JsonSerialiser.Formatting.Indented);
 		}
 		catch (Exception ex)
 		{
@@ -249,7 +250,7 @@ public class Persistence
 		loadFromFile = (filename == null) ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower());
 		if (loadFromFile != null)
 		{
-			PersistenceObject persistence = Json.Load<PersistenceObject>(loadFromFile.FullName);
+			PersistenceObject persistence = JsonSerialiser.Load<PersistenceObject>(loadFromFile.FullName);
 			Server.Instance.SolarSystem.CalculatePositionsAfterTime(persistence.SolarSystemTime);
 			if (persistence.Asteroids != null)
 			{

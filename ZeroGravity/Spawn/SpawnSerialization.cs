@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using OpenHellion.IO;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Objects;
@@ -151,7 +152,7 @@ public static class SpawnSerialization
 	public static Dictionary<string, Dictionary<LootTier, List<LootItemData>>> LoadLootData()
 	{
 		string dir = GetDirectory();
-		List<LootCategoryData> data = Json.Load<List<LootCategoryData>>(dir + "Data/LootCategories.json");
+		List<LootCategoryData> data = JsonSerialiser.Load<List<LootCategoryData>>(dir + "Data/LootCategories.json");
 		if (data != null && data.Count > 0)
 		{
 			Dictionary<string, Dictionary<LootTier, List<LootItemData>>> categories = new Dictionary<string, Dictionary<LootTier, List<LootItemData>>>();
@@ -1273,7 +1274,7 @@ public static class SpawnSerialization
 					}
 				}
 			};
-			Json.SerializeToFile(sampleData, dir + "Data/LootCategories.json", Json.Formatting.Indented, new JsonSerializerSettings
+			JsonSerialiser.SerializeToFile(sampleData, dir + "Data/LootCategories.json", JsonSerialiser.Formatting.Indented, new JsonSerializerSettings
 			{
 				NullValueHandling = NullValueHandling.Ignore
 			});
@@ -1286,7 +1287,7 @@ public static class SpawnSerialization
 		List<SpawnRuleData> data = new List<SpawnRuleData>();
 		try
 		{
-			data = Json.Load<List<SpawnRuleData>>(dir + "Data/SpawnRules.json");
+			data = JsonSerialiser.Load<List<SpawnRuleData>>(dir + "Data/SpawnRules.json");
 		}
 		catch (Exception)
 		{
@@ -1811,7 +1812,7 @@ public static class SpawnSerialization
 					IsVisibleOnRadar = false
 				}
 			};
-			Json.SerializeToFile(sampleData, dir + "Data/SpawnRules.json", Json.Formatting.Indented, new JsonSerializerSettings
+			JsonSerialiser.SerializeToFile(sampleData, dir + "Data/SpawnRules.json", JsonSerialiser.Formatting.Indented, new JsonSerializerSettings
 			{
 				NullValueHandling = NullValueHandling.Ignore
 			});

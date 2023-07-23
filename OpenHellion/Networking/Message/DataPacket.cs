@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using ZeroGravity;
+using OpenHellion.IO;
 
 namespace OpenHellion.Networking.Message;
 
@@ -26,6 +26,6 @@ public class DataPacket
 {
 	public override string ToString()
 	{
-		return Json.Serialize(this, Json.Formatting.None);
+		return JsonSerialiser.Serialize(this, JsonSerialiser.Formatting.None);
 	}
 }

@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using BulletSharp;
+using OpenHellion.IO;
 using OpenHellion.Networking;
 using OpenHellion.Networking.Message.MainServer;
 using ZeroGravity.BulletPhysics;
@@ -713,13 +714,6 @@ public class Server
 
 	private void LoadServerSettings()
 	{
-		try
-		{
-			NetworkController.ServerID = File.ReadAllText(ConfigDir + "ServerID.txt").Trim();
-		}
-		catch
-		{
-		}
 		Properties.GetProperty("server_tick_count", ref numberOfTicks);
 		Properties.GetProperty("game_client_port", ref GamePort);
 		Properties.GetProperty("status_port", ref StatusPort);
@@ -2722,13 +2716,6 @@ public class Server
 				NetworkController.ServerID = data.ServerId;
 				Console.Title = " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
 				Dbg.UnformattedMessage("==============================================================================\r\n\tServer ID: " + NetworkController.ServerID + "\r\n==============================================================================\r\n");
-				try
-				{
-					File.WriteAllText(ConfigDir + "ServerID.txt", string.Concat(NetworkController.ServerID));
-				}
-				catch
-				{
-				}
 			}
 			CheckInPassed = true;
 			AdminIPAddressRanges = data.AdminIPAddressRanges;
@@ -3107,7 +3094,7 @@ public class Server
 		try
 		{
 			string dir = ((!ConfigDir.IsNullOrEmpty() && Directory.Exists(ConfigDir + "Data")) ? ConfigDir : "");
-			List<DebrisField.DebrisFieldData> list = Json.Load<List<DebrisField.DebrisFieldData>>(dir + "Data/DebrisFields.json");
+			List<DebrisField.DebrisFieldData> list = JsonSerialiser.Load<List<DebrisField.DebrisFieldData>>(dir + "Data/DebrisFields.json");
 			foreach (DebrisField.DebrisFieldData dfd in list)
 			{
 				if (dfd.DamageVesselChance > 0f && dfd.Damage.Max >= dfd.Damage.Min && dfd.Damage.Max > 0f)

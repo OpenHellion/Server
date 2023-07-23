@@ -12,13 +12,11 @@ namespace ZeroGravity.ShipComponents;
 
 public class ManeuverCourse
 {
-	private static int numberOfCheckPoints = 100;
+	private static readonly double _activationTimeDifference = 5.0;
 
-	private static double activationTimeDifference = 5.0;
+	private static readonly double _activationDirectionDifference = 5.0;
 
-	private static double activationDirectionDifference = 5.0;
-
-	public static double StartingSoonTime = 2.0;
+	public static readonly double StartingSoonTime = 2.0;
 
 	private long GUID;
 
@@ -181,7 +179,7 @@ public class ManeuverCourse
 			return;
 		}
 		double angle = Vector3D.Angle(parentShip.Forward, startDir);
-		if (!activate || (!(StartSolarSystemTime - Server.SolarSystemTime > activationTimeDifference) && !(angle > activationDirectionDifference)))
+		if (!activate || (!(StartSolarSystemTime - Server.SolarSystemTime > _activationTimeDifference) && !(angle > _activationDirectionDifference)))
 		{
 			isActivated = activate;
 		}
@@ -350,7 +348,7 @@ public class ManeuverCourse
 		{
 			return false;
 		}
-		if (!isActivated || Vector3D.Angle(parentShip.Forward, startDir) > activationDirectionDifference || !CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
+		if (!isActivated || Vector3D.Angle(parentShip.Forward, startDir) > _activationDirectionDifference || !CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
 		{
 			Invalidate();
 			return false;

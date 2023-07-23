@@ -35,7 +35,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			public QuaternionD RotFromParent;
 		}
 
-		private List<PlayerItem> players = new List<PlayerItem>();
+		private readonly List<PlayerItem> players = new List<PlayerItem>();
 
 		public static DockUndockPlayerData GetPlayerData(params SpaceObjectVessel[] vessels)
 		{

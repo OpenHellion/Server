@@ -11,13 +11,7 @@ public class Grenade : Item
 
 	private bool isActive;
 
-	private float damage;
-
-	private float blastRadius;
-
 	private float detonationTime;
-
-	private TypeOfDamage DamageType;
 
 	public long PlayerGUID;
 

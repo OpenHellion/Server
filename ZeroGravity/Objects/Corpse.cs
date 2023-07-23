@@ -16,27 +16,17 @@ public class Corpse : SpaceObjectTransferable
 
 	private long _listenToSenderID = 0L;
 
-	private DateTime lastSenderTime;
-
-	private double WaitForSenderTime = 1.0;
-
 	public bool IsInsideSpaceObject;
 
 	public Dictionary<byte, RagdollItemData> RagdollDataList;
 
-	private Vector3D pivotPositionCorrection = Vector3D.Zero;
+	public static readonly double ArenaTimer = TimeSpan.FromMinutes(30.0).TotalMilliseconds;
 
-	private Vector3D pivotVelocityCorrection = Vector3D.Zero;
+	public static readonly double EmptyCorpseTimer = TimeSpan.FromMinutes(5.0).TotalMilliseconds;
 
-	private DateTime lastPivotResetTime = DateTime.UtcNow;
+	public static readonly double OutsideTimer = TimeSpan.FromHours(3.0).TotalMilliseconds;
 
-	public static double ArenaTimer = TimeSpan.FromMinutes(30.0).TotalMilliseconds;
-
-	public static double EmptyCorpseTimer = TimeSpan.FromMinutes(5.0).TotalMilliseconds;
-
-	public static double OutsideTimer = TimeSpan.FromHours(3.0).TotalMilliseconds;
-
-	public static double InsideModuleTimer = TimeSpan.FromHours(24.0).TotalMilliseconds;
+	public static readonly double InsideModuleTimer = TimeSpan.FromHours(24.0).TotalMilliseconds;
 
 	private Vector3D velocity;
 
@@ -93,8 +83,6 @@ public class Corpse : SpaceObjectTransferable
 		if (player.Parent is Pivot)
 		{
 			Pivot pivot = (Pivot)(Parent = new Pivot(this, player.Parent as ArtificialBody));
-			pivotPositionCorrection = Vector3D.Zero;
-			pivotVelocityCorrection = Vector3D.Zero;
 			foreach (Player pl in Server.Instance.AllPlayers)
 			{
 				if (pl.IsSubscribedTo(player.Parent.GUID))
@@ -187,7 +175,6 @@ public class Corpse : SpaceObjectTransferable
 		if (ListenToSenderID == 0L || mdom.Sender == ListenToSenderID || _listenToPlayer == null || (_listenToPlayer.Parent != Parent && _listenToSenderID != mdom.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
 		{
 			ListenToSenderID = mdom.Sender;
-			lastSenderTime = DateTime.UtcNow;
 			RagdollDataList = mdom.RagdollDataList;
 			LocalPosition = mdom.LocalPosition.ToVector3D();
 			LocalRotation = mdom.LocalRotation.ToQuaternionD();
@@ -209,8 +196,6 @@ public class Corpse : SpaceObjectTransferable
 		{
 			SpaceObjectVessel parentVessel = Parent as SpaceObjectVessel;
 			Pivot pivot = (Pivot)(Parent = new Pivot(this, parentVessel.MainVessel));
-			pivotPositionCorrection = Vector3D.Zero;
-			pivotVelocityCorrection = Vector3D.Zero;
 			foreach (Player pl2 in Server.Instance.AllPlayers)
 			{
 				if (pl2.IsSubscribedTo(parentVessel.GUID))
@@ -247,7 +232,6 @@ public class Corpse : SpaceObjectTransferable
 		{
 		}
 		ListenToSenderID = dosm.Sender;
-		lastSenderTime = DateTime.UtcNow;
 		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, (Parent != null) ? Parent.Parent : null);
 	}
 

@@ -8,8 +8,6 @@ public class HandheldAsteroidScanner : Item
 {
 	private int penetrationLevel;
 
-	private Asteroid currentAsteroid;
-
 	public override DynamicObjectStats StatsNew => null;
 
 	public HandheldAsteroidScanner(DynamicObjectAuxData data)

@@ -181,169 +181,198 @@ public class SolarSystem
 		}
 	}
 
-	public void SendMovementMessageToPlayer(Player pl)
+	/// <summary>
+	/// 	Send a message to the player that contains all of the moved objects.
+	/// </summary>
+	public void SendMovementMessageToPlayer(Player player)
 	{
-		MovementMessage mm = new MovementMessage();
-		mm.SolarSystemTime = CurrentTime;
-		mm.Timestamp = (float)Server.Instance.RunTime.TotalSeconds;
-		mm.Transforms = new List<ObjectTransform>();
-		if (pl.Parent is SpaceObjectVessel && (pl.Parent as SpaceObjectVessel).IsDocked)
+		MovementMessage movementMessage = new MovementMessage
 		{
-			SpaceObjectVessel vessel = pl.Parent as SpaceObjectVessel;
+			SolarSystemTime = CurrentTime,
+			Timestamp = (float)Server.Instance.RunTime.TotalSeconds,
+			Transforms = new List<ObjectTransform>()
+		};
+
+		if (player.Parent is SpaceObjectVessel && (player.Parent as SpaceObjectVessel).IsDocked)
+		{
+			SpaceObjectVessel vessel = player.Parent as SpaceObjectVessel;
 			vessel.Orbit.CopyDataFrom(vessel.DockedToMainVessel.Orbit, 0.0, exactCopy: true);
 		}
-		foreach (ArtificialBody ab in artificialBodies.Values)
+
+		// Loops through each artificial body in the universe, and adds all contents to the movement message.
+		foreach (ArtificialBody artificialBody in artificialBodies.Values)
 		{
-			ObjectTransform trans = new ObjectTransform
+			ObjectTransform bodyTransform = new ObjectTransform
 			{
-				GUID = ab.GUID,
-				Type = ab.ObjectType
+				GUID = artificialBody.GUID,
+				Type = artificialBody.ObjectType
 			};
-			if (ab.CurrentCourse != null && ab.CurrentCourse.IsInProgress)
+
+			if (artificialBody.CurrentCourse is not null && artificialBody.CurrentCourse.IsInProgress)
 			{
-				trans.Maneuver = ab.CurrentCourse.CurrentData();
-				trans.Forward = ab.Forward.ToFloatArray();
-				trans.Up = ab.Up.ToFloatArray();
+				bodyTransform.Maneuver = artificialBody.CurrentCourse.CurrentData();
+				bodyTransform.Forward = artificialBody.Forward.ToFloatArray();
+				bodyTransform.Up = artificialBody.Up.ToFloatArray();
 			}
-			OrbitParameters orbit = ((!(ab is SpaceObjectVessel)) ? ab.Orbit : (ab as SpaceObjectVessel).MainVessel.Orbit);
-			if (ab.StabilizeToTargetObj != null)
+
+			OrbitParameters orbit = (artificialBody is not SpaceObjectVessel) ? artificialBody.Orbit : (artificialBody as SpaceObjectVessel).MainVessel.Orbit;
+			if (artificialBody.StabilizeToTargetObj is not null)
 			{
-				if (ab.StabilizeToTargetTime >= pl.LastMovementMessageSolarSystemTime || (pl.UpdateArtificialBodyMovement.Count > 0 && pl.UpdateArtificialBodyMovement.Contains(ab.GUID)))
+				if (artificialBody.StabilizeToTargetTime >= player.LastMovementMessageSolarSystemTime
+					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.GUID)))
 				{
-					trans.StabilizeToTargetGUID = ab.StabilizeToTargetObj.GUID;
-					trans.StabilizeToTargetRelPosition = ab.StabilizeToTargetRelPosition.ToArray();
+					bodyTransform.StabilizeToTargetGUID = artificialBody.StabilizeToTargetObj.GUID;
+					bodyTransform.StabilizeToTargetRelPosition = artificialBody.StabilizeToTargetRelPosition.ToArray();
 				}
 			}
 			else if (orbit.IsOrbitValid)
 			{
-				if (orbit.LastChangeTime >= pl.LastMovementMessageSolarSystemTime || (pl.UpdateArtificialBodyMovement.Count > 0 && pl.UpdateArtificialBodyMovement.Contains(ab.GUID)))
+				if (orbit.LastChangeTime >= player.LastMovementMessageSolarSystemTime
+					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.GUID)))
 				{
-					trans.Orbit = new OrbitData
+					bodyTransform.Orbit = new OrbitData
 					{
 						ParentGUID = orbit.Parent.CelestialBody.GUID
 					};
-					orbit.FillOrbitData(ref trans.Orbit);
+					orbit.FillOrbitData(ref bodyTransform.Orbit);
 				}
 			}
 			else
 			{
-				trans.Realtime = new RealtimeData
+				bodyTransform.Realtime = new RealtimeData
 				{
 					ParentGUID = orbit.Parent.CelestialBody.GUID,
 					Position = orbit.RelativePosition.ToArray(),
 					Velocity = orbit.RelativeVelocity.ToArray()
 				};
 			}
-			if (trans.Orbit != null || trans.Realtime != null || (ab.LastOrientationChangeTime >= pl.LastMovementMessageSolarSystemTime && (pl.Parent == ab || (pl.Parent as ArtificialBody).Position.DistanceSquared(ab.Position) < 225000000.0)))
+
+			if (bodyTransform.Orbit is not null || bodyTransform.Realtime is not null || (artificialBody.LastOrientationChangeTime >= player.LastMovementMessageSolarSystemTime && (player.Parent == artificialBody || (player.Parent as ArtificialBody).Position.DistanceSquared(artificialBody.Position) < 225000000.0)))
 			{
-				trans.Forward = ab.Forward.ToFloatArray();
-				trans.Up = ab.Up.ToFloatArray();
-				trans.AngularVelocity = (ab.AngularVelocity * (180.0 / System.Math.PI)).ToFloatArray();
-				trans.RotationVec = ab.Rotation.ToFloatArray();
+				bodyTransform.Forward = artificialBody.Forward.ToFloatArray();
+				bodyTransform.Up = artificialBody.Up.ToFloatArray();
+				bodyTransform.AngularVelocity = (artificialBody.AngularVelocity * (180.0 / System.Math.PI)).ToFloatArray();
+				bodyTransform.RotationVec = artificialBody.Rotation.ToFloatArray();
 			}
-			trans.CharactersMovement = new List<CharacterMovementMessage>();
-			trans.DynamicObjectsMovement = new List<DynamicObectMovementMessage>();
-			trans.CorpsesMovement = new List<CorpseMovementMessage>();
-			if (ab is SpaceObjectVessel)
+
+			bodyTransform.CharactersMovement = new List<CharacterMovementMessage>();
+			bodyTransform.DynamicObjectsMovement = new List<DynamicObectMovementMessage>();
+			bodyTransform.CorpsesMovement = new List<CorpseMovementMessage>();
+
+			if (artificialBody is SpaceObjectVessel)
 			{
-				SpaceObjectVessel ves = ab as SpaceObjectVessel;
-				if (pl.Parent.GUID == ab.GUID || pl.IsSubscribedTo(ab.GUID))
+				SpaceObjectVessel vessel = artificialBody as SpaceObjectVessel;
+				if (player.Parent.GUID == artificialBody.GUID || player.IsSubscribedTo(artificialBody.GUID))
 				{
-					foreach (Player crewPl in ves.VesselCrew)
+					foreach (Player crewPlayer in vessel.VesselCrew)
 					{
-						if (crewPl.PlayerReady)
+						if (crewPlayer.PlayerReady)
 						{
-							CharacterMovementMessage cmm2 = crewPl.GetCharacterMovementMessage();
-							if (cmm2 != null)
+							CharacterMovementMessage characterMovement = crewPlayer.GetCharacterMovementMessage();
+							if (characterMovement is not null)
 							{
-								trans.CharactersMovement.Add(cmm2);
+								bodyTransform.CharactersMovement.Add(characterMovement);
 							}
 						}
 					}
-					foreach (DynamicObject dobj2 in ves.DynamicObjects.Values)
+
+					foreach (Corpse playerCorpse in vessel.Corpses.Values)
 					{
-						if (dobj2.PlayerReceivesMovementMessage(pl.GUID) && dobj2.LastChangeTime >= pl.LastMovementMessageSolarSystemTime)
+						if (playerCorpse.PlayerReceivesMovementMessage(player.GUID))
 						{
-							DynamicObectMovementMessage mdom2 = dobj2.GetDynamicObectMovementMessage();
-							if (mdom2 != null)
+							CorpseMovementMessage corpseMovement = playerCorpse.GetMovementMessage();
+							if (corpseMovement is not null)
 							{
-								trans.DynamicObjectsMovement.Add(mdom2);
+								bodyTransform.CorpsesMovement.Add(corpseMovement);
 							}
 						}
 					}
-					foreach (Corpse cor2 in ves.Corpses.Values)
+
+					foreach (DynamicObject dynamicObject in vessel.DynamicObjects.Values)
 					{
-						if (cor2.PlayerReceivesMovementMessage(pl.GUID))
+						if (dynamicObject.PlayerReceivesMovementMessage(player.GUID) && dynamicObject.LastChangeTime >= player.LastMovementMessageSolarSystemTime)
 						{
-							CorpseMovementMessage mcom2 = cor2.GetMovementMessage();
-							if (mcom2 != null)
+							DynamicObectMovementMessage dynamicOjectMovement = dynamicObject.GetDynamicObectMovementMessage();
+							if (dynamicOjectMovement is not null)
 							{
-								trans.CorpsesMovement.Add(mcom2);
+								bodyTransform.DynamicObjectsMovement.Add(dynamicOjectMovement);
 							}
-						}
-					}
-				}
-			}
-			else if (ab is Pivot)
-			{
-				Pivot pivot = ab as Pivot;
-				if (pivot.ObjectType == SpaceObjectType.PlayerPivot)
-				{
-					CharacterMovementMessage cmm = ((Player)pivot.Child).GetCharacterMovementMessage();
-					if (cmm != null)
-					{
-						trans.CharactersMovement.Add(cmm);
-					}
-				}
-				else if (pivot.ObjectType == SpaceObjectType.CorpsePivot)
-				{
-					Corpse cor = pivot.Child as Corpse;
-					if (cor.PlayerReceivesMovementMessage(pl.GUID))
-					{
-						CorpseMovementMessage mcom = cor.GetMovementMessage();
-						if (mcom != null)
-						{
-							trans.CorpsesMovement.Add(mcom);
-						}
-					}
-				}
-				else if (pivot.ObjectType == SpaceObjectType.DynamicObjectPivot)
-				{
-					DynamicObject dobj = pivot.Child as DynamicObject;
-					if (dobj.PlayerReceivesMovementMessage(pl.GUID))
-					{
-						DynamicObectMovementMessage mdom = dobj.GetDynamicObectMovementMessage();
-						if (mdom != null)
-						{
-							trans.DynamicObjectsMovement.Add(mdom);
 						}
 					}
 				}
 			}
-			if (trans.Orbit == null && trans.Realtime == null && trans.Maneuver == null && trans.Forward == null && trans.CharactersMovement.Count <= 0)
+			else if (artificialBody is Pivot)
 			{
-				List<CorpseMovementMessage> corpsesMovement = trans.CorpsesMovement;
+				Pivot pivot = artificialBody as Pivot;
+				switch (pivot.ObjectType)
+				{
+					case SpaceObjectType.PlayerPivot:
+					{
+						Player character = pivot.Child as Player;
+						CharacterMovementMessage characterMovement = character.GetCharacterMovementMessage();
+						if (characterMovement is not null)
+						{
+							bodyTransform.CharactersMovement.Add(characterMovement);
+						}
+						break;
+					}
+
+					case SpaceObjectType.CorpsePivot:
+					{
+						Corpse playerCorpse = pivot.Child as Corpse;
+						if (playerCorpse.PlayerReceivesMovementMessage(player.GUID))
+						{
+							CorpseMovementMessage corpseMovement = playerCorpse.GetMovementMessage();
+							if (corpseMovement is not null)
+							{
+								bodyTransform.CorpsesMovement.Add(corpseMovement);
+							}
+						}
+						break;
+					}
+
+					case SpaceObjectType.DynamicObjectPivot:
+					{
+						DynamicObject dynamicObject = pivot.Child as DynamicObject;
+						if (dynamicObject.PlayerReceivesMovementMessage(player.GUID))
+						{
+							DynamicObectMovementMessage dynamicObjectMovement = dynamicObject.GetDynamicObectMovementMessage();
+							if (dynamicObjectMovement is not null)
+							{
+								bodyTransform.DynamicObjectsMovement.Add(dynamicObjectMovement);
+							}
+						}
+						break;
+					}
+				}
+			}
+
+			if (bodyTransform.Orbit == null && bodyTransform.Realtime == null && bodyTransform.Maneuver == null && bodyTransform.Forward == null && bodyTransform.CharactersMovement.Count <= 0)
+			{
+				List<CorpseMovementMessage> corpsesMovement = bodyTransform.CorpsesMovement;
 				if (corpsesMovement == null || corpsesMovement.Count <= 0)
 				{
-					List<DynamicObectMovementMessage> dynamicObjectsMovement = trans.DynamicObjectsMovement;
-					if ((dynamicObjectsMovement == null || dynamicObjectsMovement.Count <= 0) && !trans.StabilizeToTargetGUID.HasValue)
+					List<DynamicObectMovementMessage> dynamicObjectsMovement = bodyTransform.DynamicObjectsMovement;
+					if ((dynamicObjectsMovement == null || dynamicObjectsMovement.Count <= 0) && !bodyTransform.StabilizeToTargetGUID.HasValue)
 					{
 						continue;
 					}
 				}
 			}
-			if (ab.StabilizeToTargetObj != null)
+
+			if (artificialBody.StabilizeToTargetObj is not null)
 			{
-				mm.Transforms.Add(trans);
+				movementMessage.Transforms.Add(bodyTransform);
 			}
 			else
 			{
-				mm.Transforms.Insert(0, trans);
+				movementMessage.Transforms.Insert(0, bodyTransform);
 			}
 		}
-		pl.LastMovementMessageSolarSystemTime = CurrentTime;
-		pl.UpdateArtificialBodyMovement.Clear();
-		NetworkController.Instance.SendToGameClient(pl.GUID, mm);
+
+		player.LastMovementMessageSolarSystemTime = CurrentTime;
+		player.UpdateArtificialBodyMovement.Clear();
+		NetworkController.Instance.SendToGameClient(player.GUID, movementMessage);
 	}
 
 	public void InitializeData()

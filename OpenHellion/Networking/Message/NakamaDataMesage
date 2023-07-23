@@ -1,0 +1,9 @@
+using ZeroGravity.Network;
+
+namespace OpenHellion.Networking.Message;
+
+public class NakamaDataMessage : NetworkData
+{
+	public string Dest;
+	public byte[] Data;
+}

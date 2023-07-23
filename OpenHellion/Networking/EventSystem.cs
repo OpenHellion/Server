@@ -133,17 +133,6 @@ public class EventSystem
 				_networkBuffer.Enqueue(data);
 			}
 		}
-		else if (!(data is MainServerGenericResponse) || (data as MainServerGenericResponse).Response != ResponseResult.Success)
-		{
-			if (data is MainServerGenericResponse)
-			{
-				Dbg.Info("Unhandled network package", data.Sender, data.GetType(), (data as MainServerGenericResponse).Message);
-			}
-			else
-			{
-				Dbg.Info("Unhandled network package", data.Sender, data.GetType());
-			}
-		}
 	}
 
 	/// <summary>

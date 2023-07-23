@@ -130,8 +130,6 @@ public class NetworkController
 			return;
 		}
 
-#if false
-		// TODO: Ignoring this for now.
 		if (req.ClientHash != Server.CombinedHash)
 		{
 			Dbg.Info("Server/client hash mismatch.", req.ServerID, ServerID);
@@ -141,9 +139,9 @@ public class NetworkController
 			});
 			return;
 		}
-#endif
 
 #if !HELLION_SP
+		// Also has the added benifit of blocking players from joining non-nakama servers.
 		if (req.ServerID != ServerID)
 		{
 			Dbg.Info("LogInRequest server ID doesn't match this server ID.", req.ServerID, ServerID);

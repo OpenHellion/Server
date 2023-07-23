@@ -1,4 +1,5 @@
 using OpenHellion.IO;
+using OpenHellion.Networking.Message;
 using ProtoBuf;
 
 namespace ZeroGravity.Network;
@@ -60,6 +61,7 @@ namespace ZeroGravity.Network;
 [ProtoInclude(328, typeof(ResetBaseBuilding))]
 [ProtoInclude(329, typeof(SaveGameMessage))]
 [ProtoInclude(330, typeof(VoiceCommDataMessage))]
+[ProtoInclude(331, typeof(NakamaDataMessage))]
 [ProtoInclude(332, typeof(ServerShutDownMessage))]
 [ProtoInclude(333, typeof(LatencyTestMessage))]
 [ProtoInclude(334, typeof(ServerUpdateMessage))]
@@ -70,7 +72,6 @@ namespace ZeroGravity.Network;
 [ProtoInclude(339, typeof(RepairItemMessage))]
 [ProtoInclude(340, typeof(RepairVesselMessage))]
 [ProtoInclude(341, typeof(HurtPlayerMessage))]
-[ProtoInclude(342, typeof(InviteMessage))]
 [ProtoInclude(343, typeof(RoomPressureMessage))]
 [ProtoInclude(344, typeof(RecycleItemMessage))]
 [ProtoInclude(345, typeof(CancelFabricationMessage))]
@@ -84,7 +85,6 @@ namespace ZeroGravity.Network;
 [ProtoInclude(353, typeof(NavigationMapDetailsMessage))]
 [ProtoInclude(354, typeof(UpdateVesselDataMessage))]
 [ProtoInclude(406, typeof(DeleteCharacterRequest))]
-[ProtoInclude(500, typeof(MainServerGenericResponse))]
 [ProtoInclude(506, typeof(DeleteCharacterResponse))]
 public abstract class NetworkData
 {

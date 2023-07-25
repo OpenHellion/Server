@@ -7,31 +7,31 @@ namespace ZeroGravity;
 
 public class Properties
 {
-	private Dictionary<string, string> properties = new Dictionary<string, string>();
+	private readonly Dictionary<string, string> _properties = new Dictionary<string, string>();
 
-	private DateTime propertiesChangedTime;
+	private DateTime _propertiesChangedTime;
 
-	private string fileName = "properties.ini";
+	private readonly string _fileName = "properties.ini";
 
 	public Properties(string fileName)
 	{
-		this.fileName = fileName;
-		loadProperties();
+		_fileName = fileName;
+		LoadProperties();
 	}
 
-	private void loadProperties()
+	private void LoadProperties()
 	{
 		try
 		{
-			propertiesChangedTime = File.GetLastWriteTime(fileName);
-			properties.Clear();
-			string[] array = File.ReadAllLines(fileName);
+			_propertiesChangedTime = File.GetLastWriteTime(_fileName);
+			_properties.Clear();
+			string[] array = File.ReadAllLines(_fileName);
 			foreach (string row in array)
 			{
 				try
 				{
 					string[] parts = row.Split("=".ToCharArray(), 2);
-					properties.Add(parts[0].ToLower(), parts[1]);
+					_properties.Add(parts[0].ToLower(), parts[1]);
 				}
 				catch
 				{
@@ -45,13 +45,13 @@ public class Properties
 
 	public T GetProperty<T>(string propertyName)
 	{
-		DateTime dt = File.GetLastWriteTime(fileName);
-		if (dt != propertiesChangedTime)
+		DateTime lastFileWrite = File.GetLastWriteTime(_fileName);
+		if (lastFileWrite != _propertiesChangedTime)
 		{
-			loadProperties();
+			LoadProperties();
 		}
 		TypeConverter converter = TypeDescriptor.GetConverter(typeof(T));
-		return (T)converter.ConvertFrom(properties[propertyName.ToLower()]);
+		return (T)converter.ConvertFrom(_properties[propertyName.ToLower()]);
 	}
 
 	public void GetProperty<T>(string propertyName, ref T value)
@@ -67,6 +67,6 @@ public class Properties
 
 	public void SetProperty(string name, string value)
 	{
-		properties[name.Trim()] = value;
+		_properties[name.Trim()] = value;
 	}
 }

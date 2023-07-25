@@ -1,17 +1,14 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 
 public static class Dbg
 {
 	public static string OutputDir = "";
 
-	public static bool AddTimestamp = true;
+	public const bool AddTimestamp = true;
 
-	public static string TimestampFormat = "yyyy/MM/dd HH:mm:ss.ffff";
-
-	public static string TimestampSeparator = " - ";
+	public const string TimestampFormat = "yyyy/MM/dd HH:mm:ss.ffff";
 
 	public static void Initialize()
 	{
@@ -60,8 +57,7 @@ public static class Dbg
 	{
 		try
 		{
-			StackFrame frame = new StackTrace(2, fNeedFileInfo: true).GetFrame(0);
-			Trace.WriteLine($"{message}\r\n\t{Path.GetFileName(frame.GetFileName())} Ln {frame.GetFileLineNumber()} Col {frame.GetFileColumnNumber()}\r\n------------------------------------------------------------------------------");
+			Trace.WriteLine($"{(AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + " -" ) : "")} {message}");
 		}
 		catch
 		{
@@ -77,7 +73,7 @@ public static class Dbg
 	[Conditional("SHOW_ALL_LOGS")]
 	public static void Log(string message)
 	{
-		WriteToLog(message);
+		WriteToLog($"[Debug] {message}");
 	}
 
 	[Conditional("DEBUG")]
@@ -86,11 +82,11 @@ public static class Dbg
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog(GetString(values[0]));
+			WriteToLog($"[Debug] {GetString(values[0])}");
 		}
 		else
 		{
-			WriteToLog(string.Join(" ", values));
+			WriteToLog($"[Debug] {string.Join(" ", values)}");
 		}
 	}
 
@@ -100,7 +96,7 @@ public static class Dbg
 	{
 		if (condition)
 		{
-			WriteToLog(message);
+			WriteToLog($"[Debug] {message}");
 		}
 	}
 
@@ -121,62 +117,57 @@ public static class Dbg
 
 	public static void Info(string message)
 	{
-		WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + message);
+		WriteToLog($"[Info] {message}");
 	}
 
 	public static void Info(params object[] values)
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + GetString(values[0]));
+			WriteToLog($"[Info] {GetString(values[0])}");
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + string.Join(" ", values));
+			WriteToLog($"[Info] {string.Join(" ", values)}");
 		}
 	}
 
 	public static void Warning(string message)
 	{
-		WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[WARNING] " + message);
+		WriteToLog("[Warn] " + message);
 	}
 
 	public static void Warning(params object[] values)
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[WARNING] " + GetString(values[0]));
+			WriteToLog("[Warn] " + GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[WARNING] " + string.Join(" ", values));
+			WriteToLog("[Warn] " + string.Join(" ", values));
 		}
 	}
 
 	public static void Error(string message)
 	{
-		WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + message);
+		WriteToLog($"[Error] {message}");
 	}
 
 	public static void Error(params object[] values)
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + GetString(values[0]));
+			WriteToLog("[Error] " + GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog((AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + string.Join(" ", values));
+			WriteToLog("[Error] " + string.Join(" ", values));
 		}
 	}
 
 	public static void Exception(Exception ex)
 	{
-		string msg = (AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + TimestampSeparator) : "") + "[ERROR] " + ex.Message + "\r\n" + ex.StackTrace;
-		if (ex.InnerException != null)
-		{
-			msg = msg + "\r\nInner Exception:" + ex.InnerException.Message + "\r\n" + ex.InnerException.StackTrace;
-		}
-		WriteToLog(msg);
+		WriteToLog($"[Exception] {ex}");
 	}
 }

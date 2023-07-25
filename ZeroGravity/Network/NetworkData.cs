@@ -61,7 +61,6 @@ namespace ZeroGravity.Network;
 [ProtoInclude(328, typeof(ResetBaseBuilding))]
 [ProtoInclude(329, typeof(SaveGameMessage))]
 [ProtoInclude(330, typeof(VoiceCommDataMessage))]
-[ProtoInclude(331, typeof(NakamaDataMessage))]
 [ProtoInclude(332, typeof(ServerShutDownMessage))]
 [ProtoInclude(333, typeof(LatencyTestMessage))]
 [ProtoInclude(334, typeof(ServerUpdateMessage))]

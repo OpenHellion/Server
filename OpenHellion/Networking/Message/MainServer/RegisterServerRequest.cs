@@ -1,4 +1,4 @@
-// CheckInMessage.cs
+// RegisterServerRequest.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -22,12 +22,20 @@ namespace OpenHellion.Networking.Message.MainServer;
 
 [Serializable]
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class CheckInMessage : MSMessage
+public class RegisterServerRequest : NakamaMessage
 {
-	public string ServerId;
+	public string AuthToken;
+
+	public string Location;
+
+	public int GamePort;
+
+	public int StatusPort;
+
+	public uint Hash;
 
 	public override string GetDestination()
 	{
-		throw new NotImplementedException();
+		return "register_server";
 	}
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -9,6 +10,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using BulletSharp;
+using OpenHellion.Exceptions;
 using OpenHellion.IO;
 using OpenHellion.Networking;
 using OpenHellion.Networking.Message.MainServer;
@@ -608,13 +610,13 @@ public class Server
 		PhysicsController = new BulletPhysicsController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
-		Console.Title = "(id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
+		Console.Title = "(id: " + ((NetworkController.ServerId == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
 		Stopwatch stopWatch = new Stopwatch();
 		stopWatch.Start();
 		Thread.Sleep(1);
 		stopWatch.Stop();
 		long maxTicks = (long)(1000.0 / stopWatch.Elapsed.TotalMilliseconds);
-		Dbg.UnformattedMessage(string.Format("==============================================================================\r\n\tServer ID: {1}\r\n\tGame port: {5}\r\n\tStatus port: {6}\r\n\tStart date: {0}\r\n\tServer ticks: {2}{4}\r\n\tMax server ticks (not precise): {3}\r\n==============================================================================", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), (NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", GamePort, StatusPort));
+		Dbg.UnformattedMessage(string.Format("\tGame port: {4}\r\n\tStatus port: {5}\r\n\tStart date: {0}\r\n\tServer ticks: {1}{3}\r\n\tMax server ticks (not precise): {2}", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", GamePort, StatusPort));
 		StaticData.LoadData();
 	}
 
@@ -700,7 +702,7 @@ public class Server
 		Properties = new Properties(Server.ConfigDir + "GameServer.ini");
 		if (gPort != null)
 		{
-			Properties.SetProperty("game_client_port", gPort);
+			Properties.SetProperty("game_port", gPort);
 		}
 		if (sPort != null)
 		{
@@ -715,13 +717,15 @@ public class Server
 	private void LoadServerSettings()
 	{
 		Properties.GetProperty("server_tick_count", ref numberOfTicks);
-		Properties.GetProperty("game_client_port", ref GamePort);
+		Properties.GetProperty("game_port", ref GamePort);
 		Properties.GetProperty("status_port", ref StatusPort);
 #if HELLION_SP
 		CheckAndFixPorts();
 #endif
-		Properties.GetProperty("main_server_ip", ref MSConnection.IpAddress);
-		Properties.GetProperty("main_server_port", ref MSConnection.Port);
+
+		Properties.GetProperty("http_key", ref MsConnection.HttpKey);
+		Properties.GetProperty("main_server_ip", ref MsConnection.IpAddress);
+		Properties.GetProperty("main_server_port", ref MsConnection.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
@@ -1060,10 +1064,6 @@ public class Server
 		return false;
 	}
 
-	public void CheckPosition(Player player)
-	{
-	}
-
 	public void RemovePlayer(Player player)
 	{
 		if (player.Parent != null)
@@ -1089,11 +1089,13 @@ public class Server
 		if (pl.PlayerId != null && SpawnPointInvites.ContainsKey(pl.PlayerId))
 		{
 			ShipSpawnPoint sp = SpawnPointInvites[pl.PlayerId].SpawnPoint;
-			SpawnPointDetails spd = new SpawnPointDetails();
-			spd.Name = sp.Ship.FullName;
-			spd.IsPartOfCrew = false;
-			spd.SpawnPointParentID = sp.Ship.GUID;
-			spd.PlayersOnShip = new List<string>();
+			SpawnPointDetails spd = new SpawnPointDetails
+			{
+				Name = sp.Ship.FullName,
+				IsPartOfCrew = false,
+				SpawnPointParentID = sp.Ship.GUID,
+				PlayersOnShip = new List<string>()
+			};
 			foreach (Player item in sp.Ship.VesselCrew)
 			{
 				spd.PlayersOnShip.Add(item.Name);
@@ -1108,7 +1110,7 @@ public class Server
 		NetworkController.Instance.SendToGameClient(data.Sender, data);
 	}
 
-	private void Start()
+	private async void Start()
 	{
 		EventSystem.AddListener(typeof(PlayerSpawnRequest), PlayerSpawnRequestListener);
 		EventSystem.AddListener(typeof(PlayerRespawnRequest), PlayerRespawnRequestListener);
@@ -1132,16 +1134,33 @@ public class Server
 		EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
 #if !HELLION_SP
-		MSConnection.Get<CheckInResponse>(new CheckInRequest
+		try
 		{
-			//ServerID = NetworkController.ServerID,
-			Region = Region.Europe,
-			GamePort = GamePort,
-			StatusPort = StatusPort,
-			//Private = !ServerPassword.IsNullOrEmpty(),
-			Hash = CombinedHash
-			//CleanStart = CleanStart
-		}, CheckInResponseListener);
+			RegisterServerResponse response = await MsConnection.Send<RegisterServerResponse>(new RegisterServerRequest
+			{
+				AuthToken = Properties.GetProperty<string>("auth_key"),
+				Location = RegionInfo.CurrentRegion.EnglishName,
+				GamePort = GamePort,
+				StatusPort = StatusPort,
+				Hash = CombinedHash
+			});
+
+			NetworkController.ServerId = response.ServerId;
+			Console.Title = " (id: " + (NetworkController.ServerId == null ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
+			Dbg.UnformattedMessage("r\n\tServer ID: " + NetworkController.ServerId + "\r\n");
+			CheckInPassed = true;
+			AdminIPAddressRanges = response.AdminIpAddressRanges;
+		}
+		catch (MainServerException)
+		{
+			IsRunning = false;
+			Dbg.Error("Didn't get valid response from main server. Perhaps you should check if your http_key config is correct?.");
+		}
+		catch (Exception ex)
+		{
+			Dbg.Exception(ex);
+			IsRunning = false;
+		}
 #endif
 	}
 
@@ -1981,11 +2000,13 @@ public class Server
 
 	public TextChatMessage SendSystemMessage(SystemMessagesTypes type, Ship sh)
 	{
-		TextChatMessage tcm = new TextChatMessage();
-		tcm.GUID = -1L;
-		tcm.Name = "System";
-		tcm.MessageType = type;
-		tcm.MessageText = "";
+		TextChatMessage tcm = new TextChatMessage
+		{
+			GUID = -1L,
+			Name = "System",
+			MessageType = type,
+			MessageText = ""
+		};
 		switch (type)
 		{
 		case SystemMessagesTypes.DoomedOutpostSpawned:
@@ -2002,9 +2023,8 @@ public class Server
 			break;
 		case SystemMessagesTypes.RestartServerTime:
 		{
-			string timeLeftToRestart = "";
-			timeLeftToRestart = ((!(timeToRestart <= 10.0)) ? (timeToRestart / 60.0).ToString() : timeToRestart.ToString());
-			tcm.MessageParam = new string[2]
+					string timeLeftToRestart = ((!(timeToRestart <= 10.0)) ? (timeToRestart / 60.0).ToString() : timeToRestart.ToString());
+					tcm.MessageParam = new string[2]
 			{
 				timeLeftToRestart,
 				(timeToRestart <= 10.0) ? "seconds" : "minutes"
@@ -2101,9 +2121,11 @@ public class Server
 			}
 			else
 			{
-				spawnResponse.CharacterTransform = new CharacterTransformData();
-				spawnResponse.CharacterTransform.LocalPosition = pl.LocalPosition.ToFloatArray();
-				spawnResponse.CharacterTransform.LocalRotation = pl.LocalRotation.ToFloatArray();
+				spawnResponse.CharacterTransform = new CharacterTransformData
+				{
+					LocalPosition = pl.LocalPosition.ToFloatArray(),
+					LocalRotation = pl.LocalRotation.ToFloatArray()
+				};
 			}
 
 			List<DynamicObjectDetails> playerObjects = new List<DynamicObjectDetails>();
@@ -2707,29 +2729,6 @@ public class Server
 		}
 	}
 
-	public void CheckInResponseListener(CheckInResponse data)
-	{
-		if (data.Result == ResponseResult.Success)
-		{
-			if (NetworkController.ServerID != data.ServerId)
-			{
-				NetworkController.ServerID = data.ServerId;
-				Console.Title = " (id: " + ((NetworkController.ServerID == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerID)) + ")";
-				Dbg.UnformattedMessage("==============================================================================\r\n\tServer ID: " + NetworkController.ServerID + "\r\n==============================================================================\r\n");
-			}
-			CheckInPassed = true;
-			AdminIPAddressRanges = data.AdminIPAddressRanges;
-#if !HELLION_SP
-			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_hr, SendCheckInMessage);
-#endif
-		}
-		else
-		{
-			IsRunning = false;
-			Dbg.Exception(new Exception(data.Result.ToString()));
-		}
-	}
-
 	public void PlayersOnServerRequestListener(NetworkData data)
 	{
 		PlayersOnServerRequest req = data as PlayersOnServerRequest;
@@ -2860,14 +2859,6 @@ public class Server
 		catch
 		{
 		}
-	}
-
-	public void SendCheckInMessage(double amount)
-	{
-		MSConnection.Send(new CheckInMessage
-		{
-			ServerId = NetworkController.ServerID
-		});
 	}
 
 	public bool IsAddressAutorized(string address)

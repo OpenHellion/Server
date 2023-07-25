@@ -9,9 +9,12 @@ using ZeroGravity.Network;
 
 public static class Program
 {
+	public static readonly CancellationTokenSource CancelToken = new CancellationTokenSource();
+
 	private static void ProcessExit(object sender, EventArgs e)
 	{
 		Dbg.Log("Exiting safely...");
+		CancelToken.Cancel();
 		Server.IsRunning = false;
 		if (Server.PersistenceSaveInterval > 0.0)
 		{
@@ -97,20 +100,38 @@ public static class Program
 	{
 		try
 		{
-			Server.Properties.GetProperty<ushort>("game_client_port");
+			Server.Properties.GetProperty<int>("game_port");
 		}
 		catch
 		{
-			Dbg.Error("Invalid 'game_client_port' field.");
+			Dbg.Error("Invalid 'game_port' field.");
 			Environment.Exit(0);
 		}
 		try
 		{
-			Server.Properties.GetProperty<ushort>("status_port");
+			Server.Properties.GetProperty<int>("status_port");
 		}
 		catch
 		{
 			Dbg.Error("Invalid 'status_port' field.");
+			Environment.Exit(0);
+		}
+		try
+		{
+			Server.Properties.GetProperty<string>("auth_key");
+		}
+		catch
+		{
+			Dbg.Error("Invalid 'auth_key' field.");
+			Environment.Exit(0);
+		}
+		try
+		{
+			Server.Properties.GetProperty<string>("http_key");
+		}
+		catch
+		{
+			Dbg.Error("Invalid 'http_key' field.");
 			Environment.Exit(0);
 		}
 	}
@@ -180,7 +201,6 @@ public static class Program
 	{
 		try
 		{
-			Dbg.UnformattedMessage("******************** UNHANDLED EXCEPTION ********************");
 			Dbg.Exception((Exception)args.ExceptionObject);
 		}
 		catch

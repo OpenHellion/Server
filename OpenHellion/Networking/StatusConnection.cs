@@ -51,7 +51,8 @@ public class StatusConnection
 					Server.CleanRestart = msg.CleanRestart;
 #if HELLION_SP
 					Server.SavePersistenceDataOnShutdown = false;
-#else
+#endif
+#if !HELLION_SP
 					Server.SavePersistenceDataOnShutdown = (!Server.Restart && Server.PersistenceSaveInterval > 0.0) || (Server.Restart && !Server.CleanRestart);
 #endif
 					Server.IsRunning = false;
@@ -76,7 +77,7 @@ public class StatusConnection
 			else if (data is DeleteCharacterRequest)
 			{
 				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
-				if (dcr.ServerId == NetworkController.ServerID)
+				if (dcr.ServerId == NetworkController.ServerId)
 				{
 					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.PlayerId);
 					if (!NetworkController.Instance.ContainsClient(pl.GUID))

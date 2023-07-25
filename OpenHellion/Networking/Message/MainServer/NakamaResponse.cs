@@ -1,4 +1,4 @@
-// MSMessage.cs
+// NakamaResponse.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -15,10 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
+using OpenHellion.IO;
 
 namespace OpenHellion.Networking.Message.MainServer;
 
-public abstract class MSMessage : DataPacket
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+public class NakamaResponse
 {
-	public abstract string GetDestination();
+	[JsonProperty("error")]
+	public object Error;
+
+	[JsonProperty("message")]
+	public string Message;
+
+	[JsonProperty("code")]
+	public int Code;
+
+	public override string ToString()
+	{
+		return JsonSerialiser.Serialize(this, JsonSerialiser.Formatting.None);
+	}
 }

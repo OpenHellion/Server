@@ -1,4 +1,4 @@
-// PublishServerRequest.cs
+// NakamaMessage.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -15,25 +15,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using System;
-using Newtonsoft.Json;
+
+using OpenHellion.IO;
 
 namespace OpenHellion.Networking.Message.MainServer;
 
-[Serializable]
-[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class CheckInRequest : MSMessage
+public abstract class NakamaMessage
 {
-	public Region Region;
+	public abstract string GetDestination();
 
-	public int GamePort;
-
-	public int StatusPort;
-
-	public uint Hash;
-
-	public override string GetDestination()
+	public override string ToString()
 	{
-		return "checkIn";
+		return JsonSerialiser.Serialize(this, JsonSerialiser.Formatting.None);
 	}
 }

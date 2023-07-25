@@ -1,4 +1,4 @@
-// Region.cs
+// MainServerException.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -15,12 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace OpenHellion.Networking.Message.MainServer;
+using System;
+using OpenHellion.Networking;
 
-public enum Region : byte {
-	Europe = 0,
-	Africa = 4,
-	WestAsia = 5,
-	EastAsia = 7,
-	America = 8
+namespace OpenHellion.Exceptions;
+
+public class MainServerException : Exception
+{
+	public MainServerException(string message) : base(message) { }
+	public MainServerException(string message, StatusCode statusCode) : base($"{message}. Error code: {statusCode}") { }
 }

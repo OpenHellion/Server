@@ -1,4 +1,4 @@
-// PublishServerResponse.cs
+// RegisterServerResponse.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -22,11 +22,9 @@ namespace OpenHellion.Networking.Message.MainServer;
 
 [Serializable]
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class CheckInResponse : DataPacket
+public class RegisterServerResponse : NakamaResponse
 {
-	public ResponseResult Result;
-
 	public string ServerId;
 
-	public IpAddressRange[] AdminIPAddressRanges;
+	public IpAddressRange[] AdminIpAddressRanges;
 }

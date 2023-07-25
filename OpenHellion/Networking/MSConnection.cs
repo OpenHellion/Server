@@ -1,4 +1,4 @@
-// MSConnection.cs
+// MsConnection.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -18,94 +18,84 @@
 
 using System;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using OpenHellion.Exceptions;
 using OpenHellion.IO;
 using OpenHellion.Networking.Message.MainServer;
 
 namespace OpenHellion.Networking;
 
 /// <summary>
-/// 	Handles connections to the main server.<br />
-/// 	Since the main server uses an REST api, the requests execute a callback.
+/// 	Handles connections to the main server. This is the Nakama docker repository located at: https://github.com/OpenHellion/Nakama
 /// </summary>
-public static class MSConnection
+public static class MsConnection
 {
-	public static string IpAddress = "localhost";
-	public static ushort Port = 6001;
+	public static string IpAddress = "127.0.0.1";
+	public static ushort Port = 7350;
+	public static string HttpKey;
 
-	public static string Address {
-		get {
-			return "http://" + IpAddress + ":" + Port;
+	private static HttpClient _httpClient;
+
+	/// <summary>
+	/// 	Send a message to the Nakama main server.
+	/// </summary>
+	public static async Task<T> Send<T>(NakamaMessage message)
+	{
+		if (HttpKey.Contains('&'))
+		{
+			throw new MainServerException("HttpKey contains &.");
 		}
-	}
 
-	/// <summary>
-	/// 	Send a request to get data from the main server.
-	/// </summary>
-	public static void Get<T>(MSMessage message, Action<T> callback)
-	{
-		Task.Run(async () =>
+		// Create new client if one doesn't exist.
+		_httpClient ??= new HttpClient();
+
+		Dbg.Log("Sending data to main server:", message.ToString());
+		Dbg.Log($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap");
+
+		byte[] jsonBytes = Encoding.UTF8.GetBytes(message.ToString());
+
+		var request = new HttpRequestMessage
 		{
-			try {
-				// Create new client and request and load it with data.
-				HttpClient httpClient = new HttpClient();
-				HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
-				request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
-
-				Dbg.Log("Sending data to:", request.RequestUri);
-
-				// Send message and get result.
-				HttpResponseMessage result = await httpClient.SendAsync(request);
-
-				// Read data as string.
-				string str = await result.Content.ReadAsStringAsync();
-
-				Dbg.Log("Data:", str);
-
-				// Make object out of data.
-				callback(JsonSerialiser.Deserialize<T>(str));
-
-				// Clean up.
-				httpClient.Dispose();
-				request.Dispose();
-				result.Dispose();
-			}
-			catch (Exception e)
+			RequestUri = new Uri($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap"),
+			Method = HttpMethod.Post,
+			Content = new ByteArrayContent(jsonBytes, 0, jsonBytes.Length),
+			Headers =
 			{
-				Dbg.Warning("Exception caught when sending get request to main server.");
-				Dbg.Warning("Message: {0} ", e.Message);
-				callback(default);
-			}
-		});
-	}
+				Accept = { new MediaTypeWithQualityHeaderValue("application/json") }
+			},
+			Version = new Version("2.0")
+		};
 
-	/// <summary>
-	/// 	Send a request to get data from the main server without a callback.
-	/// </summary>
-	public static void Send(MSMessage message)
-	{
-		Task.Run(async () =>
+		var response = await _httpClient.SendAsync(request, Program.CancelToken.Token);
+
+		// Read data as string.
+		string str = await response.Content.ReadAsStringAsync(Program.CancelToken.Token);
+		response.Content?.Dispose();
+
+		Dbg.Log("Response with data:", str);
+
+		// Clean up.
+		response.Dispose();
+
+		var json = JsonSerialiser.Deserialize<T>(str);
+
+		if (json is null)
 		{
-			try
-			{
-				HttpClient httpClient = new HttpClient();
-				HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, new UriBuilder("http", IpAddress, Port, "/api/" + message.GetDestination()).Uri);
-				request.Content = new StringContent(message.ToString(), Encoding.UTF8, "application/json");
+			throw new MainServerException("Received no response from MsConnection.Send.");
+		}
 
-				// Send message.
-				HttpResponseMessage result = await httpClient.SendAsync(request);
-
-				// Clean up.
-				httpClient.Dispose();
-				request.Dispose();
-				result.Dispose();
-			}
-			catch (Exception e)
+		if (json is NakamaResponse nakamaResponse)
+		{
+			if (nakamaResponse.Code != 0)
 			{
-				Dbg.Warning("Exception caught when sending get request to main server.");
-				Dbg.Warning("Message: {0} ", e.Message);
+				throw new MainServerException(nakamaResponse.Message, (StatusCode)nakamaResponse.Code);
 			}
-		});
+		}
+
+		return json;
 	}
 }

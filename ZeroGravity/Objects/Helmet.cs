@@ -23,7 +23,7 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 
 	public Jetpack Jetpack;
 
-	public float DamageReduction = 0f;
+	public float DamageReduction;
 
 	public float DamageResistance = 1f;
 
@@ -31,9 +31,9 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 
 	public ItemSlot BatterySlot { get; set; }
 
-	public Battery Battery => (BatterySlot != null) ? (BatterySlot.Item as Battery) : null;
+	public Battery Battery => BatterySlot != null ? BatterySlot.Item as Battery : null;
 
-	public float BatteryPower => (Battery != null) ? MathHelper.Clamp(Battery.CurrentPower / Battery.MaxPower, 0f, 1f) : 0f;
+	public float BatteryPower => Battery != null ? MathHelper.Clamp(Battery.CurrentPower / Battery.MaxPower, 0f, 1f) : 0f;
 
 	public bool IsVisorActive
 	{

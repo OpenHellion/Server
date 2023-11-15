@@ -27,7 +27,7 @@ internal class RepairTool : Item, ICargo
 
 	private float maxFuel => FuelCompartment.Capacity;
 
-	private float currentFuel => (FuelCompartment.Resources.Count > 0) ? FuelCompartment.Resources[0].Quantity : 0f;
+	private float currentFuel => FuelCompartment.Resources.Count > 0 ? FuelCompartment.Resources[0].Quantity : 0f;
 
 	public float FreeSpace => FuelCompartment.Capacity - FuelCompartment.Resources.Sum((CargoResourceData m) => m.Quantity);
 
@@ -99,7 +99,7 @@ internal class RepairTool : Item, ICargo
 			{
 				repairAmount = currentFuel / FuelConsumption;
 			}
-			float amount = ((repairPoint.MaxHealth - repairPoint.Health < repairAmount) ? (repairPoint.MaxHealth - repairPoint.Health) : repairAmount);
+			float amount = repairPoint.MaxHealth - repairPoint.Health < repairAmount ? repairPoint.MaxHealth - repairPoint.Health : repairAmount;
 			vessel.ChangeHealthBy(amount);
 			repairPoint.Health += amount;
 			if (vessel.MaxHealth - vessel.Health < float.Epsilon)
@@ -119,11 +119,11 @@ internal class RepairTool : Item, ICargo
 	public void RepairItem(long guid)
 	{
 		SpaceObject obj = Server.Instance.GetObject(guid);
-		if (!(obj is DynamicObject))
+		if (!(obj is DynamicObject dynamicObject))
 		{
 			return;
 		}
-		Item item = (obj as DynamicObject).Item;
+		Item item = dynamicObject.Item;
 		if (item != null)
 		{
 			float repairAmount = RepairAmount;

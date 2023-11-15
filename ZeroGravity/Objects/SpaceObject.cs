@@ -35,7 +35,7 @@ public abstract class SpaceObject
 		}
 		set
 		{
-			_ScanningRange = ((value < 10000.0) ? 10000.0 : value);
+			_ScanningRange = value < 10000.0 ? 10000.0 : value;
 		}
 	}
 
@@ -171,7 +171,7 @@ public abstract class SpaceObject
 	public List<SpaceObject> GetParents(bool includeMe, int depth = 10)
 	{
 		List<SpaceObject> retVal = new List<SpaceObject>();
-		SpaceObject tmpParent = (includeMe ? this : Parent);
+		SpaceObject tmpParent = includeMe ? this : Parent;
 		while (tmpParent != null && depth > 0)
 		{
 			retVal.Add(tmpParent);
@@ -183,9 +183,9 @@ public abstract class SpaceObject
 
 	public static T GetParent<T>(SpaceObject parent) where T : SpaceObject
 	{
-		if (parent is T)
+		if (parent is T spaceObject)
 		{
-			return parent as T;
+			return spaceObject;
 		}
 		return GetParent<T>(parent.Parent);
 	}

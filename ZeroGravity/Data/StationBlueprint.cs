@@ -38,7 +38,7 @@ public class StationBlueprint
 
 		public bool? SecurityPanelsLocked;
 
-		public GameScenes.SceneID SceneID => Server.NameGenerator.GetSceneID(StructureType);
+		public GameScenes.SceneId SceneID => Server.NameGenerator.GetSceneId(StructureType);
 	}
 
 	public class DockingPort
@@ -104,11 +104,11 @@ public class StationBlueprint
 
 	public SpaceObjectVessel AssembleStation(string name, string tag, SpawnRuleOrbit spawnRuleOrbit, long? nearArtificialBodyGUID, float? AsteroidResourcesMultiplier)
 	{
-		Dictionary<Structure, GameScenes.SceneID> structures = new Dictionary<Structure, GameScenes.SceneID>();
+		Dictionary<Structure, GameScenes.SceneId> structures = new Dictionary<Structure, GameScenes.SceneId>();
 		foreach (Structure str2 in Structures)
 		{
-			GameScenes.SceneID sid = Server.NameGenerator.GetSceneID(str2.StructureType);
-			if (sid == GameScenes.SceneID.None)
+			GameScenes.SceneId sid = Server.NameGenerator.GetSceneId(str2.StructureType);
+			if (sid == GameScenes.SceneId.None)
 			{
 				return null;
 			}
@@ -116,13 +116,13 @@ public class StationBlueprint
 		}
 		SpaceObjectVessel mainVessel = null;
 		Dictionary<Structure, SpaceObjectVessel> spawnedVessels = new Dictionary<Structure, SpaceObjectVessel>();
-		foreach (KeyValuePair<Structure, GameScenes.SceneID> str in structures)
+		foreach (KeyValuePair<Structure, GameScenes.SceneId> str in structures)
 		{
 			if (!spawnedVessels.TryGetValue(str.Key, out var vessel))
 			{
-				string vesselTag2 = ((tag != "" && str.Key.Tag != "") ? (tag + ";" + str.Key.Tag) : (tag + str.Key.Tag));
-				vessel = ((mainVessel != null) ? SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, nearArtificialBodyGUIDs: new List<long> { mainVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier) : SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, spawnRuleOrbit: spawnRuleOrbit, nearArtificialBodyGUIDs: (spawnRuleOrbit == null) ? new List<long> { nearArtificialBodyGUID.Value } : null, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: spawnRuleOrbit == null, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier));
-				vessel.VesselData.VesselRegistration = ((!name.IsNullOrEmpty()) ? name : Server.NameGenerator.GenerateStationRegistration());
+				string vesselTag2 = tag != "" && str.Key.Tag != "" ? tag + ";" + str.Key.Tag : tag + str.Key.Tag;
+				vessel = mainVessel != null ? SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, nearArtificialBodyGUIDs: new List<long> { mainVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier) : SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, spawnRuleOrbit: spawnRuleOrbit, nearArtificialBodyGUIDs: spawnRuleOrbit == null ? new List<long> { nearArtificialBodyGUID.Value } : null, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: spawnRuleOrbit == null, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
+				vessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
 				spawnedVessels[str.Key] = vessel;
 			}
 			else
@@ -139,10 +139,10 @@ public class StationBlueprint
 			}
 			foreach (DockingPort dp in str.Key.DockingPorts.Where((DockingPort m) => m.DockedStructureID.HasValue))
 			{
-				KeyValuePair<Structure, GameScenes.SceneID> otherStr = structures.FirstOrDefault((KeyValuePair<Structure, GameScenes.SceneID> m) => m.Key.StructureID == dp.DockedStructureID);
+				KeyValuePair<Structure, GameScenes.SceneId> otherStr = structures.FirstOrDefault((KeyValuePair<Structure, GameScenes.SceneId> m) => m.Key.StructureID == dp.DockedStructureID);
 				if (otherStr.Key.DockingPorts != null)
 				{
-					string vesselTag = ((tag != "" && otherStr.Key.Tag != "") ? (tag + ";" + otherStr.Key.Tag) : (tag + otherStr.Key.Tag));
+					string vesselTag = tag != "" && otherStr.Key.Tag != "" ? tag + ";" + otherStr.Key.Tag : tag + otherStr.Key.Tag;
 					if (!spawnedVessels.TryGetValue(otherStr.Key, out var otherVessel))
 					{
 						otherVessel = SpaceObjectVessel.CreateNew(otherStr.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag, nearArtificialBodyGUIDs: new List<long> { mainVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
@@ -152,7 +152,7 @@ public class StationBlueprint
 					{
 						otherVessel = spawnedVessels[otherStr.Key];
 					}
-					otherVessel.VesselData.VesselRegistration = ((!name.IsNullOrEmpty()) ? name : Server.NameGenerator.GenerateStationRegistration());
+					otherVessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
 					VesselDockingPort shipPort = vessel.DockingPorts.FirstOrDefault((VesselDockingPort m) => m.OrderID == dp.OrderID);
 					DockingPort dp2 = otherStr.Key.DockingPorts.FirstOrDefault((DockingPort m) => m.DockedStructureID == str.Key.StructureID);
 					int otherOrderID = dp2.OrderID;
@@ -194,7 +194,7 @@ public class StationBlueprint
 
 	private void SetStates(Structure structure, SpaceObjectVessel vessel)
 	{
-		vessel.IsInvulnerable = (structure.Invulnerable.HasValue ? structure.Invulnerable.Value : Invulnerable);
+		vessel.IsInvulnerable = structure.Invulnerable.HasValue ? structure.Invulnerable.Value : Invulnerable;
 		if (structure.HealthMultiplier.HasValue)
 		{
 			vessel.Health *= structure.HealthMultiplier.Value;

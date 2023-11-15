@@ -20,9 +20,9 @@ public class VesselRepairPoint : IPersistantObject
 
 	public VesselObjectID ID;
 
-	private float _MaxHealth = 0f;
+	private float _MaxHealth;
 
-	private float _Health = 0f;
+	private float _Health;
 
 	public SpaceObjectVessel ParentVessel;
 
@@ -32,7 +32,7 @@ public class VesselRepairPoint : IPersistantObject
 
 	public VesselComponent AffectedSystem;
 
-	public IAirConsumer AirCousumer = null;
+	public IAirConsumer AirCousumer;
 
 	public float MalfunctionThreshold;
 
@@ -69,7 +69,7 @@ public class VesselRepairPoint : IPersistantObject
 		}
 		set
 		{
-			float newHealth = MathHelper.Clamp((MaxHealth - value < 1f) ? MaxHealth : value, 0f, MaxHealth);
+			float newHealth = MathHelper.Clamp(MaxHealth - value < 1f ? MaxHealth : value, 0f, MaxHealth);
 			if (_Health != newHealth)
 			{
 				StatusChanged = true;
@@ -86,7 +86,7 @@ public class VesselRepairPoint : IPersistantObject
 		{
 			return;
 		}
-		float hPerc = ((_MaxHealth > 0f) ? (_Health / _MaxHealth) : 0f);
+		float hPerc = _MaxHealth > 0f ? _Health / _MaxHealth : 0f;
 		if (DamageType == RepairPointDamageType.System && AffectedSystem != null)
 		{
 			if (hPerc <= MalfunctionThreshold && !AffectedSystem.Defective && AffectedSystem.Status == SystemStatus.OnLine && takingDamage)

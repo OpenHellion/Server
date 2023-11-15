@@ -168,7 +168,7 @@ public static class Serializer
 			return;
 		}
 		TimeSpan timeFromReset = DateTime.UtcNow.Subtract(statisticUpdateResetTime);
-		string printVal = ((stat != sentStatistics) ? ("Received packets statistics (" + timeFromReset.ToString("h':'mm':'ss") + "): \n") : ("Sent packets statistics (" + timeFromReset.ToString("h':'mm':'ss") + "): \n"));
+		string printVal = stat != sentStatistics ? "Received packets statistics (" + timeFromReset.ToString("h':'mm':'ss") + "): \n" : "Sent packets statistics (" + timeFromReset.ToString("h':'mm':'ss") + "): \n";
 		long totalBytes = 0L;
 		foreach (KeyValuePair<Type, StatisticsHelper> kv in stat.OrderBy((KeyValuePair<Type, StatisticsHelper> m) => m.Value.ByteSum).Reverse())
 		{

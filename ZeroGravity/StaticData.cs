@@ -8,21 +8,21 @@ namespace ZeroGravity;
 
 public static class StaticData
 {
-	private static SolarSystemData _SolarSystem = null;
+	private static SolarSystemData _SolarSystem;
 
-	private static Dictionary<string, ServerCollisionData> _CollisionDataList = null;
+	private static Dictionary<string, ServerCollisionData> _CollisionDataList;
 
-	private static List<StructureSceneData> _StructuresDataList = null;
+	private static List<StructureSceneData> _StructuresDataList;
 
-	private static List<AsteroidSceneData> _AsteroidDataList = null;
+	private static List<AsteroidSceneData> _AsteroidDataList;
 
-	private static Dictionary<short, DynamicObjectData> _DynamicObjectsDataList = null;
+	private static Dictionary<short, DynamicObjectData> _DynamicObjectsDataList;
 
-	private static List<ItemIngredientsData> _ItemsIngredients = null;
+	private static List<ItemIngredientsData> _ItemsIngredients;
 
-	private static List<QuestData> _QuestsData = null;
+	private static List<QuestData> _QuestsData;
 
-	private static List<ItemCompoundType> _DefaultBlueprints = null;
+	private static List<ItemCompoundType> _DefaultBlueprints;
 
 	public static SolarSystemData SolarSystem
 	{
@@ -122,7 +122,7 @@ public static class StaticData
 
 	public static void LoadData()
 	{
-		string dir = (!Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data")) ? Server.ConfigDir : "";
+		string dir = !Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data") ? Server.ConfigDir : "";
 		_SolarSystem = JsonSerialiser.Load<SolarSystemData>(dir + "Data/SolarSystem.json");
 		_StructuresDataList = JsonSerialiser.Load<List<StructureSceneData>>(dir + "Data/Structures.json");
 		_CollisionDataList = new Dictionary<string, ServerCollisionData>();

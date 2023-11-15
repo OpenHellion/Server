@@ -38,7 +38,7 @@ public class ItemSlot : IItemSlot
 
 	public bool CanFitItem(Item item)
 	{
-		return CanFitItem(item.Type, (item is GenericItem) ? (item as GenericItem).SubType : GenericItemSubType.None, (item is MachineryPart) ? (item as MachineryPart).PartType : MachineryPartType.None);
+		return CanFitItem(item.Type, item is GenericItem genericItem ? genericItem.SubType : GenericItemSubType.None, item is MachineryPart part ? part.PartType : MachineryPartType.None);
 	}
 
 	public bool CanFitItem(ItemType itemType, GenericItemSubType subType, MachineryPartType partType)

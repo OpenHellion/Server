@@ -16,7 +16,7 @@ public class VesselData
 
 	public long SpawnRuleID;
 
-	public GameScenes.SceneID SceneID;
+	public GameScenes.SceneId SceneID;
 
 	public float[] CollidersCenterOffset;
 

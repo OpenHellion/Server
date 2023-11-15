@@ -44,7 +44,7 @@ public class Grenade : Item
 				activationTime = -1.0;
 				destroyTimer.Dispose();
 			}
-			gs.IsActive = (isActive = gstats.IsActive.Value);
+			gs.IsActive = isActive = gstats.IsActive.Value;
 			if (gs.IsActive == true)
 			{
 				isCanceled = false;

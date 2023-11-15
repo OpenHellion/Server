@@ -244,13 +244,13 @@ public class BulletPhysicsController
 				RigidBody obB = contactManifold.Body1 as RigidBody;
 				Vector3 vel = obA.LinearVelocity - obB.LinearVelocity;
 				List<long> shipsGUID = new List<long>();
-				if (obA.UserObject is Ship)
+				if (obA.UserObject is Ship ship)
 				{
-					shipsGUID.Add((obA.UserObject as Ship).GUID);
+					shipsGUID.Add(ship.GUID);
 				}
-				if (obB.UserObject is Ship)
+				if (obB.UserObject is Ship o)
 				{
-					shipsGUID.Add((obB.UserObject as Ship).GUID);
+					shipsGUID.Add(o.GUID);
 				}
 				int numContacts = contactManifold.NumContacts;
 				for (int j = 0; j < numContacts; j++)
@@ -258,7 +258,7 @@ public class BulletPhysicsController
 					ManifoldPoint pt = contactManifold.GetContactPoint(j);
 					if (pt.AppliedImpulse.IsNotEpsilonZeroD() && shipsGUID.Count > 0)
 					{
-						(Server.Instance.GetVessel(shipsGUID[0]) as Ship).SendCollision(vel.Length, pt.AppliedImpulse, pt.LifeTime, (shipsGUID.Count > 1) ? shipsGUID[1] : (-1));
+						(Server.Instance.GetVessel(shipsGUID[0]) as Ship).SendCollision(vel.Length, pt.AppliedImpulse, pt.LifeTime, shipsGUID.Count > 1 ? shipsGUID[1] : -1);
 					}
 				}
 				contactManifold.ClearManifold();

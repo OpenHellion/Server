@@ -11,13 +11,13 @@ public class Outfit : Item
 
 	public float ExternalTemperature;
 
-	public float DamageReductionTorso = 0f;
+	public float DamageReductionTorso;
 
-	public float DamageReductionAbdomen = 0f;
+	public float DamageReductionAbdomen;
 
-	public float DamageReductionArms = 0f;
+	public float DamageReductionArms;
 
-	public float DamageReductionLegs = 0f;
+	public float DamageReductionLegs;
 
 	public float DamageResistanceTorso = 1f;
 

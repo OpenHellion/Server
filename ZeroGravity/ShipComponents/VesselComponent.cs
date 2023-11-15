@@ -26,7 +26,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 
 	protected float _PartsWearFactor = 1f;
 
-	private bool _Defective = false;
+	private bool _Defective;
 
 	protected float powerUpFactor = 1f;
 
@@ -34,11 +34,11 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 
 	protected SystemStatus _Status = SystemStatus.None;
 
-	public string _DebugInfo = null;
+	public string _DebugInfo;
 
 	protected SystemSecondaryStatus _SecondaryStatus = SystemSecondaryStatus.None;
 
-	protected float _OperationRate = 0f;
+	protected float _OperationRate;
 
 	protected float baseRadarSignature = 0f;
 
@@ -54,11 +54,11 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 
 	public SpaceObjectVessel ParentVessel;
 
-	private float statusChangeCountdown = 0f;
+	private float statusChangeCountdown;
 
 	public bool StatusChanged = true;
 
-	public bool IsPowerConsumer = false;
+	public bool IsPowerConsumer;
 
 	public VesselObjectID ID { get; set; }
 
@@ -302,7 +302,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 			{
 				if (mp.Health > float.Epsilon)
 				{
-					value = ((!(mp.TierMultiplier > 1f)) ? (value - (1f - mp.TierMultiplier)) : (value + (mp.TierMultiplier - 1f)));
+					value = !(mp.TierMultiplier > 1f) ? value - (1f - mp.TierMultiplier) : value + (mp.TierMultiplier - 1f);
 					workingParts++;
 				}
 				parts++;
@@ -481,32 +481,30 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		foreach (DistributionSystemType resourceType in ResourceRequirements.Keys)
 		{
 			ResourceRequirement req = ResourceRequirements[resourceType];
-			float resourceCapacityNeeded = ((!standby) ? (req.Nominal * consumptionFactor * ((req.ResourceType == DistributionSystemType.Power) ? _PowerInputFactor : _InputFactor)) : (req.Standby * ((req.ResourceType == DistributionSystemType.Power) ? _PowerInputFactor : _InputFactor)));
+			float resourceCapacityNeeded = !standby ? req.Nominal * consumptionFactor * (req.ResourceType == DistributionSystemType.Power ? _PowerInputFactor : _InputFactor) : req.Standby * (req.ResourceType == DistributionSystemType.Power ? _PowerInputFactor : _InputFactor);
 			if (ConnectedProviders.ContainsKey(resourceType) && resourceCapacityNeeded > 0f)
 			{
 				foreach (IResourceProvider rp in ConnectedProviders[resourceType])
 				{
 					bool canProvide = true;
-					if (rp is Generator)
+					if (rp is Generator gen)
 					{
-						Generator gen = (Generator)rp;
 						if ((gen.Status == SystemStatus.OnLine || gen is GeneratorCapacitor) && gen.MaxOutput > float.Epsilon)
 						{
 							Dictionary<IResourceProvider, float> reservedCapacitiesBackup2 = new Dictionary<IResourceProvider, float>(reservedCapacities);
 							Dictionary<ResourceContainer, float> reservedQuantitiesBackup2 = new Dictionary<ResourceContainer, float>(reservedQuantities);
-							if ((rp as Generator).FixedConsumption && reservedCapacities.ContainsKey(rp))
+							if (gen.FixedConsumption && reservedCapacities.ContainsKey(gen))
 							{
 								canProvide = true;
 							}
-							else if (gen is GeneratorCapacitor)
+							else if (gen is GeneratorCapacitor cap)
 							{
-								GeneratorCapacitor cap = gen as GeneratorCapacitor;
 								reservedCapacities.TryGetValue(cap, out var alreadyReserved);
 								canProvide = cap.Capacity >= alreadyReserved + resourceCapacityNeeded * duration;
 							}
 							else
 							{
-								canProvide = gen.CheckAvailableResources((gen.MaxOutput > 0f) ? MathHelper.Clamp(resourceCapacityNeeded / gen.MaxOutput, 0f, 1f) : 1f, duration, standby, ref reservedCapacitiesBackup2, ref reservedQuantitiesBackup2, ref debugText);
+								canProvide = gen.CheckAvailableResources(gen.MaxOutput > 0f ? MathHelper.Clamp(resourceCapacityNeeded / gen.MaxOutput, 0f, 1f) : 1f, duration, standby, ref reservedCapacitiesBackup2, ref reservedQuantitiesBackup2, ref debugText);
 							}
 							if (canProvide)
 							{
@@ -524,16 +522,16 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 						continue;
 					}
 					float alreadyReservedCap = 0f;
-					if (reservedCapacities != null && reservedCapacities.ContainsKey(rp))
+					if (reservedCapacities != null && reservedCapacities.TryGetValue(rp, out var capacity))
 					{
-						alreadyReservedCap = reservedCapacities[rp];
+						alreadyReservedCap = capacity;
 					}
 					float resourceCapacityLeftInProvider = rp.MaxOutput - alreadyReservedCap;
 					float alreadyReservedQty = 0f;
-					if (rp is ResourceContainer)
+					if (rp is ResourceContainer container)
 					{
-						reservedQuantities.TryGetValue(rp as ResourceContainer, out alreadyReservedQty);
-						float available = (rp as ResourceContainer).GetCompartment().Resources[0].Quantity - alreadyReservedQty;
+						reservedQuantities.TryGetValue(container, out alreadyReservedQty);
+						float available = container.GetCompartment().Resources[0].Quantity - alreadyReservedQty;
 						if (resourceCapacityLeftInProvider * duration > available)
 						{
 							resourceCapacityLeftInProvider = available / duration;
@@ -541,17 +539,17 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 					}
 					if (resourceCapacityLeftInProvider >= resourceCapacityNeeded)
 					{
-						if (rp is ResourceContainer)
+						if (rp is ResourceContainer resourceContainer)
 						{
-							reservedQuantities[rp as ResourceContainer] = resourceCapacityNeeded * duration + alreadyReservedQty;
+							reservedQuantities[resourceContainer] = resourceCapacityNeeded * duration + alreadyReservedQty;
 						}
 						reservedCapacities[rp] = alreadyReservedCap + resourceCapacityNeeded;
 						resourceCapacityNeeded = 0f;
 						break;
 					}
-					if (rp is ResourceContainer && reservedCapacities.ContainsKey(rp))
+					if (rp is ResourceContainer key && reservedCapacities.TryGetValue(key, out var reservedCapacity))
 					{
-						reservedQuantities[rp as ResourceContainer] = (rp.MaxOutput - reservedCapacities[rp]) * duration + alreadyReservedQty;
+						reservedQuantities[key] = (rp.MaxOutput - reservedCapacity) * duration + alreadyReservedQty;
 					}
 					reservedCapacities[rp] = rp.MaxOutput;
 					resourceCapacityNeeded -= resourceCapacityLeftInProvider;

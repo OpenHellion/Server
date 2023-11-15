@@ -38,13 +38,6 @@ public static class Program
 
 		Dbg.Log("Starting server with args:", string.Join(" ", args));
 
-#if HELLION_SP
-		if (!ParentProcess.FileName.ToLower().Contains("hellion") && !ParentProcess.FileName.ToLower().Contains("unity"))
-		{
-			Dbg.Error("This executable is for creating the single player server, and has to be executed by either the Unity Editor or the Hellion distributable. That means you can't launch this manually.");
-			return;
-		}
-#else
 		bool shutdown = false;
 		for (int i = 0; i < args.Length; i++)
 		{
@@ -77,7 +70,6 @@ public static class Program
 		}
 
 		CheckIniFields();
-#endif
 
 		AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionHandler;
 		try

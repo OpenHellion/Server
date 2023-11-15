@@ -21,7 +21,7 @@ public class SubSystemRadar : SubSystem
 
 	public double WarpDetectionSensitivity;
 
-	private double stopActiveScanTime = 0.0;
+	private double stopActiveScanTime;
 
 	public override SubSystemType Type => SubSystemType.Radar;
 

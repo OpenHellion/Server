@@ -9,7 +9,7 @@ public class Quest
 {
 	public uint ID;
 
-	public List<QuestTrigger> QuestTriggers = null;
+	public List<QuestTrigger> QuestTriggers;
 
 	public QuestTriggerDependencyTpe ActivationDependencyTpe;
 
@@ -41,7 +41,7 @@ public class Quest
 		return new QuestDetails
 		{
 			ID = ID,
-			QuestTriggers = ((QuestTriggers != null) ? QuestTriggers.Select((QuestTrigger m) => m.GetDetails()).ToList() : null),
+			QuestTriggers = QuestTriggers != null ? QuestTriggers.Select((QuestTrigger m) => m.GetDetails()).ToList() : null,
 			Status = Status
 		};
 	}

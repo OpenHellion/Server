@@ -55,8 +55,8 @@ public class Magazine : Item
 		MagazineStats ms = stats as MagazineStats;
 		if (ms.BulletsFrom.HasValue && ms.BulletsTo.HasValue && (ms.BulletsFrom.Value == base.GUID || ms.BulletsTo.Value == base.GUID))
 		{
-			Magazine magFrom = ((ms.BulletsFrom.Value == base.GUID) ? this : (Server.Instance.GetItem(ms.BulletsFrom.Value) as Magazine));
-			Magazine magTo = ((ms.BulletsTo.Value == base.GUID) ? this : (Server.Instance.GetItem(ms.BulletsTo.Value) as Magazine));
+			Magazine magFrom = ms.BulletsFrom.Value == base.GUID ? this : Server.Instance.GetItem(ms.BulletsFrom.Value) as Magazine;
+			Magazine magTo = ms.BulletsTo.Value == base.GUID ? this : Server.Instance.GetItem(ms.BulletsTo.Value) as Magazine;
 			if (magFrom != null && magTo != null)
 			{
 				SplitMagazines(magFrom, magTo);

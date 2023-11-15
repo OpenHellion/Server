@@ -12,9 +12,9 @@ public class Corpse : SpaceObjectTransferable
 {
 	public double DestroyTime = 120000.0;
 
-	private Player _listenToPlayer = null;
+	private Player _listenToPlayer;
 
-	private long _listenToSenderID = 0L;
+	private long _listenToSenderID;
 
 	public bool IsInsideSpaceObject;
 
@@ -38,7 +38,7 @@ public class Corpse : SpaceObjectTransferable
 
 	public Gender Gender;
 
-	private SpaceObject _Parent = null;
+	private SpaceObject _Parent;
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.Corpse;
 
@@ -80,12 +80,12 @@ public class Corpse : SpaceObjectTransferable
 	public Corpse(Player player)
 		: base(GUIDFactory.NextObjectGUID(), player.LocalPosition, player.LocalRotation)
 	{
-		if (player.Parent is Pivot)
+		if (player.Parent is Pivot parent)
 		{
-			Pivot pivot = (Pivot)(Parent = new Pivot(this, player.Parent as ArtificialBody));
+			Pivot pivot = (Pivot)(Parent = new Pivot(this, parent));
 			foreach (Player pl in Server.Instance.AllPlayers)
 			{
-				if (pl.IsSubscribedTo(player.Parent.GUID))
+				if (pl.IsSubscribedTo(parent.GUID))
 				{
 					pl.SubscribeTo(pivot);
 				}
@@ -103,7 +103,7 @@ public class Corpse : SpaceObjectTransferable
 		ConnectToNetworkController();
 		if (Parent is SpaceObjectVessel)
 		{
-			DestroyTime = ((Parent as SpaceObjectVessel).IsPrefabStationVessel ? ArenaTimer : InsideModuleTimer);
+			DestroyTime = (Parent as SpaceObjectVessel).IsPrefabStationVessel ? ArenaTimer : InsideModuleTimer;
 		}
 		else
 		{
@@ -232,7 +232,7 @@ public class Corpse : SpaceObjectTransferable
 		{
 		}
 		ListenToSenderID = dosm.Sender;
-		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, (Parent != null) ? Parent.Parent : null);
+		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, Parent != null ? Parent.Parent : null);
 	}
 
 	internal void CheckInventoryDestroy()
@@ -290,8 +290,8 @@ public class Corpse : SpaceObjectTransferable
 		return new CorpseDetails
 		{
 			GUID = GUID,
-			ParentGUID = ((Parent == null) ? (-1) : Parent.GUID),
-			ParentType = ((Parent != null) ? Parent.ObjectType : SpaceObjectType.None),
+			ParentGUID = Parent == null ? -1 : Parent.GUID,
+			ParentType = Parent != null ? Parent.ObjectType : SpaceObjectType.None,
 			LocalPosition = LocalPosition.ToFloatArray(),
 			LocalRotation = LocalRotation.ToFloatArray(),
 			IsInsideSpaceObject = IsInsideSpaceObject,

@@ -13,9 +13,9 @@ public class ArtificialBody : SpaceObject
 
 	public OrbitParameters Orbit = new OrbitParameters();
 
-	private ManeuverCourse _CurrentCourse = null;
+	private ManeuverCourse _CurrentCourse;
 
-	public double LastOrientationChangeTime = 0.0;
+	public double LastOrientationChangeTime;
 
 	public bool IsInDebrisField;
 
@@ -45,13 +45,13 @@ public class ArtificialBody : SpaceObject
 
 	public List<SpaceObjectVessel> StabilizedToTargetChildren = new List<SpaceObjectVessel>();
 
-	private double? stabilizationDisabledTime = null;
+	private double? stabilizationDisabledTime;
 
-	private bool? stabilizationDisableAfterUpdate = null;
+	private bool? stabilizationDisableAfterUpdate;
 
-	private Vector3D? stabilizationDisableRelativePositionExtra = null;
+	private Vector3D? stabilizationDisableRelativePositionExtra;
 
-	private Vector3D? stabilizationDisableRelativeVelocityExtra = null;
+	private Vector3D? stabilizationDisableRelativeVelocityExtra;
 
 	public ManeuverCourse CurrentCourse
 	{
@@ -105,7 +105,7 @@ public class ArtificialBody : SpaceObject
 			{
 				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
-			_Forward = (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Forward : value);
+			_Forward = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Forward : value;
 		}
 	}
 
@@ -128,7 +128,7 @@ public class ArtificialBody : SpaceObject
 			{
 				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
-			_Up = (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Up : value);
+			_Up = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Up : value;
 		}
 	}
 

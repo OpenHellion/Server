@@ -1411,7 +1411,7 @@ public static class SpawnSerialization
 					AsteroidResourcesMultiplier = srd.AsteroidResourcesMultiplier,
 					AngularVelocity = srd.AngularVelocity,
 					DoNotRemoveVesselsFromSpawnSystem = srd.DoNotRemoveVesselsFromSpawnSystem,
-					NumberOfClusters = ((tmpLocType != SpawnRuleLocationType.Random) ? new SpawnRange<int>(1, 1) : srd.NumberOfClusters),
+					NumberOfClusters = tmpLocType != SpawnRuleLocationType.Random ? new SpawnRange<int>(1, 1) : srd.NumberOfClusters,
 					ScenePool = tmpScenePool,
 					LootPool = tmpLootPool,
 					IsVisibleOnRadar = srd.IsVisibleOnRadar
@@ -1430,12 +1430,12 @@ public static class SpawnSerialization
 	private static bool GenerateScenePoolData(SpawnRuleData data, out List<SpawnRuleScene> retVal)
 	{
 		retVal = new List<SpawnRuleScene>();
-		GameScenes.SceneID tmpSceneID = GameScenes.SceneID.None;
+		GameScenes.SceneId tmpSceneID = GameScenes.SceneId.None;
 		if (data.LocationScenes != null)
 		{
 			foreach (SpawnRuleSceneData sc in data.LocationScenes)
 			{
-				if (sc.Scene.IsNullOrEmpty() || !Enum.TryParse<GameScenes.SceneID>(sc.Scene, out tmpSceneID))
+				if (sc.Scene.IsNullOrEmpty() || !Enum.TryParse<GameScenes.SceneId>(sc.Scene, out tmpSceneID))
 				{
 					Dbg.Warning($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" scene \"{sc.Scene}\" is not valid");
 				}

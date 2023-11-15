@@ -11,19 +11,19 @@ public class SceneTriggerExecuter : IPersistantObject
 
 	public Ship ParentShip;
 
-	public int DefaultStateID = 0;
+	public int DefaultStateID;
 
-	private int _stateID = 0;
+	private int _stateID;
 
 	public Dictionary<int, SceneTriggerExceuterState> States = new Dictionary<int, SceneTriggerExceuterState>();
 
-	public long PlayerThatActivated = 0L;
+	public long PlayerThatActivated;
 
 	public ShipSpawnPoint SpawnPoint;
 
-	public SceneTriggerExecuter Child = null;
+	public SceneTriggerExecuter Child;
 
-	public SceneTriggerExecuter Parent = null;
+	public SceneTriggerExecuter Parent;
 
 	public Dictionary<int, SceneTriggerProximity> ProximityTriggers;
 

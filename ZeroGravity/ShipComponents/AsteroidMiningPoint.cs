@@ -24,7 +24,7 @@ public class AsteroidMiningPoint : IPersistantObject
 
 	public bool StatusChanged;
 
-	public Asteroid Parent = null;
+	public Asteroid Parent;
 
 	private double gasBurstSolarSystemTime;
 

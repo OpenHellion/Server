@@ -120,9 +120,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public QuaternionD RelativeRotationFromParent;
 
-	public SpaceObjectVessel DockedToMainVessel = null;
+	public SpaceObjectVessel DockedToMainVessel;
 
-	public SpaceObjectVessel DockedToVessel = null;
+	public SpaceObjectVessel DockedToVessel;
 
 	public List<SpaceObjectVessel> AllDockedVessels = new List<SpaceObjectVessel>();
 
@@ -170,7 +170,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public DistributionManager DistributionManager = null;
 
-	public DistributionManager CompoundDistributionManager = null;
+	public DistributionManager CompoundDistributionManager;
 
 	public Dictionary<VesselObjectID, AttachPointType> AttachPointsTypes = new Dictionary<VesselObjectID, AttachPointType>();
 
@@ -188,7 +188,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public long StartingSetId = -1L;
 
-	public double DecayGraceTimer = 0.0;
+	public double DecayGraceTimer;
 
 	public double JunkItemsCleanupTimer = Server.JunkItemsCleanupInterval;
 
@@ -218,13 +218,13 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	protected double? prevDestructionSolarSystemTime = null;
 
-	public SelfDestructTimer SelfDestructTimer = null;
+	public SelfDestructTimer SelfDestructTimer;
 
 	public QuestTrigger.QuestTriggerID QuestTriggerID = null;
 
 	public bool ConnectionsChanged;
 
-	public GameScenes.SceneID SceneID => (VesselData != null) ? VesselData.SceneID : GameScenes.SceneID.None;
+	public GameScenes.SceneId SceneID => VesselData != null ? VesselData.SceneID : GameScenes.SceneId.None;
 
 	public bool IsDocked => DockedToMainVessel != null;
 
@@ -253,7 +253,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public string FullName => (VesselData != null) ? (VesselData.VesselRegistration + " " + VesselData.VesselName) : "";
+	public string FullName => VesselData != null ? VesselData.VesselRegistration + " " + VesselData.VesselName : "";
 
 	public float Health
 	{
@@ -867,7 +867,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			authPersonel.Add(new VesselSecurityAuthorizedPerson
 			{
 				PlayerId = per.PlayerId,
-				Name = (pl != null) ? pl.Name : per.Name,
+				Name = pl != null ? pl.Name : per.Name,
 				Rank = per.Rank
 			});
 		}
@@ -961,34 +961,32 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		else
 		{
-			radiusMultiplier = (IsDebrisFragment ? Server.DebrisVesselExplosionRadiusMultiplier : Server.VesselExplosionRadiusMultiplier);
-			damageMultiplier = (IsDebrisFragment ? Server.DebrisVesselExplosionDamageMultiplier : Server.VesselExplosionDamageMultiplier);
+			radiusMultiplier = IsDebrisFragment ? Server.DebrisVesselExplosionRadiusMultiplier : Server.VesselExplosionRadiusMultiplier;
+			damageMultiplier = IsDebrisFragment ? Server.DebrisVesselExplosionDamageMultiplier : Server.VesselExplosionDamageMultiplier;
 		}
-		float radius = (float)((System.Math.Sqrt(Mass / 1000.0) + (double)((Engine != null && Engine.Status == SystemStatus.OnLine) ? 10 : 0) + (double)((FTL != null && FTL.Status == SystemStatus.OnLine) ? 20 : 0)) * radiusMultiplier);
+		float radius = (float)((System.Math.Sqrt(Mass / 1000.0) + (double)(Engine != null && Engine.Status == SystemStatus.OnLine ? 10 : 0) + (double)(FTL != null && FTL.Status == SystemStatus.OnLine ? 20 : 0)) * radiusMultiplier);
 		float baseDamage = (float)((double)MaxHealth * damageMultiplier);
 		ArtificialBody[] artificialBodieslsInRange = Server.Instance.SolarSystem.GetArtificialBodieslsInRange(this, radius);
 		foreach (ArtificialBody ab in artificialBodieslsInRange)
 		{
-			if (ab is SpaceObjectVessel)
+			if (ab is SpaceObjectVessel ves2)
 			{
-				SpaceObjectVessel ves2 = ab as SpaceObjectVessel;
 				float dist2 = (float)(Position - ves2.Position).Magnitude;
 				float ratio2 = MathHelper.Clamp((radius - dist2) / radius, 0f, 1f);
 				ves2.ChangeHealthBy((0f - ratio2) * baseDamage, null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.NearbyVesselExplosion);
 				Vector3D thrust2 = (ves2.Position - Position).Normalized * 5.0 * ratio2;
 				ves2.Rotation += new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 5.0 * ratio2;
 				ves2.Orbit.InitFromStateVectors(ves2.Orbit.Parent, ves2.Orbit.Position, ves2.Orbit.Velocity + thrust2, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
-				ab.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
+				ves2.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
 			}
-			else if (ab is Pivot)
+			else if (ab is Pivot pivot)
 			{
-				Pivot pivot = ab as Pivot;
 				Vector3D pos = pivot.Position + pivot.Child.LocalRotation * pivot.Child.LocalPosition;
 				float dist = (float)(Position - pos).Magnitude;
 				float ratio = MathHelper.Clamp((radius - dist) / radius, 0f, 1f);
-				if (pivot.Child is Player)
+				if (pivot.Child is Player player)
 				{
-					(pivot.Child as Player).Stats.TakeDamage(HurtType.Explosion, ratio * baseDamage);
+					player.Stats.TakeDamage(HurtType.Explosion, ratio * baseDamage);
 				}
 				Vector3D thrust = (pos - Position).Normalized * 10.0 * ratio;
 				pivot.Orbit.InitFromStateVectors(pivot.Orbit.Parent, pivot.Orbit.Position, pivot.Orbit.Velocity + thrust, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
@@ -1131,7 +1129,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public void ResetDecayGraceTimer()
 	{
-		SpaceObjectVessel mainVessel = ((DockedToMainVessel != null) ? DockedToMainVessel : this);
+		SpaceObjectVessel mainVessel = DockedToMainVessel != null ? DockedToMainVessel : this;
 		mainVessel.DecayGraceTimer = Server.VesselDecayGracePeriod;
 		foreach (SpaceObjectVessel v in mainVessel.AllDockedVessels)
 		{
@@ -1247,9 +1245,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		dockToPort.DockedVessel = this;
 		dockToPort.DockingStatus = true;
 		DockUndockPlayerData dupd = DockUndockPlayerData.GetPlayerData(this, dockToVessel);
-		SpaceObjectVessel rBodyRemoveOld = (dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel);
-		SpaceObjectVessel rBodyRemoveNew = (IsDocked ? DockedToMainVessel : this);
-		SpaceObjectVessel newDockedToMainVessel = (dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel);
+		SpaceObjectVessel rBodyRemoveOld = dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel;
+		SpaceObjectVessel rBodyRemoveNew = IsDocked ? DockedToMainVessel : this;
+		SpaceObjectVessel newDockedToMainVessel = dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel;
 		SpaceObjectVessel vesselWithSecuritySystem = newDockedToMainVessel.AllDockedVessels.Find((SpaceObjectVessel m) => m.HasSecuritySystem);
 		newDockedToMainVessel.RecreateDockedVesselsTree();
 		newDockedToMainVessel.DbgLogDockedVesseslTree();
@@ -1310,9 +1308,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		if (dockToVessel.RCS != null)
 		{
 			dockToVessel.RCS.GoOffLine(autoRestart: false);
-			if (dockToVessel is Ship)
+			if (dockToVessel is Ship ship)
 			{
-				(dockToVessel as Ship).ResetRotationAndThrust();
+				ship.ResetRotationAndThrust();
 			}
 		}
 		if (!buildingStation)
@@ -1371,7 +1369,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		SpaceObjectVessel resultVesselOther = null;
 		details.RelativePositionUpdate = new Dictionary<long, float[]>();
 		details.RelativeRotationUpdate = new Dictionary<long, float[]>();
-		SpaceObjectVessel oldMainVessel = ((DockedToMainVessel != null) ? DockedToMainVessel : dockedToVessel.DockedToMainVessel);
+		SpaceObjectVessel oldMainVessel = DockedToMainVessel != null ? DockedToMainVessel : dockedToVessel.DockedToMainVessel;
 		QuaternionD oldMainVesselRot = QuaternionD.LookRotation(oldMainVessel.Forward, oldMainVessel.Up);
 		Vector3D oldCenterOffset = oldMainVessel.VesselData.CollidersCenterOffset.ToVector3D();
 		Vector3D oldMainVessleRelPos = oldMainVessel.Orbit.RelativePosition;
@@ -1575,7 +1573,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		Vector3 minValue = Vector3.Zero;
 		BulletPhysicsController.ComplexBoundCalculation(this, out minValue, out maxValue);
 		Vector3D CollidersCenterOffset = (minValue + maxValue).ToVector3D() / 2.0;
-		Vector3D centerOffsetDiff = CollidersCenterOffset - ((VesselData.CollidersCenterOffset != null) ? VesselData.CollidersCenterOffset.ToVector3D() : Vector3D.Zero);
+		Vector3D centerOffsetDiff = CollidersCenterOffset - (VesselData.CollidersCenterOffset != null ? VesselData.CollidersCenterOffset.ToVector3D() : Vector3D.Zero);
 		VesselData.CollidersCenterOffset = CollidersCenterOffset.ToFloatArray();
 		if (AllDockedVessels.Count <= 0)
 		{
@@ -1593,7 +1591,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		relativePosition = parentPort.Position - relativeRotation * childPort.Position;
 	}
 
-	public static SpaceObjectVessel CreateNew(GameScenes.SceneID sceneID, string registration = "", long GUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0)
+	public static SpaceObjectVessel CreateNew(GameScenes.SceneId sceneID, string registration = "", long GUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0)
 	{
 		if (GameScenes.Ranges.IsAsteroid(sceneID))
 		{
@@ -1688,7 +1686,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 						DockingStatus = port.DockingStatus,
 						RelativePosition = RelativePositionFromParent.ToFloatArray(),
 						RelativeRotation = RelativeRotationFromParent.ToFloatArray(),
-						CollidersCenterOffset = (IsDocked ? DockedToMainVessel.VesselData.CollidersCenterOffset : VesselData.CollidersCenterOffset),
+						CollidersCenterOffset = IsDocked ? DockedToMainVessel.VesselData.CollidersCenterOffset : VesselData.CollidersCenterOffset,
 						ExecutersMerge = port.GetMergedExecuters(null),
 						PairedDoors = GetPairedDoors(port)
 					});
@@ -1716,9 +1714,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				InSceneID = sp.SpawnPointID,
 				NewState = sp.State,
 				NewType = sp.Type,
-				PlayerGUID = ((sp.Player != null) ? sp.Player.FakeGuid : (-1)),
-				PlayerName = ((sp.Player != null) ? sp.Player.Name : null),
-				PlayerId = ((sp.Player != null) ? sp.Player.PlayerId : null)
+				PlayerGUID = sp.Player != null ? sp.Player.FakeGuid : -1,
+				PlayerName = sp.Player != null ? sp.Player.Name : null,
+				PlayerId = sp.Player != null ? sp.Player.PlayerId : null
 			});
 		}
 		ss.EmblemId = EmblemId;

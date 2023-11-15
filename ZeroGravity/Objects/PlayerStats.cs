@@ -46,7 +46,7 @@ public class PlayerStats
 
 	public Dictionary<int, HitInfo> hitQueue = new Dictionary<int, HitInfo>();
 
-	private int hitIdentyfy = 0;
+	private int hitIdentyfy;
 
 	private PlayerStatsMessage psm = new PlayerStatsMessage();
 
@@ -150,7 +150,7 @@ public class PlayerStats
 		}
 		float amount = damages.Where((PlayerDamage m) => m.Amount > 0f && (m.HurtType == HurtType.Suffocate || m.HurtType == HurtType.Pressure)).Sum((PlayerDamage m) => m.Amount);
 		float hurt = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType != HurtType.Suffocate && m.HurtType != HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
-		amount = ((pl.PlayerInventory.CurrOutfit == null) ? (amount + hurt) : (amount + MathHelper.Clamp(hurt - pl.PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue)));
+		amount = pl.PlayerInventory.CurrOutfit == null ? amount + hurt : amount + MathHelper.Clamp(hurt - pl.PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue);
 		if (amount <= float.Epsilon)
 		{
 			return;
@@ -175,7 +175,7 @@ public class PlayerStats
 				pd.Amount += dmg.Amount;
 			}
 		}
-		psm.ShotDirection = (shotDirection.HasValue ? shotDirection.Value.ToFloatArray() : null);
+		psm.ShotDirection = shotDirection.HasValue ? shotDirection.Value.ToFloatArray() : null;
 		if (acummulatedDamage > 1f)
 		{
 			psm.GUID = pl.FakeGuid;
@@ -188,7 +188,7 @@ public class PlayerStats
 
 	public void Heal(float amount)
 	{
-		amount = ((amount > 0f) ? amount : 0f);
+		amount = amount > 0f ? amount : 0f;
 		if (!(amount <= float.Epsilon) && HealthPoints != MaxHealthPoints)
 		{
 			HealthPoints = MathHelper.Clamp(HealthPoints + amount, 0f, MaxHealthPoints);
@@ -238,7 +238,7 @@ public class PlayerStats
 		float hp = 0f;
 		if ((double)speed >= threshold)
 		{
-			hp = (float)(((double)speed - threshold) * ((double)speed - threshold) / 10.0 + (double)speed) * ((pl.PlayerInventory.CurrOutfit != null) ? pl.PlayerInventory.CurrOutfit.CollisionResistance : 1f);
+			hp = (float)(((double)speed - threshold) * ((double)speed - threshold) / 10.0 + (double)speed) * (pl.PlayerInventory.CurrOutfit != null ? pl.PlayerInventory.CurrOutfit.CollisionResistance : 1f);
 		}
 		TakeDamage(HurtType.Impact, hp);
 	}
@@ -249,9 +249,8 @@ public class PlayerStats
 		{
 			return 0f;
 		}
-		if (hitQueue.ContainsKey(id))
+		if (hitQueue.TryGetValue(id, out var hitInfo))
 		{
-			HitInfo hitInfo = hitQueue[id];
 			float damage = TakeHitDamage(hitInfo.damage, hitInfo.hitType, hitInfo.isMelee, hitInfo.direction);
 			UnqueueHit(id);
 			return damage;

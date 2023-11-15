@@ -16,13 +16,13 @@ public class Room : IPersistantObject, IResourceUser
 
 	private float _AirQuality = 1f;
 
-	private float _AirPressureChangeRate = 0f;
+	private float _AirPressureChangeRate;
 
-	private float _AirQualityChangeRate = 0f;
+	private float _AirQualityChangeRate;
 
 	private float _Temperature = 25f;
 
-	private bool _UseGravity = false;
+	private bool _UseGravity;
 
 	private bool _AirFiltering = true;
 
@@ -91,7 +91,7 @@ public class Room : IPersistantObject, IResourceUser
 		}
 		set
 		{
-			float newValue = ((!float.IsNaN(value)) ? MathHelper.Clamp(value, 0f, 1f) : 0f);
+			float newValue = !float.IsNaN(value) ? MathHelper.Clamp(value, 0f, 1f) : 0f;
 			if (_AirQuality != newValue)
 			{
 				StatusChanged = true;
@@ -108,7 +108,7 @@ public class Room : IPersistantObject, IResourceUser
 		}
 		set
 		{
-			float newValue = ((!float.IsNaN(value)) ? MathHelper.Clamp(value, 0f, 1f) : 0f);
+			float newValue = !float.IsNaN(value) ? MathHelper.Clamp(value, 0f, 1f) : 0f;
 			if (_AirPressure != newValue)
 			{
 				StatusChanged = true;
@@ -265,16 +265,16 @@ public class Room : IPersistantObject, IResourceUser
 		{
 			InSceneID = ID.InSceneID,
 			AirPressure = AirPressure,
-			AirQuality = ((AirPressure <= float.Epsilon) ? 0f : AirQuality),
+			AirQuality = AirPressure <= float.Epsilon ? 0f : AirQuality,
 			CompoundRoomID = CompoundRoom.ID,
 			UseGravity = UseGravity,
 			AirFiltering = AirFiltering,
 			Temperature = Temperature,
-			AirPressureChangeRate = (AirPressureChangeRate.IsNotEpsilonZero(1E-05f) ? AirPressureChangeRate : 0f),
-			AirQualityChangeRate = (AirQualityChangeRate.IsNotEpsilonZero(1E-05f) ? AirQualityChangeRate : 0f),
+			AirPressureChangeRate = AirPressureChangeRate.IsNotEpsilonZero(1E-05f) ? AirPressureChangeRate : 0f,
+			AirQualityChangeRate = AirQualityChangeRate.IsNotEpsilonZero(1E-05f) ? AirQualityChangeRate : 0f,
 			PressurizationStatus = GetPressurizationStatus(),
-			Fire = (AirConsumers.Count((IAirConsumer m) => m is AirConsumerFire) > 0),
-			Breach = (AirConsumers.Count((IAirConsumer m) => m is AirConsumerBreach) > 0),
+			Fire = AirConsumers.Count((IAirConsumer m) => m is AirConsumerFire) > 0,
+			Breach = AirConsumers.Count((IAirConsumer m) => m is AirConsumerBreach) > 0,
 			GravityMalfunction = GravityMalfunction
 		};
 	}
@@ -289,7 +289,7 @@ public class Room : IPersistantObject, IResourceUser
 			}
 			if (TargetPressure.Value < AirPressure)
 			{
-				return (TargetPressure.Value < 0f) ? RoomPressurizationStatus.Vent : RoomPressurizationStatus.Depressurize;
+				return TargetPressure.Value < 0f ? RoomPressurizationStatus.Vent : RoomPressurizationStatus.Depressurize;
 			}
 		}
 		else if (EquilizePressureRoom != null)

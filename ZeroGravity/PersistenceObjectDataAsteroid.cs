@@ -12,7 +12,7 @@ public class PersistenceObjectDataAsteroid : PersistenceObjectData
 
 	public string Tag;
 
-	public GameScenes.SceneID SceneID;
+	public GameScenes.SceneId SceneID;
 
 	public bool IsAlwaysVisible;
 

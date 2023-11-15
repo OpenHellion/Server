@@ -52,7 +52,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 	public override void SetAuxData(SystemAuxData auxData)
 	{
 		SubSystemFabricatorAuxData aux = auxData as SubSystemFabricatorAuxData;
-		AllowedItemTypes = ((aux.AllowedItemTypes == null || aux.AllowedItemTypes.Count == 0) ? null : aux.AllowedItemTypes);
+		AllowedItemTypes = aux.AllowedItemTypes == null || aux.AllowedItemTypes.Count == 0 ? null : aux.AllowedItemTypes;
 		TimePerResourceUnit = aux.TimePerResourceUnit;
 		AttachPoints = ParentVessel.AttachPoints.Values.Where((VesselAttachPoint m) => aux.AttachPoints.Contains(m.InSceneID)).ToList();
 		CargoCompartments = aux.CargoCompartments;
@@ -71,7 +71,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 		}
 		return new FabricatorAuxDetails
 		{
-			CurrentTimeLeft = ((TimeLeft >= 0.0) ? ((float)TimeLeft) : 0f),
+			CurrentTimeLeft = TimeLeft >= 0.0 ? (float)TimeLeft : 0f,
 			ItemsInQueue = ItemsInQueue,
 			CargoCompartments = list
 		};

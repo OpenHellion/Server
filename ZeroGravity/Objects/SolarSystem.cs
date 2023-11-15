@@ -23,7 +23,7 @@ public class SolarSystem
 
 	public const double DetailsLimitSubscribe = 2250000.0;
 
-	private double currentTime = 0.0;
+	private double currentTime;
 
 	private List<CelestialBody> celesitalBodies = new List<CelestialBody>();
 
@@ -31,7 +31,7 @@ public class SolarSystem
 
 	private List<Station> stations = new List<Station>();
 
-	public bool CheckDestroyMarkedBodies = false;
+	public bool CheckDestroyMarkedBodies;
 
 	private double timeCorrection;
 
@@ -193,10 +193,9 @@ public class SolarSystem
 			Transforms = new List<ObjectTransform>()
 		};
 
-		if (player.Parent is SpaceObjectVessel && (player.Parent as SpaceObjectVessel).IsDocked)
+		if (player.Parent is SpaceObjectVessel parent && parent.IsDocked)
 		{
-			SpaceObjectVessel vessel = player.Parent as SpaceObjectVessel;
-			vessel.Orbit.CopyDataFrom(vessel.DockedToMainVessel.Orbit, 0.0, exactCopy: true);
+			parent.Orbit.CopyDataFrom(parent.DockedToMainVessel.Orbit, 0.0, exactCopy: true);
 		}
 
 		// Loops through each artificial body in the universe, and adds all contents to the movement message.
@@ -215,7 +214,7 @@ public class SolarSystem
 				bodyTransform.Up = artificialBody.Up.ToFloatArray();
 			}
 
-			OrbitParameters orbit = (artificialBody is not SpaceObjectVessel) ? artificialBody.Orbit : (artificialBody as SpaceObjectVessel).MainVessel.Orbit;
+			OrbitParameters orbit = artificialBody is not SpaceObjectVessel objectVessel ? artificialBody.Orbit : objectVessel.MainVessel.Orbit;
 			if (artificialBody.StabilizeToTargetObj is not null)
 			{
 				if (artificialBody.StabilizeToTargetTime >= player.LastMovementMessageSolarSystemTime
@@ -259,10 +258,9 @@ public class SolarSystem
 			bodyTransform.DynamicObjectsMovement = new List<DynamicObectMovementMessage>();
 			bodyTransform.CorpsesMovement = new List<CorpseMovementMessage>();
 
-			if (artificialBody is SpaceObjectVessel)
+			if (artificialBody is SpaceObjectVessel vessel)
 			{
-				SpaceObjectVessel vessel = artificialBody as SpaceObjectVessel;
-				if (player.Parent.GUID == artificialBody.GUID || player.IsSubscribedTo(artificialBody.GUID))
+				if (player.Parent.GUID == vessel.GUID || player.IsSubscribedTo(vessel.GUID))
 				{
 					foreach (Player crewPlayer in vessel.VesselCrew)
 					{
@@ -301,9 +299,8 @@ public class SolarSystem
 					}
 				}
 			}
-			else if (artificialBody is Pivot)
+			else if (artificialBody is Pivot pivot)
 			{
-				Pivot pivot = artificialBody as Pivot;
 				switch (pivot.ObjectType)
 				{
 					case SpaceObjectType.PlayerPivot:
@@ -380,7 +377,7 @@ public class SolarSystem
 		foreach (CelestialBodyData cbd in StaticData.SolarSystem.CelestialBodies)
 		{
 			CelestialBody newBody = new CelestialBody(cbd.GUID);
-			newBody.Set((cbd.ParentGUID == -1) ? null : GetCelestialBody(cbd.ParentGUID), cbd.Mass, cbd.Radius * Server.CELESTIAL_BODY_RADIUS_MULTIPLIER, cbd.RotationPeriod, cbd.Eccentricity, cbd.SemiMajorAxis, cbd.Inclination, cbd.ArgumentOfPeriapsis, cbd.LongitudeOfAscendingNode, CurrentTime);
+			newBody.Set(cbd.ParentGUID == -1 ? null : GetCelestialBody(cbd.ParentGUID), cbd.Mass, cbd.Radius * Server.CelestialBodyRadiusMultiplier, cbd.RotationPeriod, cbd.Eccentricity, cbd.SemiMajorAxis, cbd.Inclination, cbd.ArgumentOfPeriapsis, cbd.LongitudeOfAscendingNode, CurrentTime);
 			newBody.AsteroidGasBurstTimeMin = cbd.AsteroidGasBurstTimeMin;
 			newBody.AsteroidGasBurstTimeMax = cbd.AsteroidGasBurstTimeMax;
 			newBody.AsteroidResources = cbd.AsteroidResources.ToList();
@@ -427,10 +424,10 @@ public class SolarSystem
 		ArtificialBody ab = null;
 		if (nearArtificialBodyGUIDs != null && nearArtificialBodyGUIDs.Count > 0)
 		{
-			SpaceObject so = ((nearArtificialBodyGUIDs.Count != 1) ? Server.Instance.GetObject(nearArtificialBodyGUIDs[MathHelper.RandomRange(0, nearArtificialBodyGUIDs.Count)]) : Server.Instance.GetObject(nearArtificialBodyGUIDs[0]));
-			if (so is ArtificialBody)
+			SpaceObject so = nearArtificialBodyGUIDs.Count != 1 ? Server.Instance.GetObject(nearArtificialBodyGUIDs[MathHelper.RandomRange(0, nearArtificialBodyGUIDs.Count)]) : Server.Instance.GetObject(nearArtificialBodyGUIDs[0]);
+			if (so is ArtificialBody body)
 			{
-				ab = so as ArtificialBody;
+				ab = body;
 			}
 			else if (so is Player)
 			{
@@ -468,7 +465,7 @@ public class SolarSystem
 		{
 			if (celestialBodyGUIDs != null && celestialBodyGUIDs.Count > 0)
 			{
-				parentBody = ((celestialBodyGUIDs.Count != 1) ? Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[MathHelper.RandomRange(0, celestialBodyGUIDs.Count)]) : Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[0]));
+				parentBody = celestialBodyGUIDs.Count != 1 ? Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[MathHelper.RandomRange(0, celestialBodyGUIDs.Count)]) : Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[0]);
 			}
 			if (parentBody == null)
 			{
@@ -489,14 +486,14 @@ public class SolarSystem
 				{
 					Vector3D tangent1 = Vector3D.Cross(position.Normalized, Vector3D.Forward);
 					Vector3D tangent2 = Vector3D.Cross(position.Normalized, Vector3D.Up);
-					velocityAtPosition = ((!(tangent1.SqrMagnitude > tangent2.SqrMagnitude)) ? new Vector3D?(tangent2.Normalized * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(position.Magnitude)) : new Vector3D?(tangent1.Normalized * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(position.Magnitude)));
+					velocityAtPosition = !(tangent1.SqrMagnitude > tangent2.SqrMagnitude) ? new Vector3D?(tangent2.Normalized * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(position.Magnitude)) : new Vector3D?(tangent1.Normalized * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(position.Magnitude));
 				}
 				velocity = velocityAtPosition.Value;
 			}
 			else
 			{
 				double distance = 0.0;
-				distance = ((parentBody.GUID != 1) ? (parentBody.Orbit.Radius + (parentBody.Orbit.GravityInfluenceRadius - parentBody.Orbit.Radius) * MathHelper.RandomRange(distanceFromSurfacePercMin, distanceFromSurfacePercMax)) : (parentBody.Orbit.Radius + (483940704314.0 - parentBody.Orbit.Radius) * MathHelper.RandomRange(0.1, 1.0)));
+				distance = parentBody.GUID != 1 ? parentBody.Orbit.Radius + (parentBody.Orbit.GravityInfluenceRadius - parentBody.Orbit.Radius) * MathHelper.RandomRange(distanceFromSurfacePercMin, distanceFromSurfacePercMax) : parentBody.Orbit.Radius + (483940704314.0 - parentBody.Orbit.Radius) * MathHelper.RandomRange(0.1, 1.0);
 				position = new Vector3D(0.0 - distance, 0.0, 0.0);
 				velocity = Vector3D.Back * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(distance);
 				QuaternionD randomRot2 = MathHelper.RandomRotation();

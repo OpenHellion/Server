@@ -31,7 +31,7 @@ public class ParentProcess
 		public string szExeFile;
 	}
 
-	private static Process parentProcess = null;
+	private static Process parentProcess;
 
 	private static uint TH32CS_SNAPPROCESS = 2u;
 

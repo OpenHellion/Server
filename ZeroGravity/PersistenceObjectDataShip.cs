@@ -23,7 +23,7 @@ public class PersistenceObjectDataShip : PersistenceObjectData
 
 	public string Tag;
 
-	public GameScenes.SceneID SceneID;
+	public GameScenes.SceneId SceneID;
 
 	public float Health;
 

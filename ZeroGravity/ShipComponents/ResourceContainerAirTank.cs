@@ -36,7 +36,7 @@ public class ResourceContainerAirTank : ResourceContainer
 	{
 		return new AirTankAuxDetails
 		{
-			AirQuality = ((base.Compartments[0].Resources[0].Quantity > float.Epsilon) ? AirQuality : 0f)
+			AirQuality = base.Compartments[0].Resources[0].Quantity > float.Epsilon ? AirQuality : 0f
 		};
 	}
 }

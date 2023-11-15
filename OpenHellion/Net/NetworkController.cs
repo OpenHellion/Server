@@ -139,8 +139,7 @@ public class NetworkController
 			return;
 		}
 
-#if !HELLION_SP
-		// Also has the added benifit of blocking players from joining non-nakama servers.
+		// Also has the added benefit of blocking players from joining non-nakama servers.
 		if (req.ServerID != ServerId)
 		{
 			Dbg.Info("LogInRequest server ID doesn't match this server ID.", req.ServerID, ServerId);
@@ -150,7 +149,6 @@ public class NetworkController
 			});
 			return;
 		}
-#endif
 
 		// Check if player id is valid.
 		if (!Guid.TryParse(req.PlayerId, out _))
@@ -183,9 +181,9 @@ public class NetworkController
 
 	public void SendToGameClient(long clientID, NetworkData data)
 	{
-		if (_clients.ContainsKey(clientID))
+		if (_clients.TryGetValue(clientID, out var client))
 		{
-			_gameConnection.Send(_clients[clientID], data);
+			_gameConnection.Send(client, data);
 		}
 		else
 		{
@@ -213,9 +211,9 @@ public class NetworkController
 
 	public void LogOutPlayer(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (_clients.TryGetValue(guid, out var client))
 		{
-			_gameConnection.GetPlayer(_clients[guid]).LogoutDisconnectReset();
+			_gameConnection.GetPlayer(client).LogoutDisconnectReset();
 		}
 		else
 		{
@@ -277,9 +275,9 @@ public class NetworkController
 	/// </summary>
 	public Player GetPlayer(long guid)
 	{
-		if (_clients.ContainsKey(guid))
+		if (_clients.TryGetValue(guid, out var client))
 		{
-			return _gameConnection.GetPlayer(_clients[guid]);
+			return _gameConnection.GetPlayer(client);
 		}
 
 		return null;
@@ -373,9 +371,9 @@ public class NetworkController
 					SendToGameClient(player.GUID, data);
 				}
 			}
-			else if (!player.EnvironmentReady && data is ShipStatsMessage && player.IsSubscribedTo((data as ShipStatsMessage).GUID))
+			else if (!player.EnvironmentReady && data is ShipStatsMessage message && player.IsSubscribedTo(message.GUID))
 			{
-				player.MessagesReceivedWhileLoading.Enqueue(data as ShipStatsMessage);
+				player.MessagesReceivedWhileLoading.Enqueue(message);
 			}
 		}
 	}

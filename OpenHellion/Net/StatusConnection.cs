@@ -41,27 +41,20 @@ public class StatusConnection
 			{
 				return;
 			}
-			else if (data is ServerShutDownMessage)
+			else if (data is ServerShutDownMessage msg)
 			{
 				string ipAddress = socket.RemoteEndPoint.ToString().Split(":".ToCharArray(), 2)[0];
 				if (Server.Instance.IsAddressAutorized(ipAddress))
 				{
-					ServerShutDownMessage msg = data as ServerShutDownMessage;
 					Server.Restart = msg.Restrat;
 					Server.CleanRestart = msg.CleanRestart;
-#if HELLION_SP
-					Server.SavePersistenceDataOnShutdown = false;
-#endif
-#if !HELLION_SP
 					Server.SavePersistenceDataOnShutdown = (!Server.Restart && Server.PersistenceSaveInterval > 0.0) || (Server.Restart && !Server.CleanRestart);
-#endif
 					Server.IsRunning = false;
 				}
 				return;
 			}
-			else if (data is ServerStatusRequest)
+			else if (data is ServerStatusRequest req)
 			{
-				ServerStatusRequest req = data as ServerStatusRequest;
 				ServerStatusResponse ssr = Server.Instance.GetServerStatusResponse(req);
 				try
 				{
@@ -70,13 +63,12 @@ public class StatusConnection
 				}
 				catch (ArgumentNullException)
 				{
-					Dbg.Error("Serialized data buffer is null", data.GetType().ToString(), data);
+					Dbg.Error("Serialized data buffer is null", req.GetType().ToString(), req);
 					throw;
 				}
 			}
-			else if (data is DeleteCharacterRequest)
+			else if (data is DeleteCharacterRequest dcr)
 			{
-				DeleteCharacterRequest dcr = data as DeleteCharacterRequest;
 				if (dcr.ServerId == NetworkController.ServerId)
 				{
 					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.PlayerId);

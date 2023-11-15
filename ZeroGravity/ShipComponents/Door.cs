@@ -19,9 +19,9 @@ public class Door : IAirConsumer, IPersistantObject
 
 	private bool _IsLocked;
 
-	private Room _Room1 = null;
+	private Room _Room1;
 
-	private Room _Room2 = null;
+	private Room _Room2;
 
 	[JsonIgnore]
 	public Vector3D PositionRelativeToDockingPort;
@@ -141,8 +141,8 @@ public class Door : IAirConsumer, IPersistantObject
 			HasPower = HasPower,
 			IsLocked = IsLocked,
 			IsOpen = IsOpen,
-			Room1ID = ((Room1 != null) ? Room1.ID : null),
-			Room2ID = ((Room2 != null) ? Room2.ID : null)
+			Room1ID = Room1 != null ? Room1.ID : null,
+			Room2ID = Room2 != null ? Room2.ID : null
 		};
 	}
 

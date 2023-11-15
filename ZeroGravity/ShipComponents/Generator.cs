@@ -87,7 +87,7 @@ public abstract class Generator : VesselComponent, IResourceProvider
 			if (_Output != value)
 			{
 				_Output = value;
-				base.OperationRate = ((MaxOutput > 0f) ? (Output / MaxOutput) : 0f);
+				base.OperationRate = MaxOutput > 0f ? Output / MaxOutput : 0f;
 				StatusChanged = true;
 			}
 		}

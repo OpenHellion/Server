@@ -64,12 +64,12 @@ public class Persistence
 			Forward = obj.Data.Forward,
 			Up = obj.Data.Up,
 			AuxData = obj.Data.AuxData,
-			RespawnTime = (obj.Data.SpawnSettings.Length != 0) ? obj.Data.SpawnSettings[0].RespawnTime : (-1f),
+			RespawnTime = obj.Data.SpawnSettings.Length != 0 ? obj.Data.SpawnSettings[0].RespawnTime : -1f,
 			Timer = obj.Timer
 		};
-		if (obj.APDetails != null)
+		if (obj.ApDetails != null)
 		{
-			data.AttachPointID = obj.APDetails.InSceneID;
+			data.AttachPointID = obj.ApDetails.InSceneID;
 		}
 		per.RespawnObjects.Add(data);
 	}
@@ -149,7 +149,6 @@ public class Persistence
 			per.SpawnManagerData = SpawnManager.GetPersistenceData();
 			DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 			FileInfo[] Files = d.GetFiles("*.save");
-#if !HELLION_SP
 			if (Files.Length >= Server.MaxNumberOfSaveFiles)
 			{
 				Array.Sort(Files, (FileInfo file1, FileInfo file2) => file2.CreationTimeUtc.CompareTo(file1.CreationTimeUtc));
@@ -158,7 +157,7 @@ public class Persistence
 					Files[i].Delete();
 				}
 			}
-#endif
+
 			if (filename == null)
 			{
 				filename = string.Format(k_PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
@@ -194,7 +193,7 @@ public class Persistence
 			Position = data.Position,
 			Forward = data.Forward,
 			Up = data.Up,
-			AttachPointInSceneId = data.AttachPointID.HasValue ? data.AttachPointID.Value : (-1),
+			AttachPointInSceneId = data.AttachPointID.HasValue ? data.AttachPointID.Value : -1,
 			AuxData = data.AuxData,
 			SpawnSettings = new DynaminObjectSpawnSettings[1]
 			{
@@ -213,7 +212,7 @@ public class Persistence
 			Parent = parentObj,
 			Timer = data.Timer,
 			RespawnTime = data.RespawnTime,
-			APDetails = apd
+			ApDetails = apd
 		});
 	}
 
@@ -247,7 +246,7 @@ public class Persistence
 		DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 		FileInfo[] files = d.GetFiles("*.save");
 		FileInfo loadFromFile = null;
-		loadFromFile = (filename == null) ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower());
+		loadFromFile = filename == null ? files.OrderByDescending((FileInfo m) => m.LastWriteTimeUtc).FirstOrDefault() : files.FirstOrDefault((FileInfo m) => m.Name.ToLower() == filename.ToLower());
 		if (loadFromFile != null)
 		{
 			PersistenceObject persistence = JsonSerialiser.Load<PersistenceObject>(loadFromFile.FullName);
@@ -342,8 +341,8 @@ public class Persistence
 				Forward = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnForward : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Forward).ToFloatArray(),
 				Up = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnUp : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Up).ToFloatArray(),
 				AttachPointInSceneId = apInSceneID,
-				AuxData = (persistenceData.RespawnAuxData != null) ? persistenceData.RespawnAuxData : auxData,
-				SpawnSettings = (!persistenceData.RespawnTime.HasValue) ? null : new DynaminObjectSpawnSettings[1]
+				AuxData = persistenceData.RespawnAuxData != null ? persistenceData.RespawnAuxData : auxData,
+				SpawnSettings = !persistenceData.RespawnTime.HasValue ? null : new DynaminObjectSpawnSettings[1]
 				{
 					new DynaminObjectSpawnSettings
 					{
@@ -354,9 +353,9 @@ public class Persistence
 				}
 			};
 			DynamicObjectSceneData sceneData = dynamicObjectSceneData;
-			if (persistenceData is PersistenceObjectDataItem)
+			if (persistenceData is PersistenceObjectDataItem item)
 			{
-				sceneData.AuxData.Tier = (persistenceData as PersistenceObjectDataItem).Tier;
+				sceneData.AuxData.Tier = item.Tier;
 			}
 			DynamicObject dobj = new DynamicObject(sceneData, parent, persistenceData.GUID);
 			if (dobj.Item != null)

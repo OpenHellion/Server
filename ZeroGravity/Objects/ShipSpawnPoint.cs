@@ -49,9 +49,9 @@ public class ShipSpawnPoint
 				{
 					InSceneID = SpawnPointID,
 					NewState = State,
-					PlayerGUID = (Player is not null) ? Player.FakeGuid : (-1),
-					PlayerName = (Player is not null) ? Player.Name : "",
-					PlayerId = (Player is not null) ? Player.PlayerId : "",
+					PlayerGUID = Player is not null ? Player.FakeGuid : -1,
+					PlayerName = Player is not null ? Player.Name : "",
+					PlayerId = Player is not null ? Player.PlayerId : "",
 					InvitedPlayerName = InvitedPlayerName,
 					InvitedPlayerId = InvitedPlayerId
 				};
@@ -169,9 +169,9 @@ public class ShipSpawnPoint
 				{
 					InSceneID = SpawnPointID,
 					NewState = State,
-					PlayerGUID = (Player is not null) ? Player.FakeGuid : (-1),
-					PlayerName = (Player is not null) ? Player.Name : "",
-					PlayerId = (Player is not null) ? Player.PlayerId : "",
+					PlayerGUID = Player is not null ? Player.FakeGuid : -1,
+					PlayerName = Player is not null ? Player.Name : "",
+					PlayerId = Player is not null ? Player.PlayerId : "",
 					PlayerInvite = true,
 					InvitedPlayerName = InvitedPlayerName,
 					InvitedPlayerId = InvitedPlayerId

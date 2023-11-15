@@ -11,7 +11,7 @@ public class Weapon : Item
 {
 	private WeaponStats _stats;
 
-	private ItemSlot magazineSlot = null;
+	private ItemSlot magazineSlot;
 
 	private int _currentModIndex;
 
@@ -34,7 +34,7 @@ public class Weapon : Item
 
 	public bool HasAmmo => Magazine != null && Magazine.HasAmmo;
 
-	public Magazine Magazine => (magazineSlot != null) ? (magazineSlot.Item as Magazine) : null;
+	public Magazine Magazine => magazineSlot != null ? magazineSlot.Item as Magazine : null;
 
 	public int CurrentModIndex
 	{

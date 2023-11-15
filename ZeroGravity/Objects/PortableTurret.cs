@@ -12,7 +12,7 @@ internal class PortableTurret : Item
 
 	public float Damage;
 
-	private Player targetPlayer = null;
+	private Player targetPlayer;
 
 	private PortableTurretStats _stats;
 

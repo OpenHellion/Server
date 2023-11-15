@@ -37,7 +37,7 @@ public static class BulletHelper
 	public static void Scaling(float scale, out BulletSharp.Math.Matrix result)
 	{
 		result = BulletSharp.Math.Matrix.Identity;
-		result.M11 = (result.M22 = (result.M33 = scale));
+		result.M11 = result.M22 = result.M33 = scale;
 	}
 
 	public static Quaternion LookRotation(Vector3 forward, Vector3 up)

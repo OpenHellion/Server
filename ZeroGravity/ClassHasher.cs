@@ -165,7 +165,7 @@ public static class ClassHasher
 					addHashingDataMember(par.ParameterType, ref str, nspace);
 				}
 			}
-			str = str + ((!first) ? ", " : " ") + membStr;
+			str = str + (!first ? ", " : " ") + membStr;
 			first = false;
 		}
 	}

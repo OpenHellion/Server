@@ -443,14 +443,14 @@ public struct QuaternionD
 		if (val1 > 0.999999)
 		{
 			val3 = 1.0 - t;
-			val2 = (flag ? (0.0 - t) : t);
+			val2 = flag ? 0.0 - t : t;
 		}
 		else
 		{
 			double val4 = System.Math.Acos(val1);
 			double val5 = 1.0 / System.Math.Sin(val4);
 			val3 = System.Math.Sin((1.0 - t) * val4) * val5;
-			val2 = (flag ? ((0.0 - System.Math.Sin(t * val4)) * val5) : (System.Math.Sin(t * val4) * val5));
+			val2 = flag ? (0.0 - System.Math.Sin(t * val4)) * val5 : System.Math.Sin(t * val4) * val5;
 		}
 		value.X = val3 * from.X + val2 * to.X;
 		value.Y = val3 * from.Y + val2 * to.Y;

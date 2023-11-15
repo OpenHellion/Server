@@ -10,11 +10,11 @@ internal class HandDrill : Item
 {
 	private HandDrillStats _stats;
 
-	private ItemSlot batterySlot = null;
+	private ItemSlot batterySlot;
 
-	private ItemSlot canisterSlot = null;
+	private ItemSlot canisterSlot;
 
-	private ItemSlot drillBitSlot = null;
+	private ItemSlot drillBitSlot;
 
 	private double _inAsteroidDistanceSqr;
 
@@ -24,11 +24,11 @@ internal class HandDrill : Item
 
 	public override DynamicObjectStats StatsNew => _stats;
 
-	public Battery Battery => (batterySlot != null) ? (batterySlot.Item as Battery) : null;
+	public Battery Battery => batterySlot != null ? batterySlot.Item as Battery : null;
 
-	public Canister Canister => (canisterSlot != null) ? (canisterSlot.Item as Canister) : null;
+	public Canister Canister => canisterSlot != null ? canisterSlot.Item as Canister : null;
 
-	public Item DrillBit => (drillBitSlot != null) ? (drillBitSlot.Item as GenericItem) : null;
+	public Item DrillBit => drillBitSlot != null ? drillBitSlot.Item as GenericItem : null;
 
 	public long InAsteroidGUID
 	{
@@ -46,7 +46,7 @@ internal class HandDrill : Item
 			{
 				_inAsteroidObj = null;
 			}
-			_inAsteroidDistanceSqr = ((_inAsteroidObj != null) ? System.Math.Pow(_inAsteroidObj.Radius + 100.0, 2.0) : 0.0);
+			_inAsteroidDistanceSqr = _inAsteroidObj != null ? System.Math.Pow(_inAsteroidObj.Radius + 100.0, 2.0) : 0.0;
 			_inAsteroidGUID = value;
 			_stats.InAsteroidGUID = value;
 		}

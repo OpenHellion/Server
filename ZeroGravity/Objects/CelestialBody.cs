@@ -40,7 +40,7 @@ public class CelestialBody
 			Parent.ChildBodies.Add(this);
 		}
 		Radius = radius;
-		Orbit.InitFromElements((Parent != null) ? Parent.Orbit : null, mass, radius, rotationPeriod, eccentricity, semiMajorAxis, inclination, argumentOfPeriapsis, longitudeOfAscendingNode, 0.0, 0.0);
+		Orbit.InitFromElements(Parent != null ? Parent.Orbit : null, mass, radius, rotationPeriod, eccentricity, semiMajorAxis, inclination, argumentOfPeriapsis, longitudeOfAscendingNode, 0.0, 0.0);
 		return Orbit.IsOrbitValid;
 	}
 

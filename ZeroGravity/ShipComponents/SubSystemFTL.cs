@@ -17,9 +17,9 @@ public class SubSystemFTL : SubSystem
 
 	private bool canGoOnline = true;
 
-	private int _MaxWarp = 0;
+	private int _MaxWarp;
 
-	private float _TowingCapacity = 0f;
+	private float _TowingCapacity;
 
 	public override SubSystemType Type => SubSystemType.FTL;
 
@@ -130,7 +130,7 @@ public class SubSystemFTL : SubSystem
 	public override void Update(double duration)
 	{
 		base.Update(duration);
-		base.OperationRate = ((ParentVessel.CurrentCourse != null && ParentVessel.CurrentCourse.IsInProgress) ? 1 : 0);
+		base.OperationRate = ParentVessel.CurrentCourse != null && ParentVessel.CurrentCourse.IsInProgress ? 1 : 0;
 		MachineryPart mp = MachineryParts.Values.FirstOrDefault((MachineryPart m) => m != null && m.PartType == MachineryPartType.SingularityCellDetonator);
 		if (mp == null)
 		{
@@ -183,7 +183,7 @@ public class SubSystemFTL : SubSystem
 				}
 			}
 		}
-		list.Sort((MachineryPart x, MachineryPart y) => (x.Health != y.Health) ? ((x.Health > y.Health) ? 1 : (-1)) : 0);
+		list.Sort((MachineryPart x, MachineryPart y) => x.Health != y.Health ? x.Health > y.Health ? 1 : -1 : 0);
 		foreach (MachineryPart warpCell in list)
 		{
 			if (warpCell.Health < warpFuel)

@@ -16,7 +16,7 @@ public class DoomedShipController : IPersistantObject
 
 	public static double AdditionalSpawnChance2 = 0.75;
 
-	private double spawnTimer = 0.0;
+	private double spawnTimer;
 
 	public void SubscribeToTimer()
 	{

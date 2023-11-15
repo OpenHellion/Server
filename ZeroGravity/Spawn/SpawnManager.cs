@@ -68,13 +68,13 @@ public static class SpawnManager
 		}
 		foreach (KeyValuePair<short, DynamicObjectData> val in StaticData.DynamicObjectsDataList)
 		{
-			if (val.Value.ItemType == ItemType.GenericItem && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is GenericItemData)
+			if (val.Value.ItemType == ItemType.GenericItem && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is GenericItemData data)
 			{
-				AddItemTypeItemID(val.Value.ItemType, (int)(val.Value.DefaultAuxData as GenericItemData).SubType, val.Key);
+				AddItemTypeItemID(val.Value.ItemType, (int)data.SubType, val.Key);
 			}
-			else if (val.Value.ItemType == ItemType.MachineryPart && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is MachineryPartData)
+			else if (val.Value.ItemType == ItemType.MachineryPart && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is MachineryPartData partData)
 			{
-				AddItemTypeItemID(val.Value.ItemType, (int)(val.Value.DefaultAuxData as MachineryPartData).PartType, val.Key);
+				AddItemTypeItemID(val.Value.ItemType, (int)partData.PartType, val.Key);
 			}
 			else if (val.Value.ItemType != ItemType.GenericItem && val.Value.ItemType != ItemType.MachineryPart && val.Value.ItemType != 0)
 			{
@@ -122,11 +122,11 @@ public static class SpawnManager
 		SpawnSerialization.AttachPointPriority priority = data.AttachPointPriority;
 		if (priority == SpawnSerialization.AttachPointPriority.Default)
 		{
-			priority = ((data.PartType != 0) ? SpawnSerialization.AttachPointPriority.MachineryPartSlot : ((data.Type == ItemType.PortableTurret) ? SpawnSerialization.AttachPointPriority.Active : ((data.GenericSubType != GenericItemSubType.BrokenArmature && data.GenericSubType != GenericItemSubType.BurnedPDU && data.GenericSubType != GenericItemSubType.DamagedTransmiter && data.GenericSubType != GenericItemSubType.FriedElectronics && data.GenericSubType != GenericItemSubType.RupturedInsulation && data.GenericSubType != GenericItemSubType.ShatteredPlating) ? SpawnSerialization.AttachPointPriority.Simple : SpawnSerialization.AttachPointPriority.Scrap)));
+			priority = data.PartType != 0 ? SpawnSerialization.AttachPointPriority.MachineryPartSlot : data.Type == ItemType.PortableTurret ? SpawnSerialization.AttachPointPriority.Active : data.GenericSubType != GenericItemSubType.BrokenArmature && data.GenericSubType != GenericItemSubType.BurnedPDU && data.GenericSubType != GenericItemSubType.DamagedTransmiter && data.GenericSubType != GenericItemSubType.FriedElectronics && data.GenericSubType != GenericItemSubType.RupturedInsulation && data.GenericSubType != GenericItemSubType.ShatteredPlating ? SpawnSerialization.AttachPointPriority.Simple : SpawnSerialization.AttachPointPriority.Scrap;
 		}
 		if (priority == SpawnSerialization.AttachPointPriority.Item || priority == SpawnSerialization.AttachPointPriority.TransportBox)
 		{
-			ItemSlot isl2 = Enumerable.OrderBy(keySelector: (priority != SpawnSerialization.AttachPointPriority.TransportBox) ? ((Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox)) : ((Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox)), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
+			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox) : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
 				.FirstOrDefault((ItemSlot m) => m.Item == null && m.CanFitItem(data.Type, data.GenericSubType, data.PartType));
 			if (isl2 != null)
 			{
@@ -239,9 +239,8 @@ public static class SpawnManager
 		}
 		DynamicObjectAuxData defAuxData = ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList[itemID].DefaultAuxData);
 		defAuxData.Tier = data.Tier;
-		if (defAuxData is JetpackData)
+		if (defAuxData is JetpackData dat2)
 		{
-			JetpackData dat2 = defAuxData as JetpackData;
 			dat2.OxygenCompartment.Resources[0].Quantity = 0f;
 			dat2.OxygenCompartment.Resources[0].SpawnSettings = null;
 			dat2.PropellantCompartment.Resources[0].Quantity = 0f;
@@ -257,11 +256,10 @@ public static class SpawnManager
 				}
 			}
 		}
-		else if (defAuxData is MagazineData)
+		else if (defAuxData is MagazineData dat8)
 		{
 			if (data.Count.HasValue)
 			{
-				MagazineData dat8 = defAuxData as MagazineData;
 				dat8.BulletCount = System.Math.Max(MathHelper.RandomRange(data.Count.Value.Min, data.Count.Value.Max), 0);
 				if (dat8.MaxBulletCount < dat8.BulletCount)
 				{
@@ -269,11 +267,10 @@ public static class SpawnManager
 				}
 			}
 		}
-		else if (defAuxData is BatteryData)
+		else if (defAuxData is BatteryData dat7)
 		{
 			if (data.Power.HasValue)
 			{
-				BatteryData dat7 = defAuxData as BatteryData;
 				dat7.CurrentPower = System.Math.Max(MathHelper.RandomRange(data.Power.Value.Min, data.Power.Value.Max), 0f);
 				if (dat7.MaxPower < dat7.CurrentPower)
 				{
@@ -281,11 +278,10 @@ public static class SpawnManager
 				}
 			}
 		}
-		else if (defAuxData is CanisterData)
+		else if (defAuxData is CanisterData dat6)
 		{
 			if (data.Cargo != null && data.Cargo.Count > 0)
 			{
-				CanisterData dat6 = defAuxData as CanisterData;
 				dat6.CargoCompartment.Resources = null;
 				foreach (LootItemData.CargoResourceData cargo2 in data.Cargo)
 				{
@@ -293,11 +289,10 @@ public static class SpawnManager
 				}
 			}
 		}
-		else if (defAuxData is RepairToolData)
+		else if (defAuxData is RepairToolData dat5)
 		{
 			if (data.Cargo != null && data.Cargo.Count > 0)
 			{
-				RepairToolData dat5 = defAuxData as RepairToolData;
 				dat5.FuelCompartment.Resources[0].Quantity = 0f;
 				dat5.FuelCompartment.Resources[0].SpawnSettings = null;
 				foreach (LootItemData.CargoResourceData cargo in data.Cargo)
@@ -306,26 +301,23 @@ public static class SpawnManager
 				}
 			}
 		}
-		else if (defAuxData is GlowStickData)
+		else if (defAuxData is GlowStickData dat4)
 		{
 			if (data.IsActive.HasValue)
 			{
-				GlowStickData dat4 = defAuxData as GlowStickData;
 				dat4.IsOn = data.IsActive.Value;
 			}
 		}
-		else if (defAuxData is PortableTurretData)
+		else if (defAuxData is PortableTurretData dat3)
 		{
 			if (data.IsActive.HasValue)
 			{
-				PortableTurretData dat3 = defAuxData as PortableTurretData;
 				dat3.IsActive = data.IsActive.Value;
-				dat3.Damage = (defAuxData as PortableTurretData).Damage;
+				dat3.Damage = dat3.Damage;
 			}
 		}
-		else if (defAuxData is GenericItemData && data.Look != null && data.Look.Count > 0)
+		else if (defAuxData is GenericItemData dat && data.Look != null && data.Look.Count > 0)
 		{
-			GenericItemData dat = defAuxData as GenericItemData;
 			dat.Look = data.Look[MathHelper.RandomRange(0, data.Look.Count)];
 		}
 		return defAuxData;
@@ -358,7 +350,7 @@ public static class SpawnManager
 		dynamicObjectSceneData.Position = Vector3D.Zero.ToFloatArray();
 		dynamicObjectSceneData.Forward = Vector3D.Forward.ToFloatArray();
 		dynamicObjectSceneData.Up = Vector3D.Up.ToFloatArray();
-		dynamicObjectSceneData.AttachPointInSceneId = ((ap is VesselAttachPoint) ? (ap as VesselAttachPoint).InSceneID : 0);
+		dynamicObjectSceneData.AttachPointInSceneId = ap is VesselAttachPoint attachPoint ? attachPoint.InSceneID : 0;
 		dynamicObjectSceneData.AuxData = auxData;
 		dynamicObjectSceneData.SpawnSettings = null;
 		DynamicObjectSceneData sceneData = dynamicObjectSceneData;
@@ -379,25 +371,25 @@ public static class SpawnManager
 				idmg.Armor = loot.Data.Armor.Value;
 			}
 		}
-		if (ap is VesselAttachPoint)
+		if (ap is VesselAttachPoint point)
 		{
 			AttachPointDetails attachPointDetails = new AttachPointDetails();
-			attachPointDetails.InSceneID = (ap as VesselAttachPoint).InSceneID;
+			attachPointDetails.InSceneID = point.InSceneID;
 			AttachPointDetails apd = attachPointDetails;
 			dobj.Item.SetAttachPoint(apd);
 			dobj.APDetails = apd;
-			if (dobj.Item is MachineryPart)
+			if (dobj.Item is MachineryPart part)
 			{
-				(dobj.Item as MachineryPart).WearMultiplier = 1f;
-				if (dobj.Item.AttachPointType == AttachPointType.MachineryPartSlot)
+				part.WearMultiplier = 1f;
+				if (part.AttachPointType == AttachPointType.MachineryPartSlot)
 				{
-					(ap as VesselAttachPoint).Vessel.FitMachineryPart(dobj.Item.AttachPointID, dobj.Item as MachineryPart);
+					point.Vessel.FitMachineryPart(part.AttachPointID, part);
 				}
 			}
 		}
-		else if (ap is ItemSlot)
+		else if (ap is ItemSlot slot)
 		{
-			(ap as ItemSlot).FitItem(dobj.Item);
+			slot.FitItem(dobj.Item);
 		}
 		if (!rule.IsOneTimeSpawnRule)
 		{
@@ -461,7 +453,7 @@ public static class SpawnManager
 	private static string ItemDataDebugString(LootItemData data)
 	{
 		string retVal = "";
-		retVal = ((data.Type == ItemType.GenericItem) ? (data.Type.ToString() + " - " + data.GenericSubType) : ((data.Type != ItemType.MachineryPart) ? data.Type.ToString() : (data.Type.ToString() + " - " + data.PartType)));
+		retVal = data.Type == ItemType.GenericItem ? data.Type.ToString() + " - " + data.GenericSubType : data.Type != ItemType.MachineryPart ? data.Type.ToString() : data.Type.ToString() + " - " + data.PartType;
 		if (data.Health.HasValue)
 		{
 			retVal = retVal + ", Health (" + data.Health.Value.Min + ", " + data.Health.Value.Max + ")";
@@ -583,10 +575,10 @@ public static class SpawnManager
 					{
 						foreach (SpawnRuleScene sp in sr.ScenePool)
 						{
-							PersistenceObjectDataSpawnManager.SpawnRuleScene p_srs = (spawnRuleSceneXRef[sp] = new PersistenceObjectDataSpawnManager.SpawnRuleScene
+							PersistenceObjectDataSpawnManager.SpawnRuleScene p_srs = spawnRuleSceneXRef[sp] = new PersistenceObjectDataSpawnManager.SpawnRuleScene
 							{
 								Vessels = new List<Tuple<long, int>>()
-							});
+							};
 							p_sr.ScenePool.Add(p_srs);
 						}
 					}
@@ -594,10 +586,10 @@ public static class SpawnManager
 					{
 						foreach (SpawnRuleLoot lp in sr.LootPool)
 						{
-							PersistenceObjectDataSpawnManager.SpawnRuleLoot p_srl = (spawnRuleLootXRef[lp] = new PersistenceObjectDataSpawnManager.SpawnRuleLoot
+							PersistenceObjectDataSpawnManager.SpawnRuleLoot p_srl = spawnRuleLootXRef[lp] = new PersistenceObjectDataSpawnManager.SpawnRuleLoot
 							{
 								DynamicObjects = new List<long>()
-							});
+							};
 							p_sr.LootPool.Add(p_srl);
 						}
 					}
@@ -733,10 +725,9 @@ public static class SpawnManager
 	public static void RemoveSpawnSystemObject(SpaceObject obj, bool checkChildren)
 	{
 		obj.IsPartOfSpawnSystem = false;
-		if (obj is DynamicObject && SpawnedDynamicObjects.ContainsKey(obj.GUID))
+		if (obj is DynamicObject dobj2 && SpawnedDynamicObjects.ContainsKey(dobj2.GUID))
 		{
-			DynamicObject dobj2 = obj as DynamicObject;
-			if (!SpawnedDynamicObjects[obj.GUID].Item1.RemoveDynamicObject(dobj2, SpawnedDynamicObjects[obj.GUID].Item2))
+			if (!SpawnedDynamicObjects[dobj2.GUID].Item1.RemoveDynamicObject(dobj2, SpawnedDynamicObjects[dobj2.GUID].Item2))
 			{
 				return;
 			}
@@ -750,15 +741,15 @@ public static class SpawnManager
 					}
 				}
 			}
-			SpawnedDynamicObjects.Remove(obj.GUID);
+			SpawnedDynamicObjects.Remove(dobj2.GUID);
 		}
 		else
 		{
-			if (!(obj is SpaceObjectVessel) || !SpawnedVessels.ContainsKey(obj.GUID))
+			if (!(obj is SpaceObjectVessel ves) || !SpawnedVessels.ContainsKey(ves.GUID))
 			{
 				return;
 			}
-			SpaceObjectVessel ves = obj as SpaceObjectVessel;
+
 			SpawnRule sr = SpawnedVessels[ves.GUID].Item1;
 			if (sr.LocationType == SpawnRuleLocationType.Station && sr.DoNotRemoveVesselsFromSpawnSystem)
 			{
@@ -782,7 +773,7 @@ public static class SpawnManager
 			{
 				sr.RemoveSpaceObjectVessel(ves, SpawnedVessels[ves.GUID].Item2, SpawnedVessels[ves.GUID].Item3);
 			}
-			SpawnedVessels.Remove(obj.GUID);
+			SpawnedVessels.Remove(ves.GUID);
 		}
 	}
 

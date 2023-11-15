@@ -1,5 +1,4 @@
 using OpenHellion.IO;
-using OpenHellion.Networking.Message;
 using ProtoBuf;
 
 namespace ZeroGravity.Network;
@@ -59,7 +58,6 @@ namespace ZeroGravity.Network;
 [ProtoInclude(326, typeof(RefineResourceMessage))]
 [ProtoInclude(327, typeof(ShipCollisionMessage))]
 [ProtoInclude(328, typeof(ResetBaseBuilding))]
-[ProtoInclude(329, typeof(SaveGameMessage))]
 [ProtoInclude(330, typeof(VoiceCommDataMessage))]
 [ProtoInclude(332, typeof(ServerShutDownMessage))]
 [ProtoInclude(333, typeof(LatencyTestMessage))]

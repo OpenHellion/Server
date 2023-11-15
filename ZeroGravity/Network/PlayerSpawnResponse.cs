@@ -19,7 +19,7 @@ public class PlayerSpawnResponse : NetworkData
 
 	public long MainVesselID;
 
-	public List<GameScenes.SceneID> Scenes;
+	public List<GameScenes.SceneId> Scenes;
 
 	public VesselData VesselData;
 

@@ -12,17 +12,17 @@ public static class MathHelper
 
 	public static int Clamp(int value, int min, int max)
 	{
-		return (value < min) ? min : ((value > max) ? max : value);
+		return value < min ? min : value > max ? max : value;
 	}
 
 	public static float Clamp(float value, float min, float max)
 	{
-		return (value < min) ? min : ((value > max) ? max : value);
+		return value < min ? min : value > max ? max : value;
 	}
 
 	public static double Clamp(double value, double min, double max)
 	{
-		return (value < min) ? min : ((value > max) ? max : value);
+		return value < min ? min : value > max ? max : value;
 	}
 
 	public static float Lerp(float value1, float value2, float amount)
@@ -39,7 +39,7 @@ public static class MathHelper
 	{
 		if (fromVelocity != toVelocity)
 		{
-			fromVelocity = ((!(fromVelocity < toVelocity)) ? System.Math.Max(fromVelocity + (toVelocity - fromVelocity) * Clamp(lerpAmount, 0f, 1f), toVelocity) : System.Math.Min(fromVelocity + (toVelocity - fromVelocity) * Clamp(lerpAmount, 0f, 1f), toVelocity));
+			fromVelocity = !(fromVelocity < toVelocity) ? System.Math.Max(fromVelocity + (toVelocity - fromVelocity) * Clamp(lerpAmount, 0f, 1f), toVelocity) : System.Math.Min(fromVelocity + (toVelocity - fromVelocity) * Clamp(lerpAmount, 0f, 1f), toVelocity);
 			if (System.Math.Abs(toVelocity - fromVelocity) < epsilon)
 			{
 				fromVelocity = toVelocity;
@@ -94,7 +94,7 @@ public static class MathHelper
 
 	public static float SetEpsilonZero(float value, float epsilon = float.Epsilon)
 	{
-		return (System.Math.Abs(value) > epsilon) ? value : 0f;
+		return System.Math.Abs(value) > epsilon ? value : 0f;
 	}
 
 	public static long LongRandom(long min, long max, Random rand)

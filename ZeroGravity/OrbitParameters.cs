@@ -14,13 +14,13 @@ public class OrbitParameters
 
 	public const double MaxObjectDistance = 897587224200.0;
 
-	private double mass = 0.0;
+	private double mass;
 
-	private double radius = 0.0;
+	private double radius;
 
 	private double rotationPeriod = 86400.0;
 
-	private double gravParameter = 0.0;
+	private double gravParameter;
 
 	private double gravityInfluenceRadius;
 
@@ -28,15 +28,15 @@ public class OrbitParameters
 
 	private OrbitParameters parent;
 
-	private CelestialBody celestialBodyObj = null;
+	private CelestialBody celestialBodyObj;
 
-	private ArtificialBody artificialBodyObj = null;
+	private ArtificialBody artificialBodyObj;
 
-	private double eccentricity = 0.0;
+	private double eccentricity;
 
-	private double semiMajorAxis = 0.0;
+	private double semiMajorAxis;
 
-	private double semiMinorAxis = 0.0;
+	private double semiMinorAxis;
 
 	private double inclination;
 
@@ -56,17 +56,16 @@ public class OrbitParameters
 
 	private Vector3D _RelativeVelocity = Vector3D.Zero;
 
-	private double lastValidTrueAnomaly = 0.0;
+	private double lastValidTrueAnomaly;
 
-	private double lastValidTimeSincePeriapsis = 0.0;
+	private double lastValidTimeSincePeriapsis;
 
 	public Vector3D RelativePosition
 	{
 		get
 		{
-			if (artificialBodyObj is SpaceObjectVessel)
+			if (artificialBodyObj is SpaceObjectVessel vessel)
 			{
-				SpaceObjectVessel vessel = artificialBodyObj as SpaceObjectVessel;
 				if (!vessel.IsMainVessel)
 				{
 					return vessel.MainVessel.Orbit.RelativePosition + QuaternionD.LookRotation(vessel.MainVessel.Forward, vessel.MainVessel.Up) * (vessel.RelativePositionFromMainParent - vessel.MainVessel.VesselData.CollidersCenterOffset.ToVector3D());
@@ -84,9 +83,8 @@ public class OrbitParameters
 	{
 		get
 		{
-			if (artificialBodyObj is SpaceObjectVessel)
+			if (artificialBodyObj is SpaceObjectVessel vessel)
 			{
-				SpaceObjectVessel vessel = artificialBodyObj as SpaceObjectVessel;
 				if (!vessel.IsMainVessel)
 				{
 					return vessel.MainVessel.Orbit.RelativeVelocity;
@@ -100,9 +98,9 @@ public class OrbitParameters
 		}
 	}
 
-	public Vector3D Position => (parent != null) ? (parent.Position + RelativePosition) : RelativePosition;
+	public Vector3D Position => parent != null ? parent.Position + RelativePosition : RelativePosition;
 
-	public Vector3D Velocity => (parent != null) ? (parent.Velocity + RelativeVelocity) : RelativeVelocity;
+	public Vector3D Velocity => parent != null ? parent.Velocity + RelativeVelocity : RelativeVelocity;
 
 	public double OrbitalPeriod => orbitalPeriod;
 
@@ -495,7 +493,7 @@ public class OrbitParameters
 		double eccentricAnomaly;
 		if (!(o.eccentricity < 1.0))
 		{
-			eccentricAnomaly = ((System.Math.Abs(o.eccentricity * taCos + 1.0) >= 1E-05) ? ((!(o.eccentricity * taCos >= -1.0)) ? double.NaN : MathHelper.Acosh((o.eccentricity + taCos) / (1.0 + o.eccentricity * taCos))) : ((!(trueAnomaly >= System.Math.PI)) ? double.PositiveInfinity : double.NegativeInfinity));
+			eccentricAnomaly = System.Math.Abs(o.eccentricity * taCos + 1.0) >= 1E-05 ? !(o.eccentricity * taCos >= -1.0) ? double.NaN : MathHelper.Acosh((o.eccentricity + taCos) / (1.0 + o.eccentricity * taCos)) : !(trueAnomaly >= System.Math.PI) ? double.PositiveInfinity : double.NegativeInfinity;
 		}
 		else
 		{
@@ -523,7 +521,7 @@ public class OrbitParameters
 		}
 		else if (!double.IsInfinity(eccentricAnomaly))
 		{
-			meanAnomaly = (o.eccentricity * System.Math.Sinh(eccentricAnomaly) - eccentricAnomaly) * ((trueAnomaly >= System.Math.PI) ? (-1.0) : 1.0);
+			meanAnomaly = (o.eccentricity * System.Math.Sinh(eccentricAnomaly) - eccentricAnomaly) * (trueAnomaly >= System.Math.PI ? -1.0 : 1.0);
 		}
 		return meanAnomaly;
 	}
@@ -992,6 +990,6 @@ public class OrbitParameters
 
 	public string DebugString()
 	{
-		return $"P {((parent != null) ? parent.GUID : (-1))}, ECC {eccentricity}, SMA {semiMajorAxis}, INC {inclination}, AOP {argumentOfPeriapsis}, LOAN {longitudeOfAscendingNode}, SSTAP {solarSystemTimeAtPeriapsis}, TSP {timeSincePeriapsis}";
+		return $"P {(parent != null ? parent.GUID : -1)}, ECC {eccentricity}, SMA {semiMajorAxis}, INC {inclination}, AOP {argumentOfPeriapsis}, LOAN {longitudeOfAscendingNode}, SSTAP {solarSystemTimeAtPeriapsis}, TSP {timeSincePeriapsis}";
 	}
 }

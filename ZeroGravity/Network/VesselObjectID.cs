@@ -26,11 +26,11 @@ public class VesselObjectID
 
 	public override bool Equals(object obj)
 	{
-		if (obj == null || !(obj is VesselObjectID))
+		if (obj == null || !(obj is VesselObjectID other))
 		{
 			return false;
 		}
-		VesselObjectID other = obj as VesselObjectID;
+
 		return VesselGUID == other.VesselGUID && InSceneID == other.InSceneID;
 	}
 

@@ -47,8 +47,8 @@ public class VesselDockingPort : IPersistantObject
 		List<ExecuterMergeDetails> retVal = new List<ExecuterMergeDetails>();
 		foreach (SceneTriggerExecuter exec in parentPort.MergeExecuters.Keys)
 		{
-			SceneTriggerExecuter parent = ((exec.Child != null) ? exec : exec.Parent);
-			SceneTriggerExecuter child = ((exec.Parent != null) ? exec : exec.Child);
+			SceneTriggerExecuter parent = exec.Child != null ? exec : exec.Parent;
+			SceneTriggerExecuter child = exec.Parent != null ? exec : exec.Child;
 			if (parent != null && child != null)
 			{
 				retVal.Add(new ExecuterMergeDetails
@@ -99,7 +99,7 @@ public class VesselDockingPort : IPersistantObject
 			DockingStatus = DockingStatus,
 			RelativePosition = ParentVessel.RelativePositionFromParent.ToFloatArray(),
 			RelativeRotation = ParentVessel.RelativeRotationFromParent.ToFloatArray(),
-			CollidersCenterOffset = (ParentVessel.IsDocked ? ParentVessel.DockedToMainVessel.VesselData.CollidersCenterOffset : ParentVessel.VesselData.CollidersCenterOffset),
+			CollidersCenterOffset = ParentVessel.IsDocked ? ParentVessel.DockedToMainVessel.VesselData.CollidersCenterOffset : ParentVessel.VesselData.CollidersCenterOffset,
 			ExecutersMerge = GetMergedExecuters(null),
 			PairedDoors = ParentVessel.GetPairedDoors(this)
 		};

@@ -50,7 +50,7 @@ internal class GSConnection
 			OnDisconnected = OnDisconnected,
 			SendQueueLimit = 1000,
 			ReceiveQueueLimit = 1000
-#if DEBUG || HELLION_SP
+#if DEBUG
 			,SendTimeout = 0
 			,ReceiveTimeout = 0
 #endif
@@ -200,14 +200,6 @@ internal class GSConnection
 	private void OnConnected(int connectionId)
 	{
 		string ipAddress = m_Server.GetClientAddress(connectionId);
-#if HELLION_SP
-		if (!ipAddress.Contains("127.0.0.1"))
-		{
-			Dbg.Error("Non-local client with ip", ipAddress, "tried to connect to server.");
-			m_Server.Disconnect(connectionId);
-			return;
-		}
-#endif
 
 		Dbg.Log("Client connected", connectionId, ipAddress);
 

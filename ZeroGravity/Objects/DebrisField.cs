@@ -73,7 +73,7 @@ public class DebrisField
 
 	public OrbitParameters Orbit;
 
-	public List<GameScenes.SceneID> LargeFragmentsScenes = new List<GameScenes.SceneID>();
+	public List<GameScenes.SceneId> LargeFragmentsScenes = new List<GameScenes.SceneId>();
 
 	private double radiusSq;
 
@@ -99,7 +99,7 @@ public class DebrisField
 			string[] largeFragmentsScenes = data.LargeFragmentsScenes;
 			foreach (string s in largeFragmentsScenes)
 			{
-				if (Enum.TryParse<GameScenes.SceneID>(s, out var SceneId))
+				if (Enum.TryParse<GameScenes.SceneId>(s, out var SceneId))
 				{
 					LargeFragmentsScenes.Add(SceneId);
 				}
@@ -150,9 +150,9 @@ public class DebrisField
 			if ((posOnOrbit - relPos).SqrMagnitude <= radiusSq)
 			{
 				ab.IsInDebrisField = true;
-				if ((double)Data.DamageVesselChance >= MathHelper.RandomNextDouble() && ab is SpaceObjectVessel)
+				if ((double)Data.DamageVesselChance >= MathHelper.RandomNextDouble() && ab is SpaceObjectVessel vessel)
 				{
-					damageVessel.Add(ab as SpaceObjectVessel);
+					damageVessel.Add(vessel);
 				}
 				if (!((double)Data.LargeFragmentsSpawnChance >= MathHelper.RandomNextDouble()))
 				{
@@ -160,12 +160,11 @@ public class DebrisField
 				}
 				Vector3D velocityDirection = Orbit.VelocityAtEccentricAnomaly(Vector3D.Angle(planeRot * Vector3D.Forward, proj.Normalized) * (System.Math.PI / 180.0), getRelativePosition: false).Normalized;
 				Vector3D offset = -velocityDirection * Data.LargeFragmentsSpawnDistance;
-				if (ab is Pivot)
+				if (ab is Pivot pivot)
 				{
-					Pivot pivot = ab as Pivot;
-					if (pivot.Child is Player)
+					if (pivot.Child is Player player)
 					{
-						offset += (pivot.Child as Player).LocalPosition;
+						offset += player.LocalPosition;
 						SpawnQueue.Enqueue((Action)delegate
 						{
 							SpawnFragment(ab, velocityDirection, offset);
@@ -174,11 +173,11 @@ public class DebrisField
 				}
 				else
 				{
-					if (!(ab is SpaceObjectVessel) || Server.Instance.AllPlayers.Count((Player m) => m.Parent is SpaceObjectVessel && (m.Parent as SpaceObjectVessel).MainVessel == (ab as SpaceObjectVessel).MainVessel && m.IsAlive && Server.Instance.SolarSystem.CurrentTime - m.LastMovementMessageSolarSystemTime < 10.0) <= 0)
+					if (!(ab is SpaceObjectVessel objectVessel) || Server.Instance.AllPlayers.Count((Player m) => m.Parent is SpaceObjectVessel spaceObjectVessel && spaceObjectVessel.MainVessel == (ab as SpaceObjectVessel).MainVessel && m.IsAlive && Server.Instance.SolarSystem.CurrentTime - m.LastMovementMessageSolarSystemTime < 10.0) <= 0)
 					{
 						continue;
 					}
-					SpaceObjectVessel ves = (ab as SpaceObjectVessel).MainVessel;
+					SpaceObjectVessel ves = objectVessel.MainVessel;
 					if (ves.AllDockedVessels.Count > 0 && MathHelper.RandomRange(0, ves.AllDockedVessels.Count + 1) > 0)
 					{
 						ves = ves.AllDockedVessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).First();
@@ -209,7 +208,7 @@ public class DebrisField
 
 	private void SpawnFragment(ArtificialBody ab, Vector3D velocityDirection, Vector3D offset)
 	{
-		Ship ship = Ship.CreateNewShip(LargeFragmentsScenes.OrderBy((GameScenes.SceneID m) => MathHelper.RandomNextDouble()).FirstOrDefault(), "", -1L, new List<long> { ab.GUID }, null, offset, null, null, Data.LargeFragmentsTag, checkPosition: false, 0.03, 0.3, null, 1.5, 100.0, MathHelper.RandomRange(Data.LargeFragmentsHealth.Min, Data.LargeFragmentsHealth.Max), isDebrisFragment: true);
+		Ship ship = Ship.CreateNewShip(LargeFragmentsScenes.OrderBy((GameScenes.SceneId m) => MathHelper.RandomNextDouble()).FirstOrDefault(), "", -1L, new List<long> { ab.GUID }, null, offset, null, null, Data.LargeFragmentsTag, checkPosition: false, 0.03, 0.3, null, 1.5, 100.0, MathHelper.RandomRange(Data.LargeFragmentsHealth.Min, Data.LargeFragmentsHealth.Max), isDebrisFragment: true);
 		float ttl = MathHelper.RandomRange(Data.LargeFragmentsTimeToLive.Min, Data.LargeFragmentsTimeToLive.Max);
 		ship.Health = ship.MaxHealth;
 		foreach (VesselRepairPoint vrp in ship.RepairPoints)

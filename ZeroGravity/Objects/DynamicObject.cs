@@ -17,9 +17,9 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public ItemType ItemType;
 
-	private Player MasterPlayer = null;
+	private Player MasterPlayer;
 
-	private long _MasterClientID = 0L;
+	private long _MasterClientID;
 
 	private DateTime lastSenderTime;
 
@@ -35,15 +35,15 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	private DateTime lastPivotResetTime = DateTime.UtcNow;
 
-	private SpaceObject _Parent = null;
+	private SpaceObject _Parent;
 
-	private bool pickedUp = false;
+	private bool pickedUp;
 
 	public DynamicObjectSceneData DynamicObjectSceneData;
 
 	public AttachPointDetails APDetails;
 
-	public Item Item = null;
+	public Item Item;
 
 	public float RespawnTime = -1f;
 
@@ -76,7 +76,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public bool IsAttached => Item != null && (Item.Slot != null || Item.AttachPointType != 0 || Parent is DynamicObject);
 
-	public short InvSlotID => (short)((Item != null && Item.Slot != null) ? Item.Slot.SlotID : (-1111));
+	public short InvSlotID => (short)(Item != null && Item.Slot != null ? Item.Slot.SlotID : -1111);
 
 	public bool StatsChanged { get; set; }
 
@@ -160,7 +160,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					MaxHealth = SpawnMaxHealth,
 					MinHealth = SpawnMinHealth,
 					WearMultiplier = SpawnWearMultiplier,
-					APDetails = APDetails
+					ApDetails = APDetails
 				});
 			}
 			if (IsPartOfSpawnSystem)
@@ -171,7 +171,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	}
 
 	public DynamicObject(DynamicObjectSceneData dosd, SpaceObject parent, long guid = -1L, bool ignoreSpawnSettings = false)
-		: base((guid == -1) ? GUIDFactory.NextObjectGUID() : guid, dosd.Position.ToVector3D(), QuaternionD.LookRotation(dosd.Forward.ToVector3D(), dosd.Up.ToVector3D()))
+		: base(guid == -1 ? GUIDFactory.NextObjectGUID() : guid, dosd.Position.ToVector3D(), QuaternionD.LookRotation(dosd.Forward.ToVector3D(), dosd.Up.ToVector3D()))
 	{
 		DynamicObjectSceneData = ObjectCopier.DeepCopy(dosd);
 		if (ignoreSpawnSettings)
@@ -183,9 +183,8 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		ItemType = StaticData.DynamicObjectsDataList[ItemID].ItemType;
 		Parent = parent;
 		Item = Item.Create(this, ItemType, DynamicObjectSceneData.AuxData);
-		if (Item is ICargo)
+		if (Item is ICargo cargoItem)
 		{
-			ICargo cargoItem = Item as ICargo;
 			if (cargoItem.Compartments != null && !ignoreSpawnSettings)
 			{
 				foreach (CargoCompartmentData ccd in cargoItem.Compartments.Where((CargoCompartmentData m) => m.Resources != null))
@@ -286,7 +285,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	private string GetUnknownAttachMessage(DynamicObjectAttachData data)
 	{
 		DynamicObjectAttachData curr = GetCurrAttachData();
-		return string.Format("Current: {0}, {1}, {10}, {2}, {3}, {4}\r\nNew: {5}, {6}, {7}, {8}, {9}", curr.ParentGUID, curr.ParentType, curr.IsAttached, curr.InventorySlotID, (curr.APDetails != null) ? curr.APDetails.InSceneID : 0, data.ParentGUID, data.ParentType, data.IsAttached, data.InventorySlotID, (data.APDetails != null) ? data.APDetails.InSceneID : 0, (Parent != null && Parent is Ship) ? (Parent as Ship).SceneID : GameScenes.SceneID.None);
+		return string.Format("Current: {0}, {1}, {10}, {2}, {3}, {4}\r\nNew: {5}, {6}, {7}, {8}, {9}", curr.ParentGUID, curr.ParentType, curr.IsAttached, curr.InventorySlotID, curr.APDetails != null ? curr.APDetails.InSceneID : 0, data.ParentGUID, data.ParentType, data.IsAttached, data.InventorySlotID, data.APDetails != null ? data.APDetails.InSceneID : 0, Parent != null && Parent is Ship ? (Parent as Ship).SceneID : GameScenes.SceneId.None);
 	}
 
 	private bool CanBePickedUp(Player player, DynamicObject parentDObj)
@@ -401,9 +400,9 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 							{
 								Item.SetAttachPoint(dosm.AttachData.APDetails);
 							}
-							if (Item != null && Item.AttachPointType != 0 && Item is MachineryPart && Item.AttachPointType == AttachPointType.MachineryPartSlot)
+							if (Item != null && Item.AttachPointType != 0 && Item is MachineryPart part && part.AttachPointType == AttachPointType.MachineryPartSlot)
 							{
-								(newParent as SpaceObjectVessel).FitMachineryPart(Item.AttachPointID, Item as MachineryPart);
+								(newParent as SpaceObjectVessel).FitMachineryPart(part.AttachPointID, part);
 							}
 						}
 						else
@@ -416,9 +415,9 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					else if (dosm.AttachData.ParentType == SpaceObjectType.PlayerPivot || dosm.AttachData.ParentType == SpaceObjectType.CorpsePivot || dosm.AttachData.ParentType == SpaceObjectType.DynamicObjectPivot)
 					{
 						ArtificialBody refObject = SpaceObject.GetParent<ArtificialBody>(oldParent);
-						if (refObject is SpaceObjectVessel)
+						if (refObject is SpaceObjectVessel vessel)
 						{
-							refObject = (refObject as SpaceObjectVessel).MainVessel;
+							refObject = vessel.MainVessel;
 						}
 						newParent = new Pivot(this, refObject);
 						removeFromOldParent.RunSynchronously();
@@ -533,17 +532,17 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	public DynamicObjectAttachData GetCurrAttachData()
 	{
 		DynamicObjectAttachData dynamicObjectAttachData = new DynamicObjectAttachData();
-		dynamicObjectAttachData.ParentGUID = ((Parent is Player) ? (Parent as Player).FakeGuid : Parent.GUID);
+		dynamicObjectAttachData.ParentGUID = Parent is Player ? (Parent as Player).FakeGuid : Parent.GUID;
 		dynamicObjectAttachData.ParentType = Parent.ObjectType;
 		dynamicObjectAttachData.IsAttached = IsAttached;
-		dynamicObjectAttachData.ItemSlotID = (short)((Item != null) ? Item.ItemSlotID : 0);
+		dynamicObjectAttachData.ItemSlotID = (short)(Item != null ? Item.ItemSlotID : 0);
 		dynamicObjectAttachData.InventorySlotID = InvSlotID;
-		dynamicObjectAttachData.APDetails = ((Item == null || Item.AttachPointID == null) ? null : new AttachPointDetails
+		dynamicObjectAttachData.APDetails = Item == null || Item.AttachPointID == null ? null : new AttachPointDetails
 		{
 			InSceneID = Item.AttachPointID.InSceneID
-		});
-		dynamicObjectAttachData.LocalPosition = (IsAttached ? null : LocalPosition.ToFloatArray());
-		dynamicObjectAttachData.LocalRotation = (IsAttached ? null : LocalRotation.ToFloatArray());
+		};
+		dynamicObjectAttachData.LocalPosition = IsAttached ? null : LocalPosition.ToFloatArray();
+		dynamicObjectAttachData.LocalRotation = IsAttached ? null : LocalRotation.ToFloatArray();
 		return dynamicObjectAttachData;
 	}
 
@@ -655,7 +654,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		data.ChildObjects = new List<PersistenceObjectData>();
 		foreach (DynamicObject dobj in DynamicObjects.Values)
 		{
-			data.ChildObjects.Add((dobj.Item != null) ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData());
+			data.ChildObjects.Add(dobj.Item != null ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData());
 		}
 	}
 
@@ -705,7 +704,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	public static bool SpawnDynamicObject(ItemType itemType, GenericItemSubType subType, MachineryPartType mpType, SpaceObject parent, int apId = -1, Vector3D? position = null, Vector3D? forward = null, Vector3D? up = null, int tier = 1, InventorySlot inventorySlot = null, ItemSlot itemSlot = null, bool refill = false)
 	{
 		DynamicObjectData dod = null;
-		dod = ((itemType == ItemType.GenericItem) ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is GenericItemData && (m.DefaultAuxData as GenericItemData).SubType == subType).First()) : ((itemType != ItemType.MachineryPart) ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType).First()) : ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is MachineryPartData && (m.DefaultAuxData as MachineryPartData).PartType == mpType).First())));
+		dod = itemType == ItemType.GenericItem ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is GenericItemData data && data.SubType == subType).First()) : itemType != ItemType.MachineryPart ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType).First()) : ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is MachineryPartData data && data.PartType == mpType).First());
 		if (dod == null)
 		{
 			return false;
@@ -718,9 +717,9 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		DynamicObjectSceneData sceneData = new DynamicObjectSceneData
 		{
 			ItemID = data.ItemID,
-			Position = (position.HasValue ? position.Value.ToFloatArray() : Vector3D.Zero.ToFloatArray()),
-			Forward = (forward.HasValue ? forward.Value.ToFloatArray() : Vector3D.Forward.ToFloatArray()),
-			Up = (up.HasValue ? up.Value.ToFloatArray() : Vector3D.Up.ToFloatArray()),
+			Position = position.HasValue ? position.Value.ToFloatArray() : Vector3D.Zero.ToFloatArray(),
+			Forward = forward.HasValue ? forward.Value.ToFloatArray() : Vector3D.Forward.ToFloatArray(),
+			Up = up.HasValue ? up.Value.ToFloatArray() : Vector3D.Up.ToFloatArray(),
 			AttachPointInSceneId = apId,
 			AuxData = ObjectCopier.DeepCopy(data.DefaultAuxData)
 		};
@@ -752,10 +751,10 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			{
 				inventorySlot.Inventory.AddItemToInventory(dobj.Item, inventorySlot.SlotID);
 			}
-			else if (parent is Pivot)
+			else if (parent is Pivot pivot)
 			{
-				dobj.velocity = (parent as Pivot).Child.Velocity;
-				parent = new Pivot(dobj, parent as ArtificialBody);
+				dobj.velocity = pivot.Child.Velocity;
+				parent = new Pivot(dobj, pivot);
 				dobj.Parent = parent;
 			}
 		}
@@ -763,15 +762,15 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			itemSlot?.FitItem(dobj.Item);
 		}
-		if (refill && dobj.Item is ICargo)
+		if (refill && dobj.Item is ICargo cargo)
 		{
-			foreach (CargoCompartmentData ccd in (dobj.Item as ICargo).Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
+			foreach (CargoCompartmentData ccd in cargo.Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
 			{
 				using List<CargoResourceData>.Enumerator enumerator2 = ccd.Resources.GetEnumerator();
 				if (enumerator2.MoveNext())
 				{
 					CargoResourceData r = enumerator2.Current;
-					(dobj.Item as ICargo).ChangeQuantityBy(ccd.ID, r.ResourceType, ccd.Capacity);
+					cargo.ChangeQuantityBy(ccd.ID, r.ResourceType, ccd.Capacity);
 				}
 			}
 		}

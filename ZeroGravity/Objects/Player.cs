@@ -17,11 +17,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public List<long> UpdateArtificialBodyMovement = new List<long>();
 
-	public bool IsAlive = false;
+	public bool IsAlive;
 
-	private bool _EnvironmentReady = false;
+	private bool _EnvironmentReady;
 
-	private bool _PlayerReady = false;
+	private bool _PlayerReady;
 
 	public string Name;
 
@@ -65,7 +65,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	private sbyte[] jetpackDirection;
 
-	public CharacterTransformData TransformData = null;
+	public CharacterTransformData TransformData;
 
 	public const float NoAirMaxDamage = 1f;
 
@@ -81,15 +81,15 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	private Vector3D pivotVelocityCorrection = Vector3D.Zero;
 
-	private Vector3D? dockUndockPositionCorrection = null;
+	private Vector3D? dockUndockPositionCorrection;
 
-	private QuaternionD? dockUndockRotationCorrection = null;
+	private QuaternionD? dockUndockRotationCorrection;
 
-	private bool dockUndockWaitForMsg = false;
+	private bool dockUndockWaitForMsg;
 
 	public bool IsAdmin = false;
 
-	private SpaceObject _Parent = null;
+	private SpaceObject _Parent;
 
 	public Room CurrentRoom;
 
@@ -109,7 +109,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public ConcurrentQueue<ShipStatsMessage> MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 
-	private PlayerStatsMessage lastPlayerStatsMessage = null;
+	private PlayerStatsMessage lastPlayerStatsMessage;
 
 	public VesselObjectID LockedToTriggerID;
 
@@ -117,7 +117,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public List<ItemCompoundType> Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
 
-	public NavigationMapDetails NavMapDetails = null;
+	public NavigationMapDetails NavMapDetails;
 
 	public bool Initialize = true;
 
@@ -221,14 +221,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		set
 		{
-			if (_Parent != null && _Parent is SpaceObjectVessel)
+			if (_Parent != null && _Parent is SpaceObjectVessel vessel)
 			{
-				((SpaceObjectVessel)_Parent).RemovePlayerFromCrew(this);
+				vessel.RemovePlayerFromCrew(this);
 			}
 			_Parent = value;
-			if (_Parent != null && _Parent is SpaceObjectVessel)
+			if (_Parent != null && _Parent is SpaceObjectVessel objectVessel)
 			{
-				((SpaceObjectVessel)_Parent).AddPlayerToCrew(this);
+				objectVessel.AddPlayerToCrew(this);
 			}
 		}
 	}
@@ -442,10 +442,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		SpaceObject sp = Server.Instance.GetObject(psm.HitGUID);
 		float damage = 0f;
-		damage = ((wep == null) ? (psm.ShotData.IsMeleeAttack ? 30f : 0f) : (psm.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage));
-		if (sp is DynamicObject)
+		damage = wep == null ? psm.ShotData.IsMeleeAttack ? 30f : 0f : psm.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage;
+		if (sp is DynamicObject dynamicObject)
 		{
-			(sp as DynamicObject).Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
+			dynamicObject.Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
 			{
 				TypeOfDamage.Hit,
 				damage
@@ -863,7 +863,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		else if (Parent is Pivot && pivotPositionCorrection.IsEpsilonZero() && Server.Instance.RunTime.TotalSeconds - lastPivotResetTime > 1.0)
 		{
 			Pivot pivot = Parent as Pivot;
-			SpaceObjectVessel nearestVessel = ((mm.NearestVesselGUID > 0) ? Server.Instance.GetVessel(mm.NearestVesselGUID) : null);
+			SpaceObjectVessel nearestVessel = mm.NearestVesselGUID > 0 ? Server.Instance.GetVessel(mm.NearestVesselGUID) : null;
 			SpaceObjectVessel refVessel = nearestVessel.MainVessel;
 			if (refVessel.StabilizeToTargetObj != null)
 			{
@@ -909,7 +909,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		float suffocateDamage = 0f;
 		float pressureDamage = 0f;
-		float exposureDamage = ((!(Parent is Ship)) ? (StaticData.GetPlayerExposureDamage(Parent.Position.Magnitude) * (float)deltaTime) : 0f);
+		float exposureDamage = !(Parent is Ship) ? StaticData.GetPlayerExposureDamage(Parent.Position.Magnitude) * (float)deltaTime : 0f;
 		if (!IsInsideSpawnPoint)
 		{
 			if (CurrentHelmet != null && (!CurrentHelmet.IsVisorToggleable || CurrentHelmet.IsVisorActive))
@@ -1021,11 +1021,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public void SubscribeTo(SpaceObject spaceObject)
 	{
 		subscribedToSpaceObjects.Add(spaceObject.GUID);
-		if (!(spaceObject is SpaceObjectVessel))
+		if (!(spaceObject is SpaceObjectVessel ves))
 		{
 			return;
 		}
-		SpaceObjectVessel ves = spaceObject as SpaceObjectVessel;
+
 		if (ves.IsDocked)
 		{
 			subscribedToSpaceObjects.Add(ves.DockedToMainVessel.GUID);
@@ -1182,8 +1182,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			HeadType = HeadType,
 			HairType = HairType,
 			PlayerId = PlayerId,
-			ParentID = (Parent != null) ? Parent.GUID : (-1),
-			ParentType = (Parent != null) ? Parent.ObjectType : SpaceObjectType.None,
+			ParentID = Parent != null ? Parent.GUID : -1,
+			ParentType = Parent != null ? Parent.ObjectType : SpaceObjectType.None,
 			DynamicObjects = dods,
 			AnimationStatsMask = AnimationStatsMask,
 			LockedToTriggerID = LockedToTriggerID
@@ -1215,9 +1215,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 		{
-			if (ves is Ship)
+			if (ves is Ship ship)
 			{
-				(ves as Ship).ResetSpawnPointsForPlayer(this, sendStatsMessage: true);
+				ship.ResetSpawnPointsForPlayer(this, sendStatsMessage: true);
 			}
 		}
 		Server.Instance.Remove(this);
@@ -1457,13 +1457,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		DynamicObject outfitItem = DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.Slot != null && m.Item.Slot.SlotID == -2);
 		if (outfitItem != null)
 		{
-			data.ChildObjects.Add((outfitItem.Item != null) ? outfitItem.Item.GetPersistenceData() : outfitItem.GetPersistenceData());
+			data.ChildObjects.Add(outfitItem.Item != null ? outfitItem.Item.GetPersistenceData() : outfitItem.GetPersistenceData());
 		}
 		foreach (DynamicObject dobj in DynamicObjects.Values)
 		{
 			if (dobj != outfitItem)
 			{
-				data.ChildObjects.Add((dobj.Item != null) ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData());
+				data.ChildObjects.Add(dobj.Item != null ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData());
 			}
 		}
 		data.Quests = Quests.Select((Quest m) => m.GetDetails()).ToList();
@@ -1476,13 +1476,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		try
 		{
-			if (persistenceData is not PersistenceObjectDataPlayer)
+			if (persistenceData is not PersistenceObjectDataPlayer data)
 			{
 				Dbg.Warning("PersistenceObjectDataPlayer data is null", GUID);
 				return;
 			}
 
-			PersistenceObjectDataPlayer data = persistenceData as PersistenceObjectDataPlayer;
 			GUID = data.GUID;
 			FakeGuid = data.FakeGUID;
 			LocalPosition = data.LocalPosition.ToVector3D();

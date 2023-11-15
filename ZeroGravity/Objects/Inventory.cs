@@ -106,7 +106,7 @@ public class Inventory
 					sl2.Item.DynamicObj.Parent = parentPlayer;
 				}
 			}
-			CurrOutfit.ExternalTemperature = (parentPlayer.AmbientTemperature.HasValue ? parentPlayer.AmbientTemperature.Value : parentPlayer.CoreTemperature);
+			CurrOutfit.ExternalTemperature = parentPlayer.AmbientTemperature.HasValue ? parentPlayer.AmbientTemperature.Value : parentPlayer.CoreTemperature;
 			CurrOutfit.InternalTemperature = parentPlayer.CoreTemperature;
 		}
 		foreach (InventorySlot sl in CurrOutfit.InventorySlots.Values)
@@ -149,9 +149,9 @@ public class Inventory
 	public bool AddItemToInventory(Item item, short slotID)
 	{
 		item.DynamicObj.PickedUp();
-		if (item is Outfit && slotID == -2)
+		if (item is Outfit outfit && slotID == -2)
 		{
-			return EquipOutfit(item as Outfit);
+			return EquipOutfit(outfit);
 		}
 		if (item is Outfit && CurrOutfit == item && slotID != -2)
 		{
@@ -162,9 +162,9 @@ public class Inventory
 		{
 			newSlot = HandsSlot;
 		}
-		else if (CurrOutfit != null && CurrOutfit.InventorySlots.ContainsKey(slotID))
+		else if (CurrOutfit != null && CurrOutfit.InventorySlots.TryGetValue(slotID, out var slot))
 		{
-			newSlot = CurrOutfit.InventorySlots[slotID];
+			newSlot = slot;
 		}
 		if (newSlot == null || !newSlot.CanStoreItem(item))
 		{
@@ -173,9 +173,9 @@ public class Inventory
 		if (newSlot.Item != null && newSlot.Item != item)
 		{
 			InventorySlot itemSlot = item.Slot;
-			if (item.DynamicObj.Parent is DynamicObject && (item.DynamicObj.Parent as DynamicObject).Item != null)
+			if (item.DynamicObj.Parent is DynamicObject dynamicObject && dynamicObject.Item != null)
 			{
-				Item parentItem = (item.DynamicObj.Parent as DynamicObject).Item;
+				Item parentItem = dynamicObject.Item;
 				if (parentItem == newSlot.Item)
 				{
 					return false;
@@ -230,9 +230,9 @@ public class Inventory
 		{
 			dropSlot = HandsSlot;
 		}
-		else if (CurrOutfit != null && CurrOutfit.InventorySlots.ContainsKey(slotID))
+		else if (CurrOutfit != null && CurrOutfit.InventorySlots.TryGetValue(slotID, out var slot))
 		{
-			dropSlot = CurrOutfit.InventorySlots[slotID];
+			dropSlot = slot;
 		}
 		if (dropSlot == null)
 		{

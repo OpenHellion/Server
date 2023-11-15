@@ -29,11 +29,11 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	private float _Health = 100f;
 
-	private float _Armor = 0f;
+	private float _Armor;
 
 	public float MeleeDamage;
 
-	public Dictionary<short, ItemSlot> Slots = null;
+	public Dictionary<short, ItemSlot> Slots;
 
 	public short ItemSlotID;
 
@@ -98,7 +98,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		set
 		{
-			_MaxHealth = ((value < 0f) ? 0f : value);
+			_MaxHealth = value < 0f ? 0f : value;
 		}
 	}
 
@@ -110,7 +110,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		set
 		{
-			_Health = ((value > MaxHealth) ? MaxHealth : ((value < 0f) ? 0f : value));
+			_Health = value > MaxHealth ? MaxHealth : value < 0f ? 0f : value;
 		}
 	}
 
@@ -122,7 +122,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		set
 		{
-			_Armor = ((value < 0f) ? 0f : value);
+			_Armor = value < 0f ? 0f : value;
 		}
 	}
 
@@ -235,9 +235,9 @@ public abstract class Item : IPersistantObject, IDamageable
 			if (AttachPointID != null)
 			{
 				SpaceObjectVessel ves = Server.Instance.GetVessel(AttachPointID.VesselGUID);
-				if (ves != null && ves.AttachPoints.ContainsKey(AttachPointID.InSceneID))
+				if (ves != null && ves.AttachPoints.TryGetValue(AttachPointID.InSceneID, out var point))
 				{
-					ves.AttachPoints[AttachPointID.InSceneID].Item = null;
+					point.Item = null;
 				}
 			}
 			AttachPointID = null;
@@ -484,26 +484,25 @@ public abstract class Item : IPersistantObject, IDamageable
 				}
 			}
 			DynamicObj.APDetails = apd;
-			if (DynamicObj.Parent is DynamicObject && (DynamicObj.Parent as DynamicObject).Item != null)
+			if (DynamicObj.Parent is DynamicObject parentDynObj && parentDynObj.Item != null)
 			{
-				DynamicObject parentDynObj = DynamicObj.Parent as DynamicObject;
-				if (data.SlotID.HasValue && parentDynObj.Item is Outfit && (parentDynObj.Item as Outfit).InventorySlots.ContainsKey(data.SlotID.Value))
+				if (data.SlotID.HasValue && parentDynObj.Item is Outfit outfit && outfit.InventorySlots.TryGetValue(data.SlotID.Value, out var inventorySlot))
 				{
-					SetInventorySlot((parentDynObj.Item as Outfit).InventorySlots[data.SlotID.Value]);
+					SetInventorySlot(inventorySlot);
 				}
 			}
-			if (DynamicObj.Parent is Player && data.SlotID.HasValue)
+			if (DynamicObj.Parent is Player player && data.SlotID.HasValue)
 			{
 				try
 				{
-					(DynamicObj.Parent as Player).PlayerInventory.AddItemToInventory(this, data.SlotID.Value);
+					player.PlayerInventory.AddItemToInventory(this, data.SlotID.Value);
 				}
 				catch (Exception ex)
 				{
 					Dbg.Exception(ex);
 				}
 			}
-			if (DynamicObj.Parent is DynamicObject && data.ItemSlotID.HasValue && (DynamicObj.Parent as DynamicObject).Item.Slots != null && (DynamicObj.Parent as DynamicObject).Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
+			if (DynamicObj.Parent is DynamicObject dynamicObject && data.ItemSlotID.HasValue && dynamicObject.Item.Slots != null && dynamicObject.Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
 			{
 				slot.Item = this;
 				ItemSlotID = slot.ID;
@@ -563,13 +562,13 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public static Dictionary<ResourceType, float> GetRecycleResources(Item item)
 	{
-		if (item is GenericItem)
+		if (item is GenericItem genericItem)
 		{
-			return GetRecycleResources(item.Type, (item as GenericItem).SubType, MachineryPartType.None, item.Tier);
+			return GetRecycleResources(genericItem.Type, genericItem.SubType, MachineryPartType.None, genericItem.Tier);
 		}
-		if (item is MachineryPart)
+		if (item is MachineryPart part)
 		{
-			return GetRecycleResources(item.Type, GenericItemSubType.None, (item as MachineryPart).PartType, item.Tier);
+			return GetRecycleResources(part.Type, GenericItemSubType.None, part.PartType, part.Tier);
 		}
 		return GetRecycleResources(item.Type, GenericItemSubType.None, MachineryPartType.None, item.Tier);
 	}
@@ -590,13 +589,13 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public static Dictionary<ResourceType, float> GetCraftingResources(Item item)
 	{
-		if (item is GenericItem)
+		if (item is GenericItem genericItem)
 		{
-			return GetCraftingResources(item.Type, (item as GenericItem).SubType, MachineryPartType.None, item.Tier);
+			return GetCraftingResources(genericItem.Type, genericItem.SubType, MachineryPartType.None, genericItem.Tier);
 		}
-		if (item is MachineryPart)
+		if (item is MachineryPart part)
 		{
-			return GetCraftingResources(item.Type, GenericItemSubType.None, (item as MachineryPart).PartType, item.Tier);
+			return GetCraftingResources(part.Type, GenericItemSubType.None, part.PartType, part.Tier);
 		}
 		return GetCraftingResources(item.Type, GenericItemSubType.None, MachineryPartType.None, item.Tier);
 	}

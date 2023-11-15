@@ -8,7 +8,7 @@ public class SaveFileAuxData
 {
 	public string CelestialBody;
 
-	public GameScenes.SceneID ParentSceneID;
+	public GameScenes.SceneId ParentSceneID;
 
 	public string LockedToTrigger;
 

@@ -52,7 +52,7 @@ public class SpawnRule
 
 	private Dictionary<int, int> clusterVesselsCount = new Dictionary<int, int>();
 
-	private bool vesselsRemoved = false;
+	private bool vesselsRemoved;
 
 	public int NumberOfClustersCurr => clusterVesselsCount.Count;
 
@@ -176,7 +176,7 @@ public class SpawnRule
 			if (numOfTries == 5)
 			{
 				numOfTries = 0;
-				distnceMultiplier = ((sanityCheck >= 100) ? (distnceMultiplier + 5) : (distnceMultiplier + 1));
+				distnceMultiplier = sanityCheck >= 100 ? distnceMultiplier + 5 : distnceMultiplier + 1;
 			}
 		}
 		return Vector3D.Zero;
@@ -228,7 +228,7 @@ public class SpawnRule
 					continue;
 				}
 				SpawnRuleScene sc = ScenePool[j];
-				scenesToSpawn = ((!forceSpawn && scenesToSpawnTotal == 1) ? MathHelper.RandomRange(0, 2) : (forceSpawn ? 1 : ((sc.CountMax < NumberOfClusters.Max) ? MathHelper.RandomRange(0, 2) : MathHelper.RandomRange(1, sc.CountMax / NumberOfClusters.Max + 1))));
+				scenesToSpawn = !forceSpawn && scenesToSpawnTotal == 1 ? MathHelper.RandomRange(0, 2) : forceSpawn ? 1 : sc.CountMax < NumberOfClusters.Max ? MathHelper.RandomRange(0, 2) : MathHelper.RandomRange(1, sc.CountMax / NumberOfClusters.Max + 1);
 				if (scenesToSpawn > sc.Count)
 				{
 					scenesToSpawn = sc.Count;
@@ -244,9 +244,9 @@ public class SpawnRule
 					if (firstVessel == null)
 					{
 						firstVessel = SpaceObjectVessel.CreateNew(sc.SceneID, "", -1L, null, null, null, null, MathHelper.RandomRotation(), LocationTag, checkPosition: true, spawnRuleOrbit: Orbit, artificialBodyDistanceCheck: SpawnManager.Settings.RandomLocationCheckDistance, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f);
-						if (firstVessel is Ship && IsVisibleOnRadar)
+						if (firstVessel is Ship ship && IsVisibleOnRadar)
 						{
-							(firstVessel as Ship).IsAlwaysVisible = true;
+							ship.IsAlwaysVisible = true;
 						}
 						SpawnRange<float>[] angularVelocity = AngularVelocity;
 						if (angularVelocity != null && angularVelocity.Length == 3)

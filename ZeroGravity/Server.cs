@@ -5,8 +5,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using BulletSharp;
@@ -32,7 +30,7 @@ public class Server
 
 		public SpaceObject Parent;
 
-		public AttachPointDetails APDetails;
+		public AttachPointDetails ApDetails;
 
 		public double Timer;
 
@@ -54,158 +52,158 @@ public class Server
 
 	public static class NameGenerator
 	{
-		private static DateTime lastClearDate = DateTime.UtcNow;
+		private static DateTime _lastClearDate = DateTime.UtcNow;
 
-		private static Dictionary<GameScenes.SceneID, int> dailySpawnCount = new Dictionary<GameScenes.SceneID, int>();
+		private static readonly Dictionary<GameScenes.SceneId, int> DailySpawnCount = new Dictionary<GameScenes.SceneId, int>();
 
-		private static List<char> monthCodes = new List<char>
+		private static readonly List<char> MonthCodes = new List<char>
 		{
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
 			'K', 'L'
 		};
 
-		private static Dictionary<GameScenes.SceneID, string> shipNaming = new Dictionary<GameScenes.SceneID, string>
+		private static readonly Dictionary<GameScenes.SceneId, string> ShipNaming = new Dictionary<GameScenes.SceneId, string>
 		{
 			{
-				GameScenes.SceneID.AltCorp_LifeSupportModule,
+				GameScenes.SceneId.AltCorp_LifeSupportModule,
 				"LSM-AC:HE3/"
 			},
 			{
-				GameScenes.SceneID.ALtCorp_PowerSupply_Module,
+				GameScenes.SceneId.ALtCorp_PowerSupply_Module,
 				"PSM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_AirLock,
+				GameScenes.SceneId.AltCorp_AirLock,
 				"AM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Cargo_Module,
+				GameScenes.SceneId.AltCorp_Cargo_Module,
 				"CBM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Command_Module,
+				GameScenes.SceneId.AltCorp_Command_Module,
 				"CM-AC:HE3/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_DockableContainer,
+				GameScenes.SceneId.AltCorp_DockableContainer,
 				"IC-AC:HE2/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_CorridorIntersectionModule,
+				GameScenes.SceneId.AltCorp_CorridorIntersectionModule,
 				"CTM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Corridor45TurnModule,
+				GameScenes.SceneId.AltCorp_Corridor45TurnModule,
 				"CLM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Corridor45TurnRightModule,
+				GameScenes.SceneId.AltCorp_Corridor45TurnRightModule,
 				"CRM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_CorridorVertical,
+				GameScenes.SceneId.AltCorp_CorridorVertical,
 				"CSM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_CorridorModule,
+				GameScenes.SceneId.AltCorp_CorridorModule,
 				"CIM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_StartingModule,
+				GameScenes.SceneId.AltCorp_StartingModule,
 				"OUTPOST "
 			},
 			{
-				GameScenes.SceneID.AltCorp_Shuttle_SARA,
+				GameScenes.SceneId.AltCorp_Shuttle_SARA,
 				"AC-ARG HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_CrewQuarters_Module,
+				GameScenes.SceneId.AltCorp_CrewQuarters_Module,
 				"CQM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_SolarPowerModule,
+				GameScenes.SceneId.AltCorp_SolarPowerModule,
 				"SPM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_FabricatorModule,
+				GameScenes.SceneId.AltCorp_FabricatorModule,
 				"FM-AC:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Shuttle_CECA,
+				GameScenes.SceneId.AltCorp_Shuttle_CECA,
 				"Steropes:HE1/"
 			},
 			{
-				GameScenes.SceneID.Generic_Debris_Spawn1,
+				GameScenes.SceneId.Generic_Debris_Spawn1,
 				"Small Debris:HE1/"
 			},
 			{
-				GameScenes.SceneID.Generic_Debris_Spawn2,
+				GameScenes.SceneId.Generic_Debris_Spawn2,
 				"Large Debris:HE1/"
 			},
 			{
-				GameScenes.SceneID.Generic_Debris_Spawn3,
+				GameScenes.SceneId.Generic_Debris_Spawn3,
 				"Medium Debris:HE1/"
 			},
 			{
-				GameScenes.SceneID.Generic_Debris_Outpost001,
+				GameScenes.SceneId.Generic_Debris_Outpost001,
 				"Doomed outpost:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_PatchModule,
+				GameScenes.SceneId.AltCorp_PatchModule,
 				"Bulkhead:HE1/"
 			},
 			{
-				GameScenes.SceneID.SOE_Location002,
+				GameScenes.SceneId.SOE_Location002,
 				"SOE Derelict:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Secure_Module,
+				GameScenes.SceneId.AltCorp_Secure_Module,
 				"CM-SDS:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_Destroyed_Shuttle_CECA,
+				GameScenes.SceneId.AltCorp_Destroyed_Shuttle_CECA,
 				"Steropes:HE1/"
 			},
 			{
-				GameScenes.SceneID.AltCorp_CorridorIntersection_MKII,
+				GameScenes.SceneId.AltCorp_CorridorIntersection_MKII,
 				"CTM-SDS:HE1/"
 			},
 			{
-				GameScenes.SceneID.AlrCorp_Corridor_MKII,
+				GameScenes.SceneId.AlrCorp_Corridor_MKII,
 				"CIM-SDS:HE1/"
 			}
 		};
 
-		private static List<GameScenes.SceneID> derelicts = new List<GameScenes.SceneID>
+		private static readonly List<GameScenes.SceneId> Derelicts = new List<GameScenes.SceneId>
 		{
-			GameScenes.SceneID.Generic_Debris_Corridor001,
-			GameScenes.SceneID.Generic_Debris_Corridor002,
-			GameScenes.SceneID.Generic_Debris_JuncRoom001,
-			GameScenes.SceneID.Generic_Debris_JuncRoom002
+			GameScenes.SceneId.Generic_Debris_Corridor001,
+			GameScenes.SceneId.Generic_Debris_Corridor002,
+			GameScenes.SceneId.Generic_Debris_JuncRoom001,
+			GameScenes.SceneId.Generic_Debris_JuncRoom002
 		};
 
-		public static string GenerateObjectRegistration(SpaceObjectType type, CelestialBody parentCB, GameScenes.SceneID sceneId)
+		public static string GenerateObjectRegistration(SpaceObjectType type, CelestialBody parentCelestialBody, GameScenes.SceneId sceneId)
 		{
 			string name = "";
 			string dailySpawnDigits = "000";
-			if (type == SpaceObjectType.Ship && !derelicts.Contains(sceneId))
+			if (type == SpaceObjectType.Ship && !Derelicts.Contains(sceneId))
 			{
-				if (shipNaming.ContainsKey(sceneId))
+				if (ShipNaming.TryGetValue(sceneId, out var value))
 				{
-					name += shipNaming[sceneId];
+					name += value;
 				}
 				else
 				{
 					Dbg.Warning("No name tag for ship", sceneId);
-					name = name + type.ToString() + MathHelper.RandomNextInt().ToString("X");
+					name = name + type + MathHelper.RandomNextInt().ToString("X");
 				}
 			}
 			else
 			{
 				string parentBody;
-				if (parentCB != null)
+				if (parentCelestialBody != null)
 				{
-					string plnt = ((CelestialBodyGUID)parentCB.GUID).ToString();
+					string plnt = ((CelestialBodyGUID)parentCelestialBody.GUID).ToString();
 					parentBody = plnt.Substring(0, System.Math.Min(3, plnt.Length)).ToUpper();
 				}
 				else
@@ -223,20 +221,20 @@ public class Server
 					break;
 				}
 			}
-			if ((DateTime.UtcNow - lastClearDate).TotalDays > 1.0)
+			if ((DateTime.UtcNow - _lastClearDate).TotalDays > 1.0)
 			{
-				lastClearDate = DateTime.UtcNow;
-				dailySpawnCount.Clear();
+				_lastClearDate = DateTime.UtcNow;
+				DailySpawnCount.Clear();
 			}
-			if (dailySpawnCount.ContainsKey(sceneId))
+			if (DailySpawnCount.ContainsKey(sceneId))
 			{
-				dailySpawnCount[sceneId]++;
+				DailySpawnCount[sceneId]++;
 			}
 			else
 			{
-				dailySpawnCount.Add(sceneId, 1);
+				DailySpawnCount.Add(sceneId, 1);
 			}
-			return name + DateTime.UtcNow.Day.ToString("00") + monthCodes[DateTime.UtcNow.Month - 1] + dailySpawnCount[sceneId].ToString(dailySpawnDigits);
+			return name + DateTime.UtcNow.Day.ToString("00") + MonthCodes[DateTime.UtcNow.Month - 1] + DailySpawnCount[sceneId].ToString(dailySpawnDigits);
 		}
 
 		public static string GenerateStationRegistration()
@@ -244,118 +242,108 @@ public class Server
 			return "STATION";
 		}
 
-		public static GameScenes.SceneID GetSceneID(string text)
+		public static GameScenes.SceneId GetSceneId(string text)
 		{
-			foreach (GameScenes.SceneID scene in Enum.GetValues(typeof(GameScenes.SceneID)))
+			foreach (GameScenes.SceneId scene in Enum.GetValues(typeof(GameScenes.SceneId)))
 			{
 				if (scene.ToString().ToLower().StartsWith(text.ToLower()))
 				{
 					return scene;
 				}
 			}
-			foreach (KeyValuePair<GameScenes.SceneID, string> kv2 in shipNaming)
+			foreach (KeyValuePair<GameScenes.SceneId, string> kv2 in ShipNaming)
 			{
 				if (kv2.Value.ToLower().StartsWith(text.ToLower()))
 				{
 					return kv2.Key;
 				}
 			}
-			foreach (KeyValuePair<GameScenes.SceneID, string> kv in shipNaming)
+			foreach (KeyValuePair<GameScenes.SceneId, string> kv in ShipNaming)
 			{
 				if (kv.Value.ToLower().Contains(text.ToLower()))
 				{
 					return kv.Key;
 				}
 			}
-			return GameScenes.SceneID.None;
+			return GameScenes.SceneId.None;
 		}
 	}
 
-	public static double RCS_THRUST_MULTIPLIER = 1.0;
+	public const double RcsThrustMultiplier = 1.0;
 
-	public static double RCS_ROTATION_MULTIPLIER = 1.0;
+	public const double RcsRotationMultiplier = 1.0;
 
-	public static double CELESTIAL_BODY_RADIUS_MULTIPLIER = 1.0;
+	public const double CelestialBodyRadiusMultiplier = 1.0;
 
-	public static Properties Properties = null;
+	public static Properties Properties;
 
 	public static string ConfigDir = "";
 
-#if HELLION_SP
-	public static double PersistenceSaveInterval = 0.0;
-#else
 	public static double PersistenceSaveInterval = 900.0;
-#endif
 
-	public static bool CleanStart = false;
+	private static bool CleanStart;
 
-	public static bool Restart = false;
+	public static bool Restart;
 
 	public static bool CleanRestart = false;
 
-	public static double CelestialBodyDeathDistance = 10000.0;
+	public const double CelestialBodyDeathDistance = 10000.0;
 
-	private Dictionary<long, SpaceObject> m_objects = new Dictionary<long, SpaceObject>();
+	private readonly Dictionary<long, SpaceObject> _objects = new Dictionary<long, SpaceObject>();
 
-	private Dictionary<long, Player> m_Players = new Dictionary<long, Player>();
+	private readonly Dictionary<long, Player> _players = new Dictionary<long, Player>();
 
-	private ConcurrentBag<Player> m_playersToAdd = new ConcurrentBag<Player>();
+	private ConcurrentBag<Player> _playersToAdd = new ConcurrentBag<Player>();
 
-	private ConcurrentBag<Player> m_playersToRemove = new ConcurrentBag<Player>();
+	private ConcurrentBag<Player> _playersToRemove = new ConcurrentBag<Player>();
 
-	private Dictionary<long, SpaceObjectVessel> m_vessels = new Dictionary<long, SpaceObjectVessel>();
+	private readonly Dictionary<long, SpaceObjectVessel> _vessels = new Dictionary<long, SpaceObjectVessel>();
 
-	private Dictionary<long, DynamicObject> m_updateableDynamicObjects = new Dictionary<long, DynamicObject>();
+	private readonly Dictionary<long, DynamicObject> _updateableDynamicObjects = new Dictionary<long, DynamicObject>();
 
-	private List<UpdateTimer> m_timersToRemove = new List<UpdateTimer>();
+	private readonly List<UpdateTimer> _timersToRemove = new List<UpdateTimer>();
 
-	private List<UpdateTimer> m_timers = new List<UpdateTimer>();
+	private readonly List<UpdateTimer> _timers = new List<UpdateTimer>();
 
-	public SolarSystem SolarSystem = null;
+	public readonly SolarSystem SolarSystem;
 
-	private static Server serverInstance = null;
+	private static Server _serverInstance;
 
-	public static bool IsRunning = false;
+	public static bool IsRunning;
 
-	private long numberOfTicks = 64L;
+	private long _numberOfTicks = 64L;
 
-#if HELLION_SP
-	public static int GamePort = 6104;
-
-	public static int StatusPort = 6105;
-#else
 	public static int GamePort = 6004;
 
 	public static int StatusPort = 6005;
-#endif
 
-	public static bool SavePersistenceDataOnShutdown = false;
+	public static bool SavePersistenceDataOnShutdown;
 
-	public static bool CheckInPassed = false;
+	private static bool _checkInPassed;
 
-	public bool WorldInitialized = false;
+	public bool WorldInitialized;
 
-	public DateTime ServerStartTime = DateTime.UtcNow;
+	private readonly DateTime _serverStartTime = DateTime.UtcNow;
 
-	private float solarSystemStartTime = -1f;
+	private float _solarSystemStartTime = -1f;
 
 	public int MaxPlayers = 100;
 
 	public static int MaxNumberOfSaveFiles = 10;
 
-	private IpAddressRange[] AdminIPAddressRanges = new IpAddressRange[0];
+	private IpAddressRange[] _adminIpAddressRanges = new IpAddressRange[0];
 
-	private Dictionary<string, SpawnPointInviteData> SpawnPointInvites = new Dictionary<string, SpawnPointInviteData>();
+	private readonly Dictionary<string, SpawnPointInviteData> _spawnPointInvites = new Dictionary<string, SpawnPointInviteData>();
 
-	public static AutoResetEvent MainLoopEnded = new AutoResetEvent(initialState: false);
+	public static readonly AutoResetEvent MainLoopEnded = new AutoResetEvent(initialState: false);
 
-	private bool mainLoopStarted = false;
+	private bool _mainLoopStarted;
 
-	public List<DebrisField> DebrisFields = new List<DebrisField>();
+	public readonly List<DebrisField> DebrisFields = new List<DebrisField>();
 
 	public static double VesselDecayRateMultiplier = 1.0;
 
-	public static double VesselDecayGracePeriod = 0.0;
+	public static double VesselDecayGracePeriod;
 
 	public static double VesselExplosionRadiusMultiplier = 1.0;
 
@@ -379,7 +367,7 @@ public class Server
 
 	public static float StartingSetDespawnTimeSec = 900f;
 
-	private bool updateDataInSeparateThread;
+	private bool _updateDataInSeparateThread;
 
 	public static int JunkItemsCleanupScope = 1;
 
@@ -387,17 +375,17 @@ public class Server
 
 	public static double JunkItemsCleanupInterval = 900.0;
 
-	public static bool CanWarpThroughCelestialBodies = false;
+	public static bool CanWarpThroughCelestialBodies;
 
 	public static double MaxAngularVelocityPerAxis = 300.0;
 
-	private static List<string> serverAdmins = new List<string>();
+	private static List<string> _serverAdmins = new List<string>();
 
 	public static double ServerRestartTimeSec = -1.0;
 
-	public static DateTime restartTime;
+	public static DateTime RestartTime;
 
-	private double timeToRestart = 1800.0;
+	private double _timeToRestart = 1800.0;
 
 	public List<DeathMatchArenaController> DeathMatchArenaControllers = new List<DeathMatchArenaController>();
 
@@ -405,19 +393,19 @@ public class Server
 
 	public static double MovementMessageSendInterval = 0.1;
 
-	public static bool ForceMovementMessageSend = false;
+	public static bool ForceMovementMessageSend;
 
-	private static double _movementMessageTimer = 0.0;
+	private static double _movementMessageTimer;
 
-	public static volatile int MainThreadID;
+	public static volatile int MainThreadId;
 
 	public BulletPhysicsController PhysicsController;
 
 	public DateTime LastChatMessageTime = DateTime.UtcNow;
 
-	private double persistenceSaveTimer = 0.0;
+	private double _persistenceSaveTimer;
 
-	private bool printDebugObjects = false;
+	private bool _printDebugObjects;
 
 	public static uint NetworkDataHash = ClassHasher.GetClassHashCode(typeof(NetworkData));
 
@@ -425,82 +413,82 @@ public class Server
 
 	public static uint CombinedHash = NetworkDataHash * SceneDataHash;
 
-	private bool manualSave;
+	private bool _manualSave;
 
-	private string manualSaveFileName = null;
+	private string _manualSaveFileName;
 
-	private SaveFileAuxData manualSaveAuxData = null;
+	private SaveFileAuxData _manualSaveAuxData;
 
-	private bool updatingShipSystems;
+	private bool _updatingShipSystems;
 
 	public ConcurrentDictionary<long, VesselDataUpdate> VesselsDataUpdate = new ConcurrentDictionary<long, VesselDataUpdate>();
 
 	public List<DynamicObjectsRespawn> DynamicObjectsRespawnList = new List<DynamicObjectsRespawn>();
 
-	private double tickMilliseconds = 0.0;
+	private double _tickMilliseconds;
 
 	public double DeltaTime;
 
-	private DateTime lastTime;
+	private DateTime _lastTime;
 
 	public AutoResetEvent UpdateDataFinished = new AutoResetEvent(initialState: false);
 
-	public static List<GameScenes.SceneID> RandomShipSpawnSceneIDs = new List<GameScenes.SceneID>
+	public static List<GameScenes.SceneId> RandomShipSpawnSceneIDs = new List<GameScenes.SceneId>
 	{
-		GameScenes.SceneID.AltCorp_CorridorModule,
-		GameScenes.SceneID.AltCorp_CorridorIntersectionModule,
-		GameScenes.SceneID.AltCorp_Corridor45TurnModule,
-		GameScenes.SceneID.AltCorp_Shuttle_SARA,
-		GameScenes.SceneID.ALtCorp_PowerSupply_Module,
-		GameScenes.SceneID.AltCorp_LifeSupportModule,
-		GameScenes.SceneID.AltCorp_Cargo_Module,
-		GameScenes.SceneID.AltCorp_CorridorVertical,
-		GameScenes.SceneID.AltCorp_Command_Module,
-		GameScenes.SceneID.AltCorp_Corridor45TurnRightModule,
-		GameScenes.SceneID.AltCorp_StartingModule,
-		GameScenes.SceneID.AltCorp_AirLock,
-		GameScenes.SceneID.Generic_Debris_JuncRoom001,
-		GameScenes.SceneID.Generic_Debris_JuncRoom002,
-		GameScenes.SceneID.Generic_Debris_Corridor001,
-		GameScenes.SceneID.Generic_Debris_Corridor002,
-		GameScenes.SceneID.AltCorp_DockableContainer
+		GameScenes.SceneId.AltCorp_CorridorModule,
+		GameScenes.SceneId.AltCorp_CorridorIntersectionModule,
+		GameScenes.SceneId.AltCorp_Corridor45TurnModule,
+		GameScenes.SceneId.AltCorp_Shuttle_SARA,
+		GameScenes.SceneId.ALtCorp_PowerSupply_Module,
+		GameScenes.SceneId.AltCorp_LifeSupportModule,
+		GameScenes.SceneId.AltCorp_Cargo_Module,
+		GameScenes.SceneId.AltCorp_CorridorVertical,
+		GameScenes.SceneId.AltCorp_Command_Module,
+		GameScenes.SceneId.AltCorp_Corridor45TurnRightModule,
+		GameScenes.SceneId.AltCorp_StartingModule,
+		GameScenes.SceneId.AltCorp_AirLock,
+		GameScenes.SceneId.Generic_Debris_JuncRoom001,
+		GameScenes.SceneId.Generic_Debris_JuncRoom002,
+		GameScenes.SceneId.Generic_Debris_Corridor001,
+		GameScenes.SceneId.Generic_Debris_Corridor002,
+		GameScenes.SceneId.AltCorp_DockableContainer
 	};
 
 	public static double SpawnPointInviteTimer = 300.0;
 
-	public static string LoadPersistenceFromFile = null;
+	public static string LoadPersistenceFromFile;
 
-	public Dictionary<long, SpaceObjectVessel>.ValueCollection AllVessels => m_vessels.Values;
+	public Dictionary<long, SpaceObjectVessel>.ValueCollection AllVessels => _vessels.Values;
 
-	public Dictionary<long, Player>.ValueCollection AllPlayers => m_Players.Values;
+	public Dictionary<long, Player>.ValueCollection AllPlayers => _players.Values;
 
-	public static Server Instance => serverInstance;
+	public static Server Instance => _serverInstance;
 
-	public TimeSpan RunTime => DateTime.UtcNow - ServerStartTime;
+	public TimeSpan RunTime => DateTime.UtcNow - _serverStartTime;
 
-	public double TickMilliseconds => tickMilliseconds;
+	public double TickMilliseconds => _tickMilliseconds;
 
 	public static double SolarSystemTime => Instance.SolarSystem.CurrentTime;
 
 	public bool DoesObjectExist(long guid)
 	{
-		return m_objects.ContainsKey(guid);
+		return _objects.ContainsKey(guid);
 	}
 
 	public SpaceObject GetObject(long guid)
 	{
-		if (m_objects.ContainsKey(guid))
+		if (_objects.TryGetValue(guid, out var o))
 		{
-			return m_objects[guid];
+			return o;
 		}
 		return null;
 	}
 
 	public SpaceObjectTransferable GetTransferable(long guid)
 	{
-		if (m_objects.ContainsKey(guid) && m_objects[guid] is SpaceObjectTransferable)
+		if (_objects.ContainsKey(guid) && _objects[guid] is SpaceObjectTransferable)
 		{
-			return m_objects[guid] as SpaceObjectTransferable;
+			return _objects[guid] as SpaceObjectTransferable;
 		}
 		return null;
 	}
@@ -510,7 +498,7 @@ public class Server
 	/// </summary>
 	public Player GetPlayer(long guid)
 	{
-		m_Players.TryGetValue(guid, out Player player);
+		_players.TryGetValue(guid, out Player player);
 		return player;
 	}
 
@@ -524,99 +512,99 @@ public class Server
 
 	public SpaceObjectVessel GetVessel(long guid)
 	{
-		if (m_vessels.ContainsKey(guid))
+		if (_vessels.TryGetValue(guid, out var vessel))
 		{
-			return m_vessels[guid];
+			return vessel;
 		}
 		return null;
 	}
 
 	public Item GetItem(long guid)
 	{
-		if (m_objects.ContainsKey(guid) && m_objects[guid] is DynamicObject)
+		if (_objects.ContainsKey(guid) && _objects[guid] is DynamicObject obj)
 		{
-			return (m_objects[guid] as DynamicObject).Item;
+			return obj.Item;
 		}
 		return null;
 	}
 
 	public void Add(Player player)
 	{
-		if (mainLoopStarted)
+		if (_mainLoopStarted)
 		{
-			m_playersToAdd.Add(player);
+			_playersToAdd.Add(player);
 			return;
 		}
-		m_Players[player.GUID] = player;
-		m_objects[player.FakeGuid] = player;
+		_players[player.GUID] = player;
+		_objects[player.FakeGuid] = player;
 	}
 
 	public void Add(SpaceObjectVessel vessel)
 	{
-		m_vessels[vessel.GUID] = vessel;
-		m_objects[vessel.GUID] = vessel;
+		_vessels[vessel.GUID] = vessel;
+		_objects[vessel.GUID] = vessel;
 	}
 
 	public void Add(DynamicObject dobj)
 	{
-		m_objects[dobj.GUID] = dobj;
+		_objects[dobj.GUID] = dobj;
 		if (dobj.Item != null && dobj.Item is IUpdateable)
 		{
-			m_updateableDynamicObjects[dobj.GUID] = dobj;
+			_updateableDynamicObjects[dobj.GUID] = dobj;
 		}
 	}
 
 	public void Add(Corpse corpse)
 	{
-		m_objects[corpse.GUID] = corpse;
+		_objects[corpse.GUID] = corpse;
 	}
 
 	public void Remove(Player player)
 	{
-		if (mainLoopStarted)
+		if (_mainLoopStarted)
 		{
-			m_playersToRemove.Add(player);
+			_playersToRemove.Add(player);
 			return;
 		}
-		m_Players.Remove(player.GUID);
-		m_objects.Remove(player.FakeGuid);
+		_players.Remove(player.GUID);
+		_objects.Remove(player.FakeGuid);
 	}
 
 	public void Remove(SpaceObjectVessel vessel)
 	{
-		m_vessels.Remove(vessel.GUID);
-		m_objects.Remove(vessel.GUID);
+		_vessels.Remove(vessel.GUID);
+		_objects.Remove(vessel.GUID);
 	}
 
 	public void Remove(DynamicObject dobj)
 	{
-		m_objects.Remove(dobj.GUID);
-		m_updateableDynamicObjects.Remove(dobj.GUID);
+		_objects.Remove(dobj.GUID);
+		_updateableDynamicObjects.Remove(dobj.GUID);
 	}
 
 	public void Remove(Corpse corpse)
 	{
-		if (m_objects.ContainsKey(corpse.GUID))
+		if (_objects.ContainsKey(corpse.GUID))
 		{
-			m_objects.Remove(corpse.GUID);
+			_objects.Remove(corpse.GUID);
 		}
 	}
 
 	public Server()
 	{
-		MainThreadID = Thread.CurrentThread.ManagedThreadId;
+		MainThreadId = Thread.CurrentThread.ManagedThreadId;
 		IsRunning = true;
-		serverInstance = this;
+		_serverInstance = this;
 		PhysicsController = new BulletPhysicsController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
-		Console.Title = "(id: " + ((NetworkController.ServerId == null) ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
+		Console.Title = "(id: " + (NetworkController.ServerId == null ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
 		Stopwatch stopWatch = new Stopwatch();
 		stopWatch.Start();
 		Thread.Sleep(1);
 		stopWatch.Stop();
 		long maxTicks = (long)(1000.0 / stopWatch.Elapsed.TotalMilliseconds);
-		Dbg.UnformattedMessage(string.Format("\tGame port: {4}\r\n\tStatus port: {5}\r\n\tStart date: {0}\r\n\tServer ticks: {1}{3}\r\n\tMax server ticks (not precise): {2}", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), numberOfTicks, maxTicks, (numberOfTicks > maxTicks) ? " WARNING: Server ticks is larger than max tick" : "", GamePort, StatusPort));
+		Dbg.UnformattedMessage(string.Format("\tGame port: {4}\r\n\tStatus port: {5}\r\n\tStart date: {0}\r\n\tServer ticks: {1}{3}\r\n\tMax server ticks (not precise): {2}", DateTime.UtcNow.ToString("yyyy/MM/dd HH:mm:ss.ffff"), _numberOfTicks, maxTicks, _numberOfTicks > maxTicks ? " WARNING: Server ticks is larger than max tick" : "", GamePort, StatusPort));
 		StaticData.LoadData();
 	}
 
@@ -716,26 +704,22 @@ public class Server
 
 	private void LoadServerSettings()
 	{
-		Properties.GetProperty("server_tick_count", ref numberOfTicks);
+		Properties.GetProperty("server_tick_count", ref _numberOfTicks);
 		Properties.GetProperty("game_port", ref GamePort);
 		Properties.GetProperty("status_port", ref StatusPort);
-#if HELLION_SP
-		CheckAndFixPorts();
-#endif
-
 		Properties.GetProperty("http_key", ref MsConnection.HttpKey);
 		Properties.GetProperty("main_server_ip", ref MsConnection.IpAddress);
 		Properties.GetProperty("main_server_port", ref MsConnection.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
-		serverAdmins = adminsArray.Where((string m) => m != "").ToList();
+		_serverAdmins = adminsArray.Where((string m) => m != "").ToList();
 		Properties.GetProperty("movement_send_interval", ref MovementMessageSendInterval);
 		if (MovementMessageSendInterval <= 1.4012984643248171E-45)
 		{
 			MovementMessageSendInterval = 0.1;
 		}
-		Properties.GetProperty("solar_system_time", ref solarSystemStartTime);
+		Properties.GetProperty("solar_system_time", ref _solarSystemStartTime);
 		Properties.GetProperty("save_interval", ref PersistenceSaveInterval);
 		Properties.GetProperty("max_players", ref MaxPlayers);
 		Properties.GetProperty("number_of_save_files", ref MaxNumberOfSaveFiles);
@@ -753,7 +737,7 @@ public class Server
 		Properties.GetProperty("activate_repair_point_chance_multiplier", ref ActivateRepairPointChanceMultiplier);
 		Properties.GetProperty("starting_set_despawn_time", ref StartingSetDespawnTimeSec);
 		Properties.GetProperty("server_restart_time", ref ServerRestartTimeSec);
-		Properties.GetProperty("update_data_in_separate_thread", ref updateDataInSeparateThread);
+		Properties.GetProperty("update_data_in_separate_thread", ref _updateDataInSeparateThread);
 		Properties.GetProperty("junk_items_cleanup_scope", ref JunkItemsCleanupScope);
 		Properties.GetProperty("junk_items_time_to_live", ref JunkItemsTimeToLive);
 		Properties.GetProperty("junk_items_cleanup_interval", ref JunkItemsCleanupInterval);
@@ -762,53 +746,11 @@ public class Server
 		double tmpTimer = SpaceObjectVessel.ArenaRescueTime;
 		Properties.GetProperty("arena_ship_respawn_timer", ref tmpTimer);
 		SpaceObjectVessel.ArenaRescueTime = tmpTimer;
-		Properties.GetProperty("print_debug_objects", ref printDebugObjects);
+		Properties.GetProperty("print_debug_objects", ref _printDebugObjects);
 		Properties.GetProperty("spawn_manager_print_categories", ref SpawnManager.Settings.PrintCategories);
 		Properties.GetProperty("spawn_manager_print_spawn_rules", ref SpawnManager.Settings.PrintSpawnRules);
 		Properties.GetProperty("spawn_manager_print_item_attach_points", ref SpawnManager.Settings.PrintItemAttachPoints);
 		Properties.GetProperty("spawn_manager_print_item_type_ids", ref SpawnManager.Settings.PrintItemTypeIDs);
-	}
-
-	private void CheckAndFixPorts()
-	{
-		for (int j = 6000; j <= 65535; j++)
-		{
-			if (j == StatusPort)
-			{
-				continue;
-			}
-			IPEndPoint ep2 = new IPEndPoint(System.Net.IPAddress.Any, j);
-			Socket socket2 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			try
-			{
-				socket2.Bind(ep2);
-				socket2.Close();
-				GamePort = j;
-			}
-			catch
-			{
-				continue;
-			}
-			break;
-		}
-		for (int i = 6000; i <= 65535; i++)
-		{
-			if (i != GamePort)
-			{
-				IPEndPoint ep = new IPEndPoint(System.Net.IPAddress.Any, i);
-				Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-				try
-				{
-					socket.Bind(ep);
-					socket.Close();
-					StatusPort = i;
-					break;
-				}
-				catch
-				{
-				}
-			}
-		}
 	}
 
 	public void LoginPlayer(long guid, string playerId, CharacterData characterData)
@@ -818,7 +760,7 @@ public class Server
 			InitializeWorld();
 		}
 
-		foreach (Player pl in m_Players.Values)
+		foreach (Player pl in _players.Values)
 		{
 			Dbg.Log(pl.Name, pl.GUID);
 		}
@@ -837,7 +779,7 @@ public class Server
 			NetworkController.Instance.ConnectPlayer(player);
 		}
 
-		if (serverAdmins.Contains(player.PlayerId) || serverAdmins.Contains("*"))
+		if (_serverAdmins.Contains(player.PlayerId) || _serverAdmins.Contains("*"))
 		{
 			player.IsAdmin = true;
 		}
@@ -845,174 +787,27 @@ public class Server
 
 	private void ResetSpawnPointsForPlayer(Player pl, Ship skipShip)
 	{
-		if (!pl.PlayerId.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(pl.PlayerId))
+		if (!pl.PlayerId.IsNullOrEmpty() && _spawnPointInvites.ContainsKey(pl.PlayerId))
 		{
 			ClearSpawnPointInvitation(pl.PlayerId);
 		}
 		foreach (SpaceObjectVessel ves in AllVessels)
 		{
-			if (ves is Ship && ves != skipShip)
+			if (ves is Ship ship && ship != skipShip)
 			{
-				(ves as Ship).ResetSpawnPointsForPlayer(pl, sendStatsMessage: true);
+				ship.ResetSpawnPointsForPlayer(pl, sendStatsMessage: true);
 			}
 		}
 	}
 
-	private bool AddPlayerToShip(Player pl, SpawnSetupType setupType, long shipID)
+	private bool AddPlayerToShip(Player pl, SpawnSetupType setupType, long shipId)
 	{
-		if (shipID == 0L && setupType == SpawnSetupType.None)
+		if (shipId == 0L && setupType == SpawnSetupType.None)
 		{
 			return false;
 		}
 		Ship foundShip = null;
 		ShipSpawnPoint foundSpawnPoint = null;
-#if HELLION_SP
-		if (setupType != 0)
-		{
-			if (setupType == SpawnSetupType.Continue)
-			{
-				if (pl.AuthorizedSpawnPoint == null)
-				{
-					return false;
-				}
-				foundShip = pl.AuthorizedSpawnPoint.Ship;
-				foundSpawnPoint = pl.AuthorizedSpawnPoint;
-			}
-			else if (setupType == SpawnSetupType.MiningSteropes || setupType == SpawnSetupType.MiningArges)
-			{
-				Asteroid ast2 = GetRandomAsteroid();
-				foundShip = Ship.CreateNewShip((setupType == SpawnSetupType.MiningSteropes) ? GameScenes.SceneID.AltCorp_Shuttle_CECA : GameScenes.SceneID.AltCorp_Shuttle_SARA, "", -1L, (ast2 != null) ? new List<long> { ast2.GUID } : null, null, null, null, null, "StartingScene;");
-				if (foundShip != null)
-				{
-					Vector3D forward = ast2.Position - foundShip.Position;
-					Vector3D up = foundShip.Up;
-					Vector3D.OrthoNormalize(ref forward, ref up);
-					foundShip.Forward = forward;
-					foundShip.Up = up;
-					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
-					{
-						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
-						{
-							PlayerId = pl.PlayerId,
-							Name = pl.Name,
-							Rank = AuthorizedPersonRank.CommandingOfficer
-						});
-					}
-				}
-			}
-			else if (setupType == SpawnSetupType.TestShip)
-			{
-				Asteroid ast = GetRandomAsteroid();
-				foundShip = Ship.CreateNewShip(GameScenes.SceneID.FlatShipTest, "", -1L, (ast != null) ? new List<long> { ast.GUID } : null, null, null, null, null, "StartingScene;");
-				if (foundShip != null)
-				{
-					Vector3D forward2 = ast.Position - foundShip.Position;
-					Vector3D up2 = foundShip.Up;
-					Vector3D.OrthoNormalize(ref forward2, ref up2);
-					foundShip.Forward = forward2;
-					foundShip.Up = up2;
-					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
-					{
-						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
-						{
-							PlayerId = pl.PlayerId,
-							Name = pl.Name,
-							Rank = AuthorizedPersonRank.CommandingOfficer
-						});
-					}
-				}
-			}
-			else if (setupType == SpawnSetupType.FreeRoamSteropes || setupType == SpawnSetupType.FreeRoamArges)
-			{
-				foundShip = Ship.CreateNewShip((setupType == SpawnSetupType.FreeRoamSteropes) ? GameScenes.SceneID.AltCorp_Shuttle_CECA : GameScenes.SceneID.AltCorp_Shuttle_SARA, "", -1L, null, null, null, null, null, "StartingScene;");
-				if (foundShip != null)
-				{
-					foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					if (foundShip.AuthorizedPersonel.Find((AuthorizedPerson m) => m.PlayerId == pl.PlayerId) == null)
-					{
-						foundShip.AuthorizedPersonel.Add(new AuthorizedPerson
-						{
-							PlayerId = pl.PlayerId,
-							Name = pl.Name,
-							Rank = AuthorizedPersonRank.CommandingOfficer
-						});
-					}
-				}
-			}
-			else
-			{
-				switch (setupType)
-				{
-				case SpawnSetupType.SteropesNearRandomStation:
-				{
-					SpaceObjectVessel ves = (from m in AllVessels
-						where m.IsMainVessel && m.IsPrefabStationVessel
-						orderby MathHelper.RandomNextDouble()
-						select m).FirstOrDefault();
-					foundShip = Ship.CreateNewShip(GameScenes.SceneID.AltCorp_Shuttle_CECA, "", -1L, (ves != null) ? new List<long> { ves.GUID } : null, null, null, null, null, "StartingScene;");
-					if (foundShip != null)
-					{
-						foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-						Vector3D forward3 = ves.Position - foundShip.Position;
-						Vector3D up3 = foundShip.Up;
-						Vector3D.OrthoNormalize(ref forward3, ref up3);
-						foundShip.Forward = forward3;
-						foundShip.Up = up3;
-					}
-					break;
-				}
-				case SpawnSetupType.SteropesNearDoomedOutpost:
-				{
-					Ship sh = Ship.CreateNewShip(GameScenes.SceneID.Generic_Debris_Outpost001, "", -1L);
-					sh.Orbit.InitFromPeriapisAndApoapsis(SolarSystem.GetCelestialBody(2L).Orbit, MathHelper.RandomRange(9500000, 10000000), MathHelper.RandomRange(28000000, 32000000), MathHelper.RandomRange(-90, 90), MathHelper.RandomRange(32, 89), MathHelper.RandomRange(44, 87), MathHelper.RandomRange(270, 270), SolarSystemTime);
-					foundShip = Ship.CreateNewShip(GameScenes.SceneID.AltCorp_Shuttle_CECA, "", -1L, (sh != null) ? new List<long> { sh.GUID } : null, null, null, null, null, "StartingScene;");
-					if (foundShip != null)
-					{
-						Vector3D forward4 = sh.Position - foundShip.Position;
-						Vector3D up4 = foundShip.Up;
-						Vector3D.OrthoNormalize(ref forward4, ref up4);
-						foundShip.Forward = forward4;
-						foundShip.Up = up4;
-						foundSpawnPoint = foundShip.GetPlayerSpawnPoint(pl);
-					}
-					break;
-				}
-				default:
-					ResetSpawnPointsForPlayer(pl, null);
-					foundShip = SpawnManager.SpawnStartingSetup(setupType.ToString());
-					if (foundShip != null)
-					{
-						foundSpawnPoint = SpawnManager.SetStartingSetupSpawnPoints(foundShip, pl);
-					}
-					if (foundShip == null || foundSpawnPoint == null)
-					{
-						Dbg.Error("FAILED TO SPAWN STARTING SETUP", pl.GUID, foundShip?.GUID ?? (-1));
-					}
-					break;
-				}
-			}
-		}
-		else if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.PlayerId) && SpawnPointInvites[pl.PlayerId].SpawnPoint.Ship.GUID == shipID)
-		{
-			foundShip = GetVessel(shipID) as Ship;
-			foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.PlayerId].SpawnPoint : null);
-			if (foundSpawnPoint != null)
-			{
-				ResetSpawnPointsForPlayer(pl, null);
-			}
-		}
-		else if (shipID > 0)
-		{
-			foundShip = GetVessel(shipID) as Ship;
-			foundSpawnPoint = foundShip?.GetPlayerSpawnPoint(pl);
-			if (foundSpawnPoint != null)
-			{
-				ResetSpawnPointsForPlayer(pl, null);
-			}
-		}
-#else
 		switch (setupType)
 		{
 		case SpawnSetupType.Continue:
@@ -1032,14 +827,14 @@ public class Server
 			}
 			if (foundShip == null || foundSpawnPoint == null)
 			{
-				Dbg.Error("FAILED TO SPAWN STARTING SETUP", pl.GUID, foundShip?.GUID ?? (-1));
+				Dbg.Error("FAILED TO SPAWN STARTING SETUP", pl.GUID, foundShip?.GUID ?? -1);
 			}
 			break;
 		case SpawnSetupType.None:
-			if (shipID > 0 && SpawnPointInvites.ContainsKey(pl.PlayerId) && SpawnPointInvites[pl.PlayerId].SpawnPoint.Ship.GUID == shipID)
+			if (shipId > 0 && _spawnPointInvites.ContainsKey(pl.PlayerId) && _spawnPointInvites[pl.PlayerId].SpawnPoint.Ship.GUID == shipId)
 			{
-				foundShip = GetVessel(shipID) as Ship;
-				foundSpawnPoint = ((foundShip != null) ? SpawnPointInvites[pl.PlayerId].SpawnPoint : null);
+				foundShip = GetVessel(shipId) as Ship;
+				foundSpawnPoint = foundShip != null ? _spawnPointInvites[pl.PlayerId].SpawnPoint : null;
 				if (foundSpawnPoint != null)
 				{
 					ResetSpawnPointsForPlayer(pl, null);
@@ -1047,7 +842,7 @@ public class Server
 			}
 			break;
 		}
-#endif
+
 		if (foundShip != null && foundSpawnPoint != null)
 		{
 			foundSpawnPoint.Player = pl;
@@ -1086,9 +881,9 @@ public class Server
 	public List<SpawnPointDetails> GetAvailableSpawnPoints(Player pl)
 	{
 		List<SpawnPointDetails> retVal = new List<SpawnPointDetails>();
-		if (pl.PlayerId != null && SpawnPointInvites.ContainsKey(pl.PlayerId))
+		if (pl.PlayerId != null && _spawnPointInvites.TryGetValue(pl.PlayerId, out var invite))
 		{
-			ShipSpawnPoint sp = SpawnPointInvites[pl.PlayerId].SpawnPoint;
+			ShipSpawnPoint sp = invite.SpawnPoint;
 			SpawnPointDetails spd = new SpawnPointDetails
 			{
 				Name = sp.Ship.FullName,
@@ -1129,11 +924,9 @@ public class Server
 		EventSystem.AddListener(typeof(ConsoleMessage), ConsoleMessageListener);
 		EventSystem.AddListener(typeof(ExplosionMessage), ExplosionMessageListener);
 		EventSystem.AddListener(typeof(LatencyTestMessage), LatencyTestListener);
-		EventSystem.AddListener(typeof(SaveGameMessage), SaveGameMessageListener);
 		EventSystem.AddListener(typeof(ServerShutDownMessage), ServerShutDownMessageListener);
 		EventSystem.AddListener(typeof(NameTagMessage), NameTagMessageListener);
 
-#if !HELLION_SP
 		try
 		{
 			RegisterServerResponse response = await MsConnection.Send<RegisterServerResponse>(new RegisterServerRequest
@@ -1148,8 +941,8 @@ public class Server
 			NetworkController.ServerId = response.ServerId;
 			Console.Title = " (id: " + (NetworkController.ServerId == null ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
 			Dbg.UnformattedMessage("r\n\tServer ID: " + NetworkController.ServerId + "\r\n");
-			CheckInPassed = true;
-			AdminIPAddressRanges = response.AdminIpAddressRanges;
+			_checkInPassed = true;
+			_adminIpAddressRanges = response.AdminIpAddressRanges;
 		}
 		catch (MainServerException)
 		{
@@ -1161,7 +954,6 @@ public class Server
 			Dbg.Exception(ex);
 			IsRunning = false;
 		}
-#endif
 	}
 
 	public void TransferResourcesMessageListener(NetworkData data)
@@ -1181,15 +973,15 @@ public class Server
 				toCargo2 = toVessel.MainDistributionManager.GetResourceContainer(new VesselObjectID(trm.ToVesselGuid, trm.ToInSceneID));
 			}
 			DynamicObject dobj2 = fromVessel.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.AttachPointID != null && m.Item.AttachPointID.InSceneID == trm.FromInSceneID);
-			if (dobj2 != null && dobj2.Item != null && dobj2.Item is ICargo && toCargo2 != null)
+			if (dobj2 != null && dobj2.Item != null && dobj2.Item is ICargo item && toCargo2 != null)
 			{
 				if (trm.ToLocationType != 0)
 				{
-					TransferResources(dobj2.Item as ICargo, trm.FromCompartmentID, toCargo2, trm.ToCompartmentID, trm.ResourceType, trm.Quantity);
+					TransferResources(item, trm.FromCompartmentID, toCargo2, trm.ToCompartmentID, trm.ResourceType, trm.Quantity);
 				}
 				else
 				{
-					VentResources(dobj2.Item as ICargo, trm.FromCompartmentID, trm.ResourceType, trm.Quantity);
+					VentResources(item, trm.FromCompartmentID, trm.ResourceType, trm.Quantity);
 				}
 			}
 			return;
@@ -1206,15 +998,15 @@ public class Server
 				fromCargo2 = fromVessel.MainDistributionManager.GetResourceContainer(new VesselObjectID(trm.FromVesselGuid, trm.FromInSceneID));
 			}
 			DynamicObject dobj = toVessel.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.AttachPointID != null && m.Item.AttachPointID.InSceneID == trm.ToInSceneID);
-			if (dobj != null && dobj.Item != null && dobj.Item is ICargo && fromCargo2 != null)
+			if (dobj != null && dobj.Item != null && dobj.Item is ICargo item && fromCargo2 != null)
 			{
 				if (trm.ToLocationType != 0)
 				{
-					TransferResources(fromCargo2, trm.FromCompartmentID, dobj.Item as ICargo, trm.ToCompartmentID, trm.ResourceType, trm.Quantity);
+					TransferResources(fromCargo2, trm.FromCompartmentID, item, trm.ToCompartmentID, trm.ResourceType, trm.Quantity);
 				}
 				else
 				{
-					VentResources(dobj.Item as ICargo, trm.FromCompartmentID, trm.ResourceType, trm.Quantity);
+					VentResources(item, trm.FromCompartmentID, trm.ResourceType, trm.Quantity);
 				}
 			}
 			return;
@@ -1264,10 +1056,10 @@ public class Server
 		}
 	}
 
-	public void TransferResources(ICargo fromCargo, short fromCompartmentID, ICargo toCargo, short toCompartmentID, ResourceType resourceType, float quantity)
+	public void TransferResources(ICargo fromCargo, short fromCompartmentId, ICargo toCargo, short toCompartmentId, ResourceType resourceType, float quantity)
 	{
-		CargoCompartmentData fromCompartment = fromCargo.Compartments.Find((CargoCompartmentData m) => m.ID == fromCompartmentID);
-		CargoCompartmentData toCompartment = toCargo.Compartments.Find((CargoCompartmentData m) => m.ID == toCompartmentID);
+		CargoCompartmentData fromCompartment = fromCargo.Compartments.Find((CargoCompartmentData m) => m.ID == fromCompartmentId);
+		CargoCompartmentData toCompartment = toCargo.Compartments.Find((CargoCompartmentData m) => m.ID == toCompartmentId);
 		if (fromCompartment == null || toCompartment == null || (toCompartment.AllowedResources.Count > 0 && !toCompartment.AllowedResources.Contains(resourceType)) || (toCompartment.AllowOnlyOneType && toCompartment.Resources.Count > 0 && toCompartment.Resources[0].ResourceType != resourceType))
 		{
 			return;
@@ -1290,14 +1082,14 @@ public class Server
 			{
 				qty = free;
 			}
-			fromCargo.ChangeQuantityBy(fromCompartmentID, resourceType, 0f - qty);
-			toCargo.ChangeQuantityBy(toCompartmentID, resourceType, qty);
+			fromCargo.ChangeQuantityBy(fromCompartmentId, resourceType, 0f - qty);
+			toCargo.ChangeQuantityBy(toCompartmentId, resourceType, qty);
 		}
 	}
 
-	private void VentResources(ICargo fromCargo, short fromCompartmentID, ResourceType resourceType, float quantity)
+	private void VentResources(ICargo fromCargo, short fromCompartmentId, ResourceType resourceType, float quantity)
 	{
-		CargoCompartmentData fromCompartment = fromCargo.Compartments.Find((CargoCompartmentData m) => m.ID == fromCompartmentID);
+		CargoCompartmentData fromCompartment = fromCargo.Compartments.Find((CargoCompartmentData m) => m.ID == fromCompartmentId);
 		if (fromCompartment == null)
 		{
 			return;
@@ -1311,11 +1103,11 @@ public class Server
 			{
 				qty = available;
 			}
-			fromCargo.ChangeQuantityBy(fromCompartmentID, resourceType, 0f - qty);
+			fromCargo.ChangeQuantityBy(fromCompartmentId, resourceType, 0f - qty);
 		}
 	}
 
-	public void FabricateItemMessageListener(NetworkData data)
+	private void FabricateItemMessageListener(NetworkData data)
 	{
 		FabricateItemMessage fim = data as FabricateItemMessage;
 		SpaceObjectVessel vessel = GetVessel(fim.ID.VesselGUID);
@@ -1325,7 +1117,7 @@ public class Server
 		}
 	}
 
-	public void CancelFabricationMessageListener(NetworkData data)
+	private void CancelFabricationMessageListener(NetworkData data)
 	{
 		CancelFabricationMessage cfm = data as CancelFabricationMessage;
 		SpaceObjectVessel vessel = GetVessel(cfm.ID.VesselGUID);
@@ -1335,7 +1127,7 @@ public class Server
 		}
 	}
 
-	public void RepairMessageListener(NetworkData data)
+	private void RepairMessageListener(NetworkData data)
 	{
 		Player pl = GetPlayer(data.Sender);
 		if (pl == null)
@@ -1343,19 +1135,16 @@ public class Server
 			return;
 		}
 		Item rTool = pl.PlayerInventory.HandsSlot.Item;
-		if (!(rTool is RepairTool))
+		if (!(rTool is RepairTool rt))
 		{
 			return;
 		}
-		if (data is RepairVesselMessage)
+		if (data is RepairVesselMessage rvm)
 		{
-			RepairVesselMessage rvm = data as RepairVesselMessage;
-			(rTool as RepairTool).RepairVessel(rvm.ID);
+			rt.RepairVessel(rvm.ID);
 		}
-		else if (data is RepairItemMessage)
+		else if (data is RepairItemMessage rim)
 		{
-			RepairItemMessage rim = data as RepairItemMessage;
-			RepairTool rt = rTool as RepairTool;
 			if (rim.GUID > 0)
 			{
 				rt.RepairItem(rim.GUID);
@@ -1367,14 +1156,14 @@ public class Server
 		}
 	}
 
-	public void HurtPlayerMessageListener(NetworkData data)
+	private void HurtPlayerMessageListener(NetworkData data)
 	{
 		Player pl = GetPlayer(data.Sender);
 		HurtPlayerMessage hpm = data as HurtPlayerMessage;
 		pl.Stats.TakeDamage(hpm.Duration, hpm.Damage);
 	}
 
-	public void ConsoleMessageListener(NetworkData data)
+	private void ConsoleMessageListener(NetworkData data)
 	{
 		Player player = GetPlayer(data.Sender);
 		ConsoleMessage cm = data as ConsoleMessage;
@@ -1384,10 +1173,10 @@ public class Server
 		}
 	}
 
-	public void TextChatMessageListener(NetworkData data)
+	private void TextChatMessageListener(NetworkData data)
 	{
 		TextChatMessage tcm = data as TextChatMessage;
-		Player player = m_Players[tcm.Sender];
+		Player player = _players[tcm.Sender];
 		tcm.GUID = player.FakeGuid;
 		tcm.Name = player.Name;
 		if (tcm.MessageText.Length > 250)
@@ -1398,7 +1187,7 @@ public class Server
 		{
 			Vector3D playerGlobalPos = player.Parent.Position + player.Position;
 			{
-				foreach (Player pl in m_Players.Values)
+				foreach (Player pl in _players.Values)
 				{
 					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
 					{
@@ -1428,15 +1217,15 @@ public class Server
 			if (parts[0] == "refill" && parts.Length == 1)
 			{
 				Item handsItem = player.PlayerInventory.HandsSlot.Item;
-				if (handsItem != null && handsItem is ICargo)
+				if (handsItem != null && handsItem is ICargo cargo)
 				{
-					foreach (CargoCompartmentData ccd in (handsItem as ICargo).Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
+					foreach (CargoCompartmentData ccd in cargo.Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
 					{
 						using List<CargoResourceData>.Enumerator enumerator2 = ccd.Resources.GetEnumerator();
 						if (enumerator2.MoveNext())
 						{
 							CargoResourceData r = enumerator2.Current;
-							(handsItem as ICargo).ChangeQuantityBy(ccd.ID, r.ResourceType, ccd.Capacity);
+							cargo.ChangeQuantityBy(ccd.ID, r.ResourceType, ccd.Capacity);
 						}
 					}
 				}
@@ -1445,26 +1234,26 @@ public class Server
 					foreach (InventorySlot os in player.PlayerInventory.CurrOutfit.InventorySlots.Values)
 					{
 						Item item2 = os.Item;
-						if (item2 == null || !(item2 is ICargo))
+						if (item2 == null || !(item2 is ICargo cargo1))
 						{
 							continue;
 						}
-						foreach (CargoCompartmentData ccd2 in (item2 as ICargo).Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
+						foreach (CargoCompartmentData ccd2 in cargo1.Compartments.Where((CargoCompartmentData m) => m.AllowOnlyOneType))
 						{
 							using List<CargoResourceData>.Enumerator enumerator5 = ccd2.Resources.GetEnumerator();
 							if (enumerator5.MoveNext())
 							{
 								CargoResourceData r2 = enumerator5.Current;
-								(item2 as ICargo).ChangeQuantityBy(ccd2.ID, r2.ResourceType, ccd2.Capacity);
+								cargo1.ChangeQuantityBy(ccd2.ID, r2.ResourceType, ccd2.Capacity);
 							}
 						}
 					}
 				}
-				if (!(parent is SpaceObjectVessel))
+				if (!(parent is SpaceObjectVessel vessel))
 				{
 					return;
 				}
-				foreach (ResourceContainer rc in (parent as SpaceObjectVessel).MainDistributionManager.GetResourceContainers())
+				foreach (ResourceContainer rc in vessel.MainDistributionManager.GetResourceContainers())
 				{
 					foreach (CargoCompartmentData ccd3 in rc.Compartments)
 					{
@@ -1475,7 +1264,7 @@ public class Server
 					}
 				}
 				{
-					foreach (GeneratorCapacitor cap in from m in (parent as SpaceObjectVessel).MainDistributionManager.GetGenerators()
+					foreach (GeneratorCapacitor cap in from m in vessel.MainDistributionManager.GetGenerators()
 						where m is GeneratorCapacitor
 						select m)
 					{
@@ -1529,17 +1318,17 @@ public class Server
 					if (dod.ItemType == ItemType.GenericItem)
 					{
 						InventorySlot slot = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.GenericItem));
-						DynamicObject.SpawnDynamicObject(dod.ItemType, (dod.DefaultAuxData as GenericItemData).SubType, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot, null, refill: true);
+						DynamicObject.SpawnDynamicObject(dod.ItemType, (dod.DefaultAuxData as GenericItemData).SubType, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot, refill: true);
 					}
 					else if (dod.ItemType == ItemType.MachineryPart)
 					{
 						InventorySlot slot2 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.MachineryPart));
-						DynamicObject.SpawnDynamicObject(dod.ItemType, GenericItemSubType.None, (dod.DefaultAuxData as MachineryPartData).PartType, parent, -1, spawnItemPosition, null, null, tier, slot2, null, refill: true);
+						DynamicObject.SpawnDynamicObject(dod.ItemType, GenericItemSubType.None, (dod.DefaultAuxData as MachineryPartData).PartType, parent, -1, spawnItemPosition, null, null, tier, slot2, refill: true);
 					}
 					else
 					{
 						InventorySlot slot3 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(dod.ItemType));
-						DynamicObject.SpawnDynamicObject(dod.ItemType, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot3, null, refill: true);
+						DynamicObject.SpawnDynamicObject(dod.ItemType, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot3, refill: true);
 					}
 					return;
 				}
@@ -1548,7 +1337,7 @@ public class Server
 					if (v.ToString().ToLower().Contains(parts[1]))
 					{
 						InventorySlot slot4 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(v));
-						DynamicObject.SpawnDynamicObject(v, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot4, null, refill: true);
+						DynamicObject.SpawnDynamicObject(v, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot4, refill: true);
 						return;
 					}
 				}
@@ -1557,7 +1346,7 @@ public class Server
 					if (v4.ToString().ToLower().Contains(parts[1]))
 					{
 						InventorySlot slot5 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.GenericItem));
-						DynamicObject.SpawnDynamicObject(ItemType.GenericItem, v4, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot5, null, refill: true);
+						DynamicObject.SpawnDynamicObject(ItemType.GenericItem, v4, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot5, refill: true);
 						return;
 					}
 				}
@@ -1566,24 +1355,23 @@ public class Server
 					if (v5.ToString().ToLower().Contains(parts[1]))
 					{
 						InventorySlot slot6 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.MachineryPart));
-						DynamicObject.SpawnDynamicObject(ItemType.MachineryPart, GenericItemSubType.None, v5, parent, -1, spawnItemPosition, null, null, tier, slot6, null, refill: true);
+						DynamicObject.SpawnDynamicObject(ItemType.MachineryPart, GenericItemSubType.None, v5, parent, -1, spawnItemPosition, null, null, tier, slot6, refill: true);
 						return;
 					}
 				}
 				{
-					foreach (GameScenes.SceneID v6 in Enum.GetValues(typeof(GameScenes.SceneID)))
+					foreach (GameScenes.SceneId v6 in Enum.GetValues(typeof(GameScenes.SceneId)))
 					{
 						if (v6.ToString().ToLower().Contains(parts[1]))
 						{
-							string tag = ((parts.Length == 3) ? parts[2] : "");
+							string tag = parts.Length == 3 ? parts[2] : "";
 							if (GameScenes.Ranges.IsShip(v6))
 							{
-								tag = tag + ((tag == "" || tag.EndsWith(";")) ? "" : ";") + "_RescueVessel";
+								tag = tag + (tag == "" || tag.EndsWith(";") ? "" : ";") + "_RescueVessel";
 							}
 							Vector3D offset;
-							if (parent is SpaceObjectVessel)
+							if (parent is SpaceObjectVessel vessel6)
 							{
-								SpaceObjectVessel vessel6 = parent as SpaceObjectVessel;
 								offset = QuaternionD.LookRotation(vessel6.Forward, vessel6.Up) * (player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0);
 							}
 							else
@@ -1592,12 +1380,12 @@ public class Server
 							}
 							if (GameScenes.Ranges.IsAsteroid(v6))
 							{
-								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, new List<long> { (parent is SpaceObjectVessel) ? (parent as SpaceObjectVessel).MainVessel.GUID : parent.GUID }, null, offset * 10.0, null, null, tag, checkPosition: false);
+								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.GUID : parent.GUID }, null, offset * 10.0, null, null, tag, checkPosition: false);
 								asteroid.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
 							}
 							else
 							{
-								Ship ship2 = Ship.CreateNewShip(v6, "", -1L, new List<long> { (parent is SpaceObjectVessel) ? (parent as SpaceObjectVessel).MainVessel.GUID : parent.GUID }, null, offset, null, null, tag, checkPosition: false);
+								Ship ship2 = Ship.CreateNewShip(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.GUID : parent.GUID }, null, offset, null, null, tag, checkPosition: false);
 								ship2.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
 							}
 							break;
@@ -1608,9 +1396,9 @@ public class Server
 			}
 			if (parts[0] == "selfdestruct" && parts.Length == 2)
 			{
-				if (parent is SpaceObjectVessel && int.TryParse(parts[1], out var time2))
+				if (parent is SpaceObjectVessel vessel && int.TryParse(parts[1], out var time2))
 				{
-					(parent as SpaceObjectVessel).SelfDestructTimer = new SelfDestructTimer(parent as SpaceObjectVessel, time2);
+					vessel.SelfDestructTimer = new SelfDestructTimer(vessel, time2);
 				}
 				return;
 			}
@@ -1619,17 +1407,17 @@ public class Server
 				double distance = 500.0;
 				double velocity = 50.0;
 				double radius2 = 10.0;
-				Vector3D offset3 = ((!(parent is SpaceObjectVessel)) ? (player.LocalRotation * Vector3D.Forward * distance) : (QuaternionD.LookRotation((parent as SpaceObjectVessel).Forward, (parent as SpaceObjectVessel).Up) * player.LocalRotation * Vector3D.Forward * distance));
-				Ship ship3 = Ship.CreateNewShip(GameScenes.SceneID.AltCorp_CorridorModule, "", -1L, new List<long> { parent.GUID }, null, offset3, null, null, "", checkPosition: false);
+				Vector3D offset3 = !(parent is SpaceObjectVessel vessel) ? player.LocalRotation * Vector3D.Forward * distance : QuaternionD.LookRotation(vessel.Forward, vessel.Up) * player.LocalRotation * Vector3D.Forward * distance;
+				Ship ship3 = Ship.CreateNewShip(GameScenes.SceneId.AltCorp_CorridorModule, "", -1L, new List<long> { parent.GUID }, null, offset3, null, null, checkPosition: false);
 				Vector3D thrust2 = -offset3.Normalized * velocity;
 				Vector3D offset4 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * radius2 * 2.0;
 				ship3.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
 				ship3.Orbit.InitFromStateVectors(ship3.Orbit.Parent, ship3.Orbit.Position + offset4, ship3.Orbit.Velocity + thrust2, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 				return;
 			}
-			if (parts[0] == "setmain" && parts.Length == 1 && parent is SpaceObjectVessel)
+			if (parts[0] == "setmain" && parts.Length == 1 && parent is SpaceObjectVessel objectVessel)
 			{
-				(parent as SpaceObjectVessel).SetMainVessel();
+				objectVessel.SetMainVessel();
 				return;
 			}
 			if (parts[0] == "pressurize" && parts.Length == 1 && parent is SpaceObjectVessel)
@@ -1662,14 +1450,13 @@ public class Server
 				Vector3D offset2 = player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0;
 				Vector3D direction = (player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward).Normalized;
 				long guid = player.Parent.GUID;
-				if (parent is SpaceObjectVessel)
+				if (parent is SpaceObjectVessel vessel7)
 				{
-					SpaceObjectVessel vessel7 = parent as SpaceObjectVessel;
 					offset2 = QuaternionD.LookRotation(vessel7.MainVessel.Forward, vessel7.MainVessel.Up) * (offset2 - vessel7.VesselData.CollidersCenterOffset.ToVector3D());
 					direction = QuaternionD.LookRotation(vessel7.MainVessel.Forward, vessel7.MainVessel.Up) * direction;
 					guid = vessel7.MainVessel.GUID;
 				}
-				Ship ship = Ship.CreateNewShip(GameScenes.SceneID.AltCorp_DockableContainer, "PHTORP MK4", -1L, new List<long> { guid }, null, offset2, null, null, "", checkPosition: false);
+				Ship ship = Ship.CreateNewShip(GameScenes.SceneId.AltCorp_DockableContainer, "PHTORP MK4", -1L, new List<long> { guid }, null, offset2, null, null, checkPosition: false);
 				ship.Forward = direction;
 				Vector3D thrust = direction * 80.0;
 				ship.Orbit.InitFromStateVectors(ship.Orbit.Parent, ship.Orbit.Position, ship.Orbit.Velocity + thrust, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
@@ -1736,8 +1523,8 @@ public class Server
 				{
 					foreach (SpaceObjectVessel ves in artificialBodies)
 					{
-						foreach (Item item in from m in m_objects.Values
-							where m is DynamicObject && (m as DynamicObject).Parent == ves && (m as DynamicObject).Item != null
+						foreach (Item item in from m in _objects.Values
+							where m is DynamicObject dynamicObject && dynamicObject.Parent == ves && dynamicObject.Item != null
 							select (m as DynamicObject).Item)
 						{
 							string name = item.TypeName;
@@ -1751,7 +1538,7 @@ public class Server
 				}
 				foreach (KeyValuePair<string, int> kv in count)
 				{
-					msg = msg + ((msg == "") ? "" : "\r\n") + kv.Key + ": " + kv.Value;
+					msg = msg + (msg == "" ? "" : "\r\n") + kv.Key + ": " + kv.Value;
 				}
 				NetworkController.Instance.SendToGameClient(player.GUID, new ConsoleMessage
 				{
@@ -1761,21 +1548,21 @@ public class Server
 			}
 			if (parts[0] == "station" && parts.Length == 2)
 			{
-				List<SpaceObjectVessel> vessels = StationBlueprint.AssembleStation(parts[1], "JsonStation", "JsonStation", null, parent.GUID, 1f);
+				List<SpaceObjectVessel> vessels = StationBlueprint.AssembleStation(parts[1], "JsonStation", "JsonStation", null, parent.GUID);
 				return;
 			}
 			if (parts[0] == "collision" && parts.Length == 2)
 			{
-				if (!(player.Parent is SpaceObjectVessel))
+				if (!(player.Parent is SpaceObjectVessel vessel5))
 				{
 					return;
 				}
-				SpaceObjectVessel vessel5 = player.Parent as SpaceObjectVessel;
-				vessel5.MainVessel.RigidBody.CollisionFlags = ((parts[1] == "0") ? CollisionFlags.NoContactResponse : CollisionFlags.None);
+
+				vessel5.MainVessel.RigidBody.CollisionFlags = parts[1] == "0" ? CollisionFlags.NoContactResponse : CollisionFlags.None;
 				{
 					foreach (SpaceObjectVessel v3 in vessel5.MainVessel.AllDockedVessels)
 					{
-						v3.RigidBody.CollisionFlags = ((parts[1] == "0") ? CollisionFlags.NoContactResponse : CollisionFlags.None);
+						v3.RigidBody.CollisionFlags = parts[1] == "0" ? CollisionFlags.NoContactResponse : CollisionFlags.None;
 					}
 					return;
 				}
@@ -1795,10 +1582,10 @@ public class Server
 			if (parts[0] == "teleport" && parts.Length == 2)
 			{
 				ArtificialBody target = null;
-				Player p = m_Players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
-				if (p != null && p.Parent is ArtificialBody)
+				Player p = _players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
+				if (p != null && p.Parent is ArtificialBody body)
 				{
-					target = ((!(p.Parent is SpaceObjectVessel)) ? (p.Parent as ArtificialBody) : (p.Parent as SpaceObjectVessel).MainVessel);
+					target = !(body is SpaceObjectVessel vessel) ? body : vessel.MainVessel;
 				}
 				else
 				{
@@ -1810,22 +1597,22 @@ public class Server
 						target = v2.MainVessel;
 					}
 				}
-				ArtificialBody myAB = ((parent is SpaceObjectVessel) ? (parent as SpaceObjectVessel).MainVessel : (parent as ArtificialBody));
-				if (target != null && target != myAB)
+				ArtificialBody myAb = parent is SpaceObjectVessel spaceObjectVessel ? spaceObjectVessel.MainVessel : parent as ArtificialBody;
+				if (target != null && target != myAb)
 				{
-					myAB.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
-					myAB.Orbit.CopyDataFrom(target.Orbit, SolarSystem.CurrentTime, exactCopy: true);
-					if (myAB is Pivot)
+					myAb.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+					myAb.Orbit.CopyDataFrom(target.Orbit, SolarSystem.CurrentTime, exactCopy: true);
+					if (myAb is Pivot)
 					{
-						myAB.Orbit.RelativePosition -= player.LocalPosition + player.LocalRotation * Vector3D.Forward * (target.Radius + 100.0);
-						myAB.Orbit.RelativeVelocity -= player.LocalVelocity;
+						myAb.Orbit.RelativePosition -= player.LocalPosition + player.LocalRotation * Vector3D.Forward * (target.Radius + 100.0);
+						myAb.Orbit.RelativeVelocity -= player.LocalVelocity;
 					}
 					else
 					{
-						myAB.Orbit.RelativePosition -= myAB.Forward * (target.Radius + 100.0);
+						myAb.Orbit.RelativePosition -= myAb.Forward * (target.Radius + 100.0);
 					}
-					myAB.Orbit.InitFromCurrentStateVectors(SolarSystem.CurrentTime);
-					myAB.Orbit.UpdateOrbit();
+					myAb.Orbit.InitFromCurrentStateVectors(SolarSystem.CurrentTime);
+					myAb.Orbit.UpdateOrbit();
 				}
 				return;
 			}
@@ -1847,11 +1634,11 @@ public class Server
 				}
 				else
 				{
-					if (!(parent is SpaceObjectVessel))
+					if (!(parent is SpaceObjectVessel vessel4))
 					{
 						return;
 					}
-					SpaceObjectVessel vessel4 = parent as SpaceObjectVessel;
+
 					vessel4.Health = vessel4.MaxHealth;
 					foreach (VesselRepairPoint vrp in vessel4.RepairPoints)
 					{
@@ -1867,7 +1654,7 @@ public class Server
 				ArtificialBody[] artificialBodies2 = SolarSystem.GetArtificialBodies();
 				foreach (ArtificialBody ab in artificialBodies2)
 				{
-					if (!(ab is SpaceObjectVessel) || (!(ab as SpaceObjectVessel).IsInvulnerable && !ab.IsPartOfSpawnSystem && !(ab is Asteroid)))
+					if (!(ab is SpaceObjectVessel vessel) || (!vessel.IsInvulnerable && !vessel.IsPartOfSpawnSystem && !(vessel is Asteroid)))
 					{
 						continue;
 					}
@@ -1882,8 +1669,8 @@ public class Server
 					}
 					if (!found)
 					{
-						ab.MarkForDestruction = true;
-						SpawnManager.SpawnedVessels.Remove(ab.GUID);
+						vessel.MarkForDestruction = true;
+						SpawnManager.SpawnedVessels.Remove(vessel.GUID);
 					}
 				}
 				return;
@@ -1899,7 +1686,7 @@ public class Server
 			}
 			if (parts[0] == "resetblueprints")
 			{
-				foreach (Player pl in m_Players.Values)
+				foreach (Player pl in _players.Values)
 				{
 					pl.Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
 					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
@@ -1912,9 +1699,8 @@ public class Server
 			if (parts[0] == "blink" && parts.Length == 2)
 			{
 				double.TryParse(parts[1], out var dist);
-				if (parent is SpaceObjectVessel)
+				if (parent is SpaceObjectVessel vessel3)
 				{
-					SpaceObjectVessel vessel3 = parent as SpaceObjectVessel;
 					vessel3.MainVessel.DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
 					vessel3.MainVessel.Orbit.RelativePosition += vessel3.Forward * dist * 1000.0;
 					vessel3.MainVessel.Orbit.InitFromCurrentStateVectors(SolarSystemTime);
@@ -1924,9 +1710,8 @@ public class Server
 			else if (parts[0] == "whereami" && parts.Length == 1)
 			{
 				string msg2;
-				if (parent is SpaceObjectVessel)
+				if (parent is SpaceObjectVessel vessel)
 				{
-					SpaceObjectVessel vessel = parent as SpaceObjectVessel;
 					msg2 = "Inside vessel '" + vessel.VesselData.VesselName + "' near " + (CelestialBodyGUID)vessel.Orbit.Parent.CelestialBody.GUID;
 					foreach (SpawnRule sr in SpawnManager.spawnRules)
 					{
@@ -1938,11 +1723,11 @@ public class Server
 				}
 				else
 				{
-					if (!(parent is Pivot))
+					if (!(parent is Pivot pivot))
 					{
 						return;
 					}
-					msg2 = "Near " + (parent as Pivot).Orbit.Parent.CelestialBody.ToString();
+					msg2 = "Near " + pivot.Orbit.Parent.CelestialBody;
 				}
 				NetworkController.Instance.SendToGameClient(player.GUID, new ConsoleMessage
 				{
@@ -1951,14 +1736,14 @@ public class Server
 			}
 			else
 			{
-				if (!(parts[0] == "restock") || parts.Length != 1 || !(parent is SpaceObjectVessel))
+				if (!(parts[0] == "restock") || parts.Length != 1 || !(parent is SpaceObjectVessel vessel))
 				{
 					return;
 				}
 				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>();
-				list.Add((parent as SpaceObjectVessel).MainVessel);
+				list.Add(vessel.MainVessel);
 				{
-					foreach (SpaceObjectVessel vessel2 in list.Concat((parent as SpaceObjectVessel).MainVessel.AllDockedVessels))
+					foreach (SpaceObjectVessel vessel2 in list.Concat(vessel.MainVessel.AllDockedVessels))
 					{
 						foreach (VesselAttachPoint ap in vessel2.AttachPoints.Values.Where((VesselAttachPoint m) => m.Item == null))
 						{
@@ -1982,19 +1767,19 @@ public class Server
 									it = ItemType.GenericItem;
 								}
 							}
-							DynamicObject.SpawnDynamicObject(it, gt, mt, vessel2, ap.InSceneID, null, null, null, MathHelper.RandomRange(1, 5), null, null, refill: true);
+							DynamicObject.SpawnDynamicObject(it, gt, mt, vessel2, ap.InSceneID, null, null, null, MathHelper.RandomRange(1, 5), null, refill: true);
 							if (mt != 0)
 							{
 								vessel2.MainDistributionManager.GetVesselComponentByPartSlot(ap.Item.AttachPointID)?.FitPartToSlot(ap.Item.AttachPointID, (MachineryPart)ap.Item);
 							}
 						}
 					}
-					return;
 				}
 			}
 		}
 		catch (Exception)
 		{
+			// ignored
 		}
 	}
 
@@ -2023,11 +1808,11 @@ public class Server
 			break;
 		case SystemMessagesTypes.RestartServerTime:
 		{
-					string timeLeftToRestart = ((!(timeToRestart <= 10.0)) ? (timeToRestart / 60.0).ToString() : timeToRestart.ToString());
+					string timeLeftToRestart = !(_timeToRestart <= 10.0) ? (_timeToRestart / 60.0).ToString() : _timeToRestart.ToString();
 					tcm.MessageParam = new string[2]
 			{
 				timeLeftToRestart,
-				(timeToRestart <= 10.0) ? "seconds" : "minutes"
+				_timeToRestart <= 10.0 ? "seconds" : "minutes"
 			};
 			break;
 		}
@@ -2047,7 +1832,7 @@ public class Server
 			return;
 		}
 		pl.MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
-		spawnSuccsessful = ((!pl.IsAlive) ? AddPlayerToShip(pl, p.SpawnSetupType, p.SpawPointParentID) : (pl.Parent != null && pl.Parent is ArtificialBody));
+		spawnSuccsessful = !pl.IsAlive ? AddPlayerToShip(pl, p.SpawnSetupType, p.SpawPointParentID) : pl.Parent != null && pl.Parent is ArtificialBody;
 		PlayerSpawnResponse spawnResponse = new PlayerSpawnResponse();
 		if (!spawnSuccsessful)
 		{
@@ -2055,9 +1840,9 @@ public class Server
 		}
 		else
 		{
-			if (pl.Parent is Pivot && (pl.Parent as Pivot).StabilizeToTargetObj != null)
+			if (pl.Parent is Pivot pivot && pivot.StabilizeToTargetObj != null)
 			{
-				(pl.Parent as Pivot).DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
+				pivot.DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
 			}
 			if (pl.Parent != null && !pl.IsSubscribedTo(pl.Parent.GUID))
 			{
@@ -2075,7 +1860,7 @@ public class Server
 				spawnResponse.MainVesselID = mainVessel.GUID;
 			}
 
-			ArtificialBody mainAb = ((mainVessel != null) ? mainVessel : parentObj);
+			ArtificialBody mainAb = mainVessel != null ? mainVessel : parentObj;
 			spawnResponse.ParentTransform = new ObjectTransform
 			{
 				GUID = mainAb.GUID,
@@ -2084,17 +1869,16 @@ public class Server
 				Up = mainAb.Up.ToFloatArray()
 			};
 
-			if (mainVessel != null && mainVessel is Ship)
+			if (mainVessel != null && mainVessel is Ship mainShip)
 			{
-				Ship mainShip = mainVessel as Ship;
 				spawnResponse.DockedVessels = mainShip.GetDockedVesselsData();
 				spawnResponse.VesselData = mainShip.VesselData;
 				spawnResponse.VesselObjects = mainShip.GetVesselObjects();
 			}
-			else if (mainVessel != null && mainVessel is Asteroid)
+			else if (mainVessel != null && mainVessel is Asteroid asteroid)
 			{
-				spawnResponse.VesselData = mainVessel.VesselData;
-				spawnResponse.MiningPoints = (mainVessel as Asteroid).MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList();
+				spawnResponse.VesselData = asteroid.VesselData;
+				spawnResponse.MiningPoints = asteroid.MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList();
 			}
 
 			if (mainAb.Orbit.IsOrbitValid)
@@ -2143,27 +1927,27 @@ public class Server
 			}
 			if (ServerRestartTimeSec > 0.0)
 			{
-				spawnResponse.TimeUntilServerRestart = (restartTime - DateTime.UtcNow).TotalSeconds;
+				spawnResponse.TimeUntilServerRestart = (RestartTime - DateTime.UtcNow).TotalSeconds;
 			}
-			if (pl.Parent is ArtificialBody)
+			if (pl.Parent is ArtificialBody body)
 			{
-				HashSet<GameScenes.SceneID> SceneIDs = new HashSet<GameScenes.SceneID>();
-				List<SpaceObjectVessel> vessels = (from m in SolarSystem.GetArtificialBodieslsInRange(pl.Parent as ArtificialBody, 10000.0)
+				HashSet<GameScenes.SceneId> sceneIDs = new HashSet<GameScenes.SceneId>();
+				List<SpaceObjectVessel> vessels = (from m in SolarSystem.GetArtificialBodieslsInRange(body, 10000.0)
 					where m is SpaceObjectVessel
 					select m as SpaceObjectVessel).ToList();
-				if (pl.Parent is SpaceObjectVessel)
+				if (body is SpaceObjectVessel vessel)
 				{
-					vessels.Add(pl.Parent as SpaceObjectVessel);
+					vessels.Add(vessel);
 				}
 				foreach (SpaceObjectVessel ves in vessels)
 				{
-					SceneIDs.Add(ves.SceneID);
+					sceneIDs.Add(ves.SceneID);
 					foreach (SpaceObjectVessel dves in ves.AllDockedVessels)
 					{
-						SceneIDs.Add(dves.SceneID);
+						sceneIDs.Add(dves.SceneID);
 					}
 				}
-				spawnResponse.Scenes = SceneIDs.ToList();
+				spawnResponse.Scenes = sceneIDs.ToList();
 			}
 			spawnResponse.Quests = pl.Quests.Select((Quest m) => m.GetDetails()).ToList();
 			spawnResponse.Blueprints = pl.Blueprints;
@@ -2189,7 +1973,7 @@ public class Server
 		foreach (long guid in req.GUIDs)
 		{
 			SpaceObject obj = GetObject(guid);
-			if (obj != null && (!(obj is SpaceObjectVessel) || (obj as SpaceObjectVessel).IsMainVessel))
+			if (obj != null && (!(obj is SpaceObjectVessel vessel) || vessel.IsMainVessel))
 			{
 				res.Data.Add(obj.GetSpawnResponseData(pl));
 			}
@@ -2217,21 +2001,21 @@ public class Server
 		}
 		foreach (DynamicObjectsRespawn dos in toRemove)
 		{
-			if (dos.Parent is SpaceObjectVessel && dos.Parent.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.AttachPointID != null && dos.APDetails != null && m.Item.AttachPointID.InSceneID == dos.APDetails.InSceneID) != null)
+			if (dos.Parent is SpaceObjectVessel && dos.Parent.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.AttachPointID != null && dos.ApDetails != null && m.Item.AttachPointID.InSceneID == dos.ApDetails.InSceneID) != null)
 			{
 				dos.Timer = dos.RespawnTime;
 				continue;
 			}
 			DynamicObjectsRespawnList.Remove(dos);
-			if (m_vessels.ContainsKey(dos.Parent.GUID))
+			if (_vessels.ContainsKey(dos.Parent.GUID))
 			{
 				DynamicObject dobj = new DynamicObject(dos.Data, dos.Parent, -1L);
 				if (dos.Data.AttachPointInSceneId > 0 && dobj.Item != null)
 				{
-					dobj.Item.SetAttachPoint(dos.APDetails);
+					dobj.Item.SetAttachPoint(dos.ApDetails);
 				}
-				dobj.APDetails = dos.APDetails;
-				dobj.RespawnTime = ((dos.Data.SpawnSettings.Length != 0) ? dos.Data.SpawnSettings[0].RespawnTime : (-1f));
+				dobj.APDetails = dos.ApDetails;
+				dobj.RespawnTime = dos.Data.SpawnSettings.Length != 0 ? dos.Data.SpawnSettings[0].RespawnTime : -1f;
 				if (dobj.Item != null && dobj.Item != null && dos.MaxHealth >= 0f && dos.MinHealth >= 0f)
 				{
 					IDamageable idmg = dobj.Item;
@@ -2276,7 +2060,7 @@ public class Server
 		Dbg.Info("REMOVING ALL WORLD OBJECTS");
 		try
 		{
-			long[] array = m_Players.Keys.ToArray();
+			long[] array = _players.Keys.ToArray();
 			foreach (long guid in array)
 			{
 				NetworkController.Instance.DisconnectClient(guid);
@@ -2286,25 +2070,25 @@ public class Server
 		catch (Exception)
 		{
 		}
-		m_Players.Clear();
-		m_objects.Clear();
+		_players.Clear();
+		_objects.Clear();
 		ArtificialBody[] artificialBodies = Instance.SolarSystem.GetArtificialBodies();
 		foreach (ArtificialBody ab in artificialBodies)
 		{
-			if (ab is Ship)
+			if (ab is Ship ship)
 			{
-				(ab as Ship).Destroy();
+				ship.Destroy();
 			}
-			else if (ab is Asteroid)
+			else if (ab is Asteroid asteroid)
 			{
-				(ab as Asteroid).Destroy();
+				asteroid.Destroy();
 			}
 			else
 			{
 				Instance.SolarSystem.RemoveArtificialBody(ab);
 			}
 		}
-		m_vessels.Clear();
+		_vessels.Clear();
 		WorldInitialized = false;
 	}
 
@@ -2314,9 +2098,8 @@ public class Server
 		{
 			return;
 		}
-		if (ab is SpaceObjectVessel)
+		if (ab is SpaceObjectVessel ves)
 		{
-			SpaceObjectVessel ves = ab as SpaceObjectVessel;
 			if (destroyChildren && ves.AllDockedVessels.Count > 0)
 			{
 				foreach (SpaceObjectVessel child in new List<SpaceObjectVessel>(ves.AllDockedVessels))
@@ -2367,7 +2150,7 @@ public class Server
 				{
 					destroyVessels = new HashSet<SpaceObjectVessel>();
 				}
-				destroyVessels.Add((vessel.DockedToMainVessel != null) ? vessel.DockedToMainVessel : vessel);
+				destroyVessels.Add(vessel.DockedToMainVessel != null ? vessel.DockedToMainVessel : vessel);
 			}
 			else
 			{
@@ -2381,7 +2164,7 @@ public class Server
 				DestroyArtificialBody(dv, destroyChildren: true, vesselExploded: true);
 			}
 		}
-		foreach (DynamicObject dobj in m_updateableDynamicObjects.Values)
+		foreach (DynamicObject dobj in _updateableDynamicObjects.Values)
 		{
 			(dobj.Item as IUpdateable).Update(deltaTime);
 		}
@@ -2397,7 +2180,7 @@ public class Server
 
 	private void PrintObjectsDebug(double time)
 	{
-		Dbg.Info("Server stats, objects", m_objects.Count, "players", m_Players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+		Dbg.Info("Server stats, objects", _objects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 	}
 
 	public void MainLoop()
@@ -2406,13 +2189,13 @@ public class Server
 		InitializeDebrisFields();
 		if (CleanStart || PersistenceSaveInterval < 0.0 || (CleanStart = !Persistence.Load(LoadPersistenceFromFile)))
 		{
-			if ((double)solarSystemStartTime < 0.0)
+			if ((double)_solarSystemStartTime < 0.0)
 			{
 				SolarSystem.CalculatePositionsAfterTime(MathHelper.RandomRange(86400.0, 5256000.0));
 			}
 			else
 			{
-				SolarSystem.CalculatePositionsAfterTime(solarSystemStartTime);
+				SolarSystem.CalculatePositionsAfterTime(_solarSystemStartTime);
 			}
 			InitializeWorld();
 		}
@@ -2422,116 +2205,89 @@ public class Server
 		}
 		Start();
 		NetworkController.Instance.Start();
-		tickMilliseconds = System.Math.Floor(1000.0 / (double)numberOfTicks);
-		lastTime = DateTime.UtcNow;
-#if !HELLION_SP
+		_tickMilliseconds = System.Math.Floor(1000.0 / _numberOfTicks);
+		_lastTime = DateTime.UtcNow;
 		if (ServerRestartTimeSec > 0.0)
 		{
-			restartTime = DateTime.UtcNow.AddSeconds(ServerRestartTimeSec);
+			RestartTime = DateTime.UtcNow.AddSeconds(ServerRestartTimeSec);
 			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, ServerAutoRestartTimer);
 		}
-#endif
 		DoomedShipController.SubscribeToTimer();
 		bool hadSleep = true;
 		DateTime lastServerTickedWithoutSleepTime = DateTime.MinValue;
-		if (printDebugObjects)
+		if (_printDebugObjects)
 		{
 			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_hr, PrintObjectsDebug);
 		}
 		SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, UpdateShipSystemsTimer);
-		mainLoopStarted = true;
-
-#if HELLION_SP
-		// Don't change. This gives the single player game the required connection info.
-		Console.WriteLine("ports:" + GamePort + "," + StatusPort);
-		Console.WriteLine("ready");
-#endif
+		_mainLoopStarted = true;
 
 		Dbg.Log("Starting main game loop.");
-#if !HELLION_SP
 		Task.Run(delegate
 		{
-			MainLoopWatcher();
+			StartMainLoopWatcher();
 		});
-#endif
 		while (IsRunning)
 		{
 			try
 			{
 				DateTime currentTime = DateTime.UtcNow;
-				TimeSpan span = currentTime - lastTime;
+				TimeSpan span = currentTime - _lastTime;
 
 				// Actual main loop. Functionaly go here.
-				if (span.TotalMilliseconds >= tickMilliseconds)
+				if (span.TotalMilliseconds >= _tickMilliseconds)
 				{
 					NetworkController.Instance.Tick();
 
 					AddRemovePlayers();
-					if (printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
+					if (_printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
 					{
-						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", tickMilliseconds, "objects", m_objects.Count, "players", m_Players.Count, "vessels", m_vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+						Dbg.Info("Server ticked without sleep, time span ms", span.TotalMilliseconds, "tick ms", _tickMilliseconds, "objects", _objects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 						lastServerTickedWithoutSleepTime = currentTime;
 					}
 					hadSleep = false;
 					DeltaTime = span.TotalSeconds;
 					UpdateData(span.TotalSeconds);
-					lastTime = currentTime;
-					foreach (UpdateTimer timer2 in m_timers)
+					_lastTime = currentTime;
+					foreach (UpdateTimer timer2 in _timers)
 					{
 						timer2.AddTime(DeltaTime);
 					}
-					if (m_timersToRemove.Count > 0)
+					if (_timersToRemove.Count > 0)
 					{
-						foreach (UpdateTimer timer in m_timersToRemove)
+						foreach (UpdateTimer timer in _timersToRemove)
 						{
 							if (timer.OnTick == null)
 							{
-								m_timers.Remove(timer);
+								_timers.Remove(timer);
 							}
 						}
-						m_timersToRemove.Clear();
+						_timersToRemove.Clear();
 					}
 					SpawnManager.UpdateTimers(DeltaTime);
-					if (PersistenceSaveInterval > 0.0 || manualSave)
+					if (PersistenceSaveInterval > 0.0 || _manualSave)
 					{
-						persistenceSaveTimer += span.TotalSeconds;
-						if (persistenceSaveTimer >= PersistenceSaveInterval || manualSave)
+						_persistenceSaveTimer += span.TotalSeconds;
+						if (_persistenceSaveTimer >= PersistenceSaveInterval || _manualSave)
 						{
-							persistenceSaveTimer = 0.0;
-							Persistence.Save(manualSaveFileName, manualSaveAuxData);
+							_persistenceSaveTimer = 0.0;
+							Persistence.Save(_manualSaveFileName, _manualSaveAuxData);
 						}
-						manualSave = false;
-						manualSaveFileName = null;
-						manualSaveAuxData = null;
+						_manualSave = false;
+						_manualSaveFileName = null;
+						_manualSaveAuxData = null;
 					}
 				}
 				else
 				{
 					hadSleep = true;
-					Thread.Sleep((int)(tickMilliseconds - span.TotalMilliseconds));
+					Thread.Sleep((int)(_tickMilliseconds - span.TotalMilliseconds));
 				}
 			}
 			catch (Exception ex)
 			{
 				Dbg.Exception(ex);
 			}
-
-#if HELLION_SP
-			// Stop server if player has closed the game.
-			try
-			{
-				if (ParentProcess.GetParentProcess().HasExited)
-				{
-					IsRunning = false;
-					SavePersistenceDataOnShutdown = false;
-					Restart = false;
-				}
-			}
-			catch (Exception ex)
-			{
-				Dbg.Exception(ex);
-			}
-#endif
 		}
 
 		// Shutting down...
@@ -2550,14 +2306,16 @@ public class Server
 		}
 		catch
 		{
+			// ignored
 		}
+
 		if (Restart)
 		{
 			RestartServer(CleanRestart);
 		}
 	}
 
-	private void MainLoopWatcher()
+	private void StartMainLoopWatcher()
 	{
 		double lastSolarSystemTime = SolarSystemTime;
 		bool logEvent = true;
@@ -2582,18 +2340,18 @@ public class Server
 
 	private void AddRemovePlayers()
 	{
-		foreach (Player player2 in m_playersToAdd)
+		foreach (Player player2 in _playersToAdd)
 		{
-			m_Players[player2.GUID] = player2;
-			m_objects[player2.FakeGuid] = player2;
+			_players[player2.GUID] = player2;
+			_objects[player2.FakeGuid] = player2;
 		}
-		m_playersToAdd = new ConcurrentBag<Player>();
-		foreach (Player player in m_playersToRemove)
+		_playersToAdd = new ConcurrentBag<Player>();
+		foreach (Player player in _playersToRemove)
 		{
-			m_Players.Remove(player.GUID);
-			m_objects.Remove(player.FakeGuid);
+			_players.Remove(player.GUID);
+			_objects.Remove(player.FakeGuid);
 		}
-		m_playersToRemove = new ConcurrentBag<Player>();
+		_playersToRemove = new ConcurrentBag<Player>();
 	}
 
 	public static void RestartServer(bool clean)
@@ -2697,20 +2455,20 @@ public class Server
 			{
 				break;
 			}
-			if (m_Players.ContainsKey(req.Sender))
+			if (_players.TryGetValue(req.Sender, out var player))
 			{
-				m_Players[req.Sender].UnsubscribeFrom(so);
+				player.UnsubscribeFrom(so);
 			}
 		}
 	}
 
 	public void SubscribeToTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = m_timers.Find((UpdateTimer x) => x.Step == step);
+		UpdateTimer timer = _timers.Find((UpdateTimer x) => x.Step == step);
 		if (timer == null)
 		{
 			timer = new UpdateTimer(step);
-			m_timers.Add(timer);
+			_timers.Add(timer);
 		}
 		UpdateTimer updateTimer = timer;
 		updateTimer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Combine(updateTimer.OnTick, del);
@@ -2718,13 +2476,13 @@ public class Server
 
 	public void UnsubscribeFromTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = m_timers.Find((UpdateTimer x) => x.Step == step);
+		UpdateTimer timer = _timers.Find((UpdateTimer x) => x.Step == step);
 		if (timer != null)
 		{
 			timer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Remove(timer.OnTick, del);
 			if (timer.OnTick == null)
 			{
-				m_timersToRemove.Add(timer);
+				_timersToRemove.Add(timer);
 			}
 		}
 	}
@@ -2770,7 +2528,7 @@ public class Server
 					{
 						PlayerId = pl.PlayerId,
 						Name = pl.Name,
-						AlreadyHasInvite = SpawnPointInvites.ContainsKey(pl.PlayerId)
+						AlreadyHasInvite = _spawnPointInvites.ContainsKey(pl.PlayerId)
 					});
 				}
 				if (pl.PlayerId.IsNullOrEmpty())
@@ -2827,24 +2585,8 @@ public class Server
 		}
 	}
 
-	public void SaveGameMessageListener(NetworkData data)
-	{
-#if HELLION_SP
-		manualSaveAuxData = (data as SaveGameMessage).AuxData;
-		manualSaveFileName = (data as SaveGameMessage).FileName;
-		manualSave = true;
-#endif
-	}
-
 	public void ServerShutDownMessageListener(NetworkData data)
 	{
-#if HELLION_SP
-		ServerShutDownMessage msg = data as ServerShutDownMessage;
-		Restart = msg.Restrat;
-		CleanRestart = msg.CleanRestart;
-		SavePersistenceDataOnShutdown = false;
-		IsRunning = false;
-#endif
 	}
 
 	private void NameTagMessageListener(NetworkData data)
@@ -2872,8 +2614,8 @@ public class Server
 			byte[] bytes = System.Net.IPAddress.Parse(address).GetAddressBytes();
 			Array.Reverse(bytes);
 			uint addr = BitConverter.ToUInt32(bytes, 0);
-			IpAddressRange[] adminIPAddressRanges = AdminIPAddressRanges;
-			foreach (IpAddressRange range in adminIPAddressRanges)
+			IpAddressRange[] adminIpAddressRanges = _adminIpAddressRanges;
+			foreach (IpAddressRange range in adminIpAddressRanges)
 			{
 				byte[] sBytes = System.Net.IPAddress.Parse(range.StartAddress).GetAddressBytes();
 				Array.Reverse(sBytes);
@@ -2895,12 +2637,12 @@ public class Server
 
 	public void UpdatePlayerInvitationTimers(double deltaTime)
 	{
-		if (SpawnPointInvites.Count == 0)
+		if (_spawnPointInvites.Count == 0)
 		{
 			return;
 		}
 		List<string> removedKeys = null;
-		foreach (KeyValuePair<string, SpawnPointInviteData> item in SpawnPointInvites)
+		foreach (KeyValuePair<string, SpawnPointInviteData> item in _spawnPointInvites)
 		{
 			item.Value.InviteTimer -= deltaTime;
 			if (item.Value.InviteTimer <= 0.0)
@@ -2924,16 +2666,16 @@ public class Server
 
 	public void ClearSpawnPointInvitation(string playerId)
 	{
-		if (SpawnPointInvites.ContainsKey(playerId))
+		if (_spawnPointInvites.ContainsKey(playerId))
 		{
-			SpawnPointInvites[playerId].SpawnPoint.SetInvitation("", "", sendMessage: true);
-			SpawnPointInvites.Remove(playerId);
+			_spawnPointInvites[playerId].SpawnPoint.SetInvitation("", "", sendMessage: true);
+			_spawnPointInvites.Remove(playerId);
 		}
 	}
 
 	public void CreateSpawnPointInvitation(ShipSpawnPoint sp, string playerId, string playerName)
 	{
-		SpawnPointInvites.Add(playerId, new SpawnPointInviteData
+		_spawnPointInvites.Add(playerId, new SpawnPointInviteData
 		{
 			SpawnPoint = sp,
 			InviteTimer = SpawnPointInviteTimer
@@ -2945,15 +2687,15 @@ public class Server
 	{
 		if (!invitedPlayerId.IsNullOrEmpty())
 		{
-			if (SpawnPointInvites.ContainsKey(invitedPlayerId) && SpawnPointInvites[invitedPlayerId].SpawnPoint == sp && sp.InvitedPlayerId == invitedPlayerId)
+			if (_spawnPointInvites.ContainsKey(invitedPlayerId) && _spawnPointInvites[invitedPlayerId].SpawnPoint == sp && sp.InvitedPlayerId == invitedPlayerId)
 			{
 				return false;
 			}
-			if (SpawnPointInvites.ContainsKey(invitedPlayerId))
+			if (_spawnPointInvites.ContainsKey(invitedPlayerId))
 			{
 				ClearSpawnPointInvitation(invitedPlayerId);
 			}
-			if (!sp.InvitedPlayerId.IsNullOrEmpty() && SpawnPointInvites.ContainsKey(sp.InvitedPlayerId))
+			if (!sp.InvitedPlayerId.IsNullOrEmpty() && _spawnPointInvites.ContainsKey(sp.InvitedPlayerId))
 			{
 				ClearSpawnPointInvitation(sp.InvitedPlayerId);
 			}
@@ -2962,7 +2704,7 @@ public class Server
 		}
 		if (!sp.InvitedPlayerId.IsNullOrEmpty())
 		{
-			if (SpawnPointInvites.ContainsKey(sp.InvitedPlayerId))
+			if (_spawnPointInvites.ContainsKey(sp.InvitedPlayerId))
 			{
 				ClearSpawnPointInvitation(sp.InvitedPlayerId);
 			}
@@ -2975,71 +2717,52 @@ public class Server
 		return false;
 	}
 
-#if HELLION_SP
-	public Asteroid GetRandomAsteroid()
-	{
-		List<Asteroid> asteroids = new List<Asteroid>();
-		foreach (KeyValuePair<long, SpaceObjectVessel> item in m_vessels)
-		{
-			if (item.Value is Asteroid)
-			{
-				asteroids.Add(item.Value as Asteroid);
-			}
-		}
-		if (asteroids.Count > 0)
-		{
-			return asteroids[MathHelper.RandomRange(0, asteroids.Count)];
-		}
-		return Asteroid.CreateNewAsteroid(GameScenes.SceneID.Asteroid01, "", -1L, null, null, null, null, null, "StartingScene;");
-	}
-
-#endif
 	private void ServerAutoRestartTimer(double time)
 	{
 		DateTime currentTime = DateTime.UtcNow;
-		if (currentTime.AddSeconds(timeToRestart) > restartTime)
+		if (currentTime.AddSeconds(_timeToRestart) > RestartTime)
 		{
-			if ((restartTime - currentTime).TotalSeconds >= timeToRestart - 2.0)
+			if ((RestartTime - currentTime).TotalSeconds >= _timeToRestart - 2.0)
 			{
 				NetworkController.Instance.SendToAllClients(SendSystemMessage(SystemMessagesTypes.RestartServerTime, null), -1L);
 			}
-			if (timeToRestart == 1800.0)
+			if (_timeToRestart == 1800.0)
 			{
-				timeToRestart = 900.0;
+				_timeToRestart = 900.0;
 			}
-			else if (timeToRestart == 900.0)
+			else if (_timeToRestart == 900.0)
 			{
-				timeToRestart = 300.0;
+				_timeToRestart = 300.0;
 			}
-			else if (timeToRestart == 300.0)
+			else if (_timeToRestart == 300.0)
 			{
-				timeToRestart = 60.0;
+				_timeToRestart = 60.0;
 			}
-			else if (timeToRestart == 60.0)
+			else if (_timeToRestart == 60.0)
 			{
-				timeToRestart = 10.0;
+				_timeToRestart = 10.0;
 			}
-			else if (timeToRestart <= 10.0)
+			else if (_timeToRestart <= 10.0)
 			{
-				timeToRestart -= 1.0;
+				_timeToRestart -= 1.0;
 			}
 			else
 			{
-				timeToRestart -= 300.0;
+				_timeToRestart -= 300.0;
 			}
 		}
-		if (currentTime > restartTime)
+		if (currentTime > RestartTime)
 		{
 			IsRunning = false;
 			Restart = true;
 			SavePersistenceDataOnShutdown = true;
-			restartTime = currentTime.AddSeconds(ServerRestartTimeSec);
+			RestartTime = currentTime.AddSeconds(ServerRestartTimeSec);
 		}
 	}
 
 	private void UpdateShipSystemsTimer(double time)
 	{
-		if (updatingShipSystems)
+		if (_updatingShipSystems)
 		{
 			return;
 		}
@@ -3047,8 +2770,8 @@ public class Server
 		{
 			try
 			{
-				updatingShipSystems = true;
-				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>(m_vessels.Values);
+				_updatingShipSystems = true;
+				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>(_vessels.Values);
 				foreach (SpaceObjectVessel current in list)
 				{
 					current.UpdateVesselSystems();
@@ -3066,7 +2789,7 @@ public class Server
 			catch
 			{
 			}
-			updatingShipSystems = false;
+			_updatingShipSystems = false;
 		});
 	}
 
@@ -3084,7 +2807,7 @@ public class Server
 	{
 		try
 		{
-			string dir = ((!ConfigDir.IsNullOrEmpty() && Directory.Exists(ConfigDir + "Data")) ? ConfigDir : "");
+			string dir = !ConfigDir.IsNullOrEmpty() && Directory.Exists(ConfigDir + "Data") ? ConfigDir : "";
 			List<DebrisField.DebrisFieldData> list = JsonSerialiser.Load<List<DebrisField.DebrisFieldData>>(dir + "Data/DebrisFields.json");
 			foreach (DebrisField.DebrisFieldData dfd in list)
 			{
@@ -3123,27 +2846,26 @@ public class Server
 		if (em.AffectedGUIDs != null && em.AffectedGUIDs.Length != 0)
 		{
 			Vector3D itemPos = item.DynamicObj.Position;
-			long[] affectedGUIDs = em.AffectedGUIDs;
-			foreach (long affectedGuid in affectedGUIDs)
+			long[] affectedGuiDs = em.AffectedGUIDs;
+			foreach (long affectedGuid in affectedGuiDs)
 			{
 				SpaceObject tmpSp = Instance.GetObject(affectedGuid);
 				if ((tmpSp.Position - item.DynamicObj.Position).Magnitude < (double)(item.ExplosionRadius * 1.5f) && affectedObjects.Add(tmpSp.GUID))
 				{
-					if (tmpSp is Player)
+					if (tmpSp is Player player)
 					{
-						(tmpSp as Player).Stats.TakeDamage(HurtType.Explosion, item.ExplosionDamage);
+						player.Stats.TakeDamage(HurtType.Explosion, item.ExplosionDamage);
 					}
-					if (tmpSp is DynamicObject && (tmpSp as DynamicObject).Item != null)
+					if (tmpSp is DynamicObject dynamicObject && dynamicObject.Item != null)
 					{
-						(tmpSp as DynamicObject).Item.TakeDamage(new Dictionary<TypeOfDamage, float> { { item.ExplosionDamageType, item.ExplosionDamage } });
+						dynamicObject.Item.TakeDamage(new Dictionary<TypeOfDamage, float> { { item.ExplosionDamageType, item.ExplosionDamage } });
 					}
 				}
 			}
 		}
-		if (item.ExplosionDamageType == TypeOfDamage.Impact && item.DynamicObj.Parent is SpaceObjectVessel && affectedObjects.Add(item.DynamicObj.Parent.GUID))
+		if (item.ExplosionDamageType == TypeOfDamage.Impact && item.DynamicObj.Parent is SpaceObjectVessel parentVessel && affectedObjects.Add(parentVessel.GUID))
 		{
 			List<VesselRepairPoint> list = null;
-			SpaceObjectVessel parentVessel = item.DynamicObj.Parent as SpaceObjectVessel;
 			if (em.RepairPointIDs != null)
 			{
 				list = new List<VesselRepairPoint>();
@@ -3162,10 +2884,10 @@ public class Server
 				ShipCollisionMessage scm = new ShipCollisionMessage
 				{
 					CollisionVelocity = 0f,
-					ShipOne = item.DynamicObj.Parent.GUID,
+					ShipOne = parentVessel.GUID,
 					ShipTwo = -1L
 				};
-				NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, item.DynamicObj.Parent);
+				NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, parentVessel);
 			}
 		}
 		Extensions.Invoke(delegate

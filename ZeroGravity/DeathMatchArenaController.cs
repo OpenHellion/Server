@@ -18,7 +18,7 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public double SquaredDistanceThreshold = 100000000.0;
 
-	public double timePassedSince = 0.0;
+	public double timePassedSince;
 
 	public DeathMatchArenaController(SpaceObjectVessel main, Ship ship, long arenaAsteroidID, double squaredDistanceThreshold = 100000000.0, float respawnTimeForShip = 100f)
 	{
@@ -41,7 +41,7 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public static Ship SpawnSara(SpaceObjectVessel mainShip, Vector3D pos, long arenaAsteroidID)
 	{
-		Ship sara = Ship.CreateNewShip(GameScenes.SceneID.AltCorp_Shuttle_SARA, "", -1L, new List<long> { mainShip.GUID }, null, pos, null, MathHelper.RandomRotation());
+		Ship sara = Ship.CreateNewShip(GameScenes.SceneId.AltCorp_Shuttle_SARA, "", -1L, new List<long> { mainShip.GUID }, null, pos, null, MathHelper.RandomRotation());
 		sara.StabilizeToTarget(Server.Instance.GetVessel(arenaAsteroidID), forceStabilize: true);
 		return sara;
 	}
@@ -72,7 +72,7 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public void DistanceCallback(double dbl)
 	{
-		double distanceSquared = (CurrentSpawnedShip == null) ? double.MaxValue : CurrentSpawnedShip.Position.DistanceSquared(MainVessel.Position);
+		double distanceSquared = CurrentSpawnedShip == null ? double.MaxValue : CurrentSpawnedShip.Position.DistanceSquared(MainVessel.Position);
 		if (distanceSquared > SquaredDistanceThreshold)
 		{
 			CurrentSpawnedShip = null;
@@ -86,7 +86,7 @@ public class DeathMatchArenaController : IPersistantObject
 		PersistenceArenaControllerData data = new PersistenceArenaControllerData
 		{
 			MainShipGUID = MainVessel.GUID,
-			CurrentSpawnedShipGUID = ((CurrentSpawnedShip == null) ? (-1) : CurrentSpawnedShip.GUID),
+			CurrentSpawnedShipGUID = CurrentSpawnedShip == null ? -1 : CurrentSpawnedShip.GUID,
 			RespawnTimeForShip = RespawnTimeForShip,
 			SquaredDistanceThreshold = SquaredDistanceThreshold,
 			timePassedSince = timePassedSince
@@ -96,9 +96,8 @@ public class DeathMatchArenaController : IPersistantObject
 
 	public void LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		if (persistenceData is PersistenceArenaControllerData)
+		if (persistenceData is PersistenceArenaControllerData data)
 		{
-			PersistenceArenaControllerData data = persistenceData as PersistenceArenaControllerData;
 			SquaredDistanceThreshold = data.SquaredDistanceThreshold;
 			RespawnTimeForShip = data.RespawnTimeForShip;
 			MainVessel = Server.Instance.GetVessel(data.MainShipGUID);

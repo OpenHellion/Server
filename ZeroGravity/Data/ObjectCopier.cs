@@ -25,36 +25,36 @@ public static class ObjectCopier
 			return source;
 		}
 		T ret;
-		if (source is Array)
+		if (source is Array array1)
 		{
 			object[] dim = new object[type.GetArrayRank()];
 			for (int i = 0; i < dim.Length; i++)
 			{
-				dim[i] = (source as Array).GetLength(i);
+				dim[i] = array1.GetLength(i);
 			}
 			ret = (T)Activator.CreateInstance(type, dim);
-			IEnumerable<IEnumerable<int>> dimensionBounds = from x in Enumerable.Range(0, (source as Array).Rank)
+			IEnumerable<IEnumerable<int>> dimensionBounds = from x in Enumerable.Range(0, array1.Rank)
 				select Enumerable.Range((source as Array).GetLowerBound(x), (source as Array).GetUpperBound(x) - (source as Array).GetLowerBound(x) + 1);
 			foreach (IEnumerable<int> indexSet in dimensionBounds.CartesianProduct())
 			{
 				int[] pos = indexSet.ToArray();
-				(ret as Array).SetValue(DeepCopy((source as Array).GetValue(pos), depth - 1), pos);
+				(ret as Array).SetValue(DeepCopy(array1.GetValue(pos), depth - 1), pos);
 			}
 		}
 		else
 		{
 			ret = (T)Activator.CreateInstance(type);
-			if (source is IDictionary)
+			if (source is IDictionary dictionary)
 			{
-				foreach (object key in (source as IDictionary).Keys)
+				foreach (object key in dictionary.Keys)
 				{
-					(ret as IDictionary)[key] = DeepCopy((source as IDictionary)[key], depth - 1);
+					(ret as IDictionary)[key] = DeepCopy(dictionary[key], depth - 1);
 				}
 			}
-			else if (type.IsGenericType && source is IEnumerable && type.GetGenericArguments().Length == 1)
+			else if (type.IsGenericType && source is IEnumerable enumerable && type.GetGenericArguments().Length == 1)
 			{
 				MethodInfo add = type.GetMethod("Add");
-				foreach (object obj in source as IEnumerable)
+				foreach (object obj in enumerable)
 				{
 					add.Invoke(ret, new object[1] { DeepCopy(obj, depth - 1) });
 				}

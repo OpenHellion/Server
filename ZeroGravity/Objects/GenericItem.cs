@@ -16,7 +16,7 @@ public class GenericItem : Item
 	{
 		get
 		{
-			return (stats != null) ? stats.Look : "";
+			return stats != null ? stats.Look : "";
 		}
 		set
 		{

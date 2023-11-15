@@ -42,7 +42,7 @@ public class DistributionManager
 
 	public class CompoundRoom
 	{
-		public float Volume = 0f;
+		public float Volume;
 
 		public HashSet<Room> Rooms = new HashSet<Room>();
 
@@ -50,9 +50,9 @@ public class DistributionManager
 
 		private float _AirQuality = 1f;
 
-		private float _AirPressureChangeRate = 0f;
+		private float _AirPressureChangeRate;
 
-		private float _AirQualityChangeRate = 0f;
+		private float _AirQualityChangeRate;
 
 		public List<ILifeSupportDevice> LifeSupportDevices = new List<ILifeSupportDevice>();
 
@@ -166,8 +166,8 @@ public class DistributionManager
 					LifeSupportDevices.AddRange(r.LifeSupportDevices);
 				}
 			}
-			_AirPressure = ((quantityDivider > 0f) ? (quantitySum / quantityDivider) : 0f);
-			_AirQuality = ((qualityDivider > 0f) ? (qualitySum / qualityDivider) : 0f);
+			_AirPressure = quantityDivider > 0f ? quantitySum / quantityDivider : 0f;
+			_AirQuality = qualityDivider > 0f ? qualitySum / qualityDivider : 0f;
 		}
 
 		private void addConnectedRooms(Room room)
@@ -243,7 +243,7 @@ public class DistributionManager
 			{
 				return 1;
 			}
-			return (types[x.GetType()] > types[y.GetType()] || (types[x.GetType()] == types[y.GetType()] && x is VesselComponent && y is VesselComponent && (x as VesselComponent).ParentVessel != (y as VesselComponent).ParentVessel)) ? 1 : (-1);
+			return types[x.GetType()] > types[y.GetType()] || (types[x.GetType()] == types[y.GetType()] && x is VesselComponent component && y is VesselComponent vesselComponent && component.ParentVessel != vesselComponent.ParentVessel) ? 1 : -1;
 		}
 	}
 
@@ -277,11 +277,11 @@ public class DistributionManager
 
 	public Dictionary<DistributionSystemType, float> AvailableResourceQuantities = new Dictionary<DistributionSystemType, float>();
 
-	private bool isCompoundDM = false;
+	private bool isCompoundDM;
 
 	private bool initialize = true;
 
-	private SpaceObjectVessel parentVessel = null;
+	private SpaceObjectVessel parentVessel;
 
 	static DistributionManager()
 	{
@@ -331,7 +331,7 @@ public class DistributionManager
 			float sumArea = 0f;
 			if (cr1.AirPressure <= float.Epsilon)
 			{
-				foreach (Door d in cr1.AirConsumers.Where((IAirConsumer m) => m is Door && (m as Door).isExternal && !(m as Door).IsSealed))
+				foreach (Door d in cr1.AirConsumers.Where((IAirConsumer m) => m is Door door1 && door1.isExternal && !door1.IsSealed))
 				{
 					sumArea += d.PassageArea;
 				}
@@ -345,7 +345,7 @@ public class DistributionManager
 			}
 			else if (cr2.AirPressure <= float.Epsilon)
 			{
-				foreach (Door d2 in cr2.AirConsumers.Where((IAirConsumer m) => m is Door && (m as Door).isExternal && !(m as Door).IsSealed))
+				foreach (Door d2 in cr2.AirConsumers.Where((IAirConsumer m) => m is Door door1 && door1.isExternal && !door1.IsSealed))
 				{
 					sumArea += d2.PassageArea;
 				}
@@ -644,7 +644,7 @@ public class DistributionManager
 		return null;
 	}
 
-	private DistributionNode AddShipDataStructure(SpaceObjectVessel vessel, GameScenes.SceneID sceneID)
+	private DistributionNode AddShipDataStructure(SpaceObjectVessel vessel, GameScenes.SceneId sceneID)
 	{
 		StructureSceneData structureSceneData = structureDefs[(short)sceneID];
 		foreach (RoomData roomData2 in structureSceneData.Rooms)
@@ -707,7 +707,7 @@ public class DistributionManager
 		foreach (ResourceContainerData rcData in structureSceneData.ResourceContainers)
 		{
 			VesselObjectID id3 = new VesselObjectID(vessel.GUID, rcData.InSceneID);
-			ResourceContainer rc = ((!isCompoundDM) ? ((rcData.DistributionSystemType != DistributionSystemType.Air) ? new ResourceContainer(vessel, id3, rcData) : new ResourceContainerAirTank(vessel, id3, rcData)) : vessel.DistributionManager.GetResourceContainer(id3));
+			ResourceContainer rc = !isCompoundDM ? rcData.DistributionSystemType != DistributionSystemType.Air ? new ResourceContainer(vessel, id3, rcData) : new ResourceContainerAirTank(vessel, id3, rcData) : vessel.DistributionManager.GetResourceContainer(id3);
 			node.ResourceProviders.Add(rc);
 			node.ResourceUsers.Add(rc);
 			idResourceContainers[id3] = rc;
@@ -724,34 +724,34 @@ public class DistributionManager
 			else
 			{
 				VesselComponent vc2 = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == ssData.InSceneID);
-				if (vc2 == null || !(vc2 is SubSystem))
+				if (vc2 == null || !(vc2 is SubSystem system))
 				{
 					continue;
 				}
-				ss = vc2 as SubSystem;
-				if (ss is SubSystemRCS)
+				ss = system;
+				if (ss is SubSystemRCS rcs)
 				{
-					vessel.RCS = ss as SubSystemRCS;
+					vessel.RCS = rcs;
 				}
-				else if (ss is SubSystemEngine)
+				else if (ss is SubSystemEngine engine)
 				{
-					vessel.Engine = ss as SubSystemEngine;
+					vessel.Engine = engine;
 				}
-				else if (ss is SubSystemFTL)
+				else if (ss is SubSystemFTL ftl)
 				{
-					vessel.FTL = ss as SubSystemFTL;
+					vessel.FTL = ftl;
 				}
-				else if (ss is SubSystemRefinery)
+				else if (ss is SubSystemRefinery refinery)
 				{
-					vessel.Refinery = ss as SubSystemRefinery;
+					vessel.Refinery = refinery;
 				}
-				else if (ss is VesselBaseSystem)
+				else if (ss is VesselBaseSystem baseSystem)
 				{
-					vessel.VesselBaseSystem = ss as VesselBaseSystem;
+					vessel.VesselBaseSystem = baseSystem;
 				}
-				else if (ss is SubSystemFabricator)
+				else if (ss is SubSystemFabricator fabricator)
 				{
-					vessel.Fabricator = ss as SubSystemFabricator;
+					vessel.Fabricator = fabricator;
 				}
 				foreach (int resourceContainer in ssData.ResourceContainers)
 				{
@@ -772,9 +772,9 @@ public class DistributionManager
 					Room room = idRooms[new VesselObjectID(vessel.GUID, ssData.RoomID)];
 					room.VesselComponents.Add(ss);
 					ss.Room = room;
-					if (ss is ILifeSupportDevice)
+					if (ss is ILifeSupportDevice device)
 					{
-						room.LifeSupportDevices.Add(ss as ILifeSupportDevice);
+						room.LifeSupportDevices.Add(device);
 					}
 				}
 			}
@@ -809,14 +809,14 @@ public class DistributionManager
 			else
 			{
 				VesselComponent vc = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == gData.InSceneID);
-				if (vc == null || !(vc is Generator))
+				if (vc == null || !(vc is Generator generator))
 				{
 					continue;
 				}
-				gen = vc as Generator;
-				if (gen is GeneratorCapacitor)
+				gen = generator;
+				if (gen is GeneratorCapacitor capacitor)
 				{
-					vessel.Capacitor = gen as GeneratorCapacitor;
+					vessel.Capacitor = capacitor;
 				}
 				foreach (int resourceContainer2 in gData.ResourceContainers)
 				{
@@ -890,7 +890,7 @@ public class DistributionManager
 					SecondaryStatus = kv.Value.SecondaryStatus,
 					Output = kv.Value.Output,
 					MaxOutput = kv.Value.MaxOutput,
-					OutputRate = ((kv.Value.FixedConsumption && kv.Value.Status == SystemStatus.OnLine && kv.Value.OperationRate > float.Epsilon) ? 1f : kv.Value.OperationRate),
+					OutputRate = kv.Value.FixedConsumption && kv.Value.Status == SystemStatus.OnLine && kv.Value.OperationRate > float.Epsilon ? 1f : kv.Value.OperationRate,
 					InputFactor = kv.Value.InputFactor,
 					PowerInputFactor = kv.Value.PowerInputFactor,
 					AutoRestart = kv.Value.CanReactivate,
@@ -915,7 +915,7 @@ public class DistributionManager
 					InSceneID = kv.Key.InSceneID,
 					Status = kv.Value.Status,
 					SecondaryStatus = kv.Value.SecondaryStatus,
-					OperationRate = ((kv.Value.FixedConsumption && kv.Value.Status == SystemStatus.OnLine && kv.Value.OperationRate > float.Epsilon) ? 1f : kv.Value.OperationRate),
+					OperationRate = kv.Value.FixedConsumption && kv.Value.Status == SystemStatus.OnLine && kv.Value.OperationRate > float.Epsilon ? 1f : kv.Value.OperationRate,
 					InputFactor = kv.Value.InputFactor,
 					PowerInputFactor = kv.Value.PowerInputFactor,
 					AutoRestart = kv.Value.CanReactivate,
@@ -996,7 +996,7 @@ public class DistributionManager
 
 	public void UpdateSystems(bool connectionsChanged = true, bool compoundRoomsChanged = true)
 	{
-		double duration = (initialize ? 0.0 : (DateTime.UtcNow - prevSystemsUpdateTime).TotalSeconds);
+		double duration = initialize ? 0.0 : (DateTime.UtcNow - prevSystemsUpdateTime).TotalSeconds;
 		initialize = false;
 		prevSystemsUpdateTime = DateTime.UtcNow;
 		if (isCompoundDM)
@@ -1040,12 +1040,12 @@ public class DistributionManager
 		UpdateConsumers((float)duration);
 		foreach (CompoundRoom cr in compRooms)
 		{
-			cr.AirQualityChangeRate = ((duration > 0.0) ? ((float)((double)(cr.AirQuality - prevAirQualities[cr]) / duration)) : 0f);
-			cr.AirPressureChangeRate = ((duration > 0.0) ? ((float)((double)(cr.AirPressure - prevAirPressures[cr]) / duration)) : 0f);
+			cr.AirQualityChangeRate = duration > 0.0 ? (float)((double)(cr.AirQuality - prevAirQualities[cr]) / duration) : 0f;
+			cr.AirPressureChangeRate = duration > 0.0 ? (float)((double)(cr.AirPressure - prevAirPressures[cr]) / duration) : 0f;
 		}
 		foreach (KeyValuePair<GeneratorCapacitor, float> kvCap in prevCapacities)
 		{
-			kvCap.Key.CapacityChangeRate = ((duration > 0.0) ? ((float)((double)(kvCap.Key.Capacity - kvCap.Value) / duration)) : 0f);
+			kvCap.Key.CapacityChangeRate = duration > 0.0 ? (float)((double)(kvCap.Key.Capacity - kvCap.Value) / duration) : 0f;
 		}
 		foreach (KeyValuePair<ResourceContainer, float> kvRc in prevQuantities)
 		{
@@ -1066,9 +1066,9 @@ public class DistributionManager
 		}
 		foreach (IResourceProvider rp2 in resourceProviderNodes.Keys)
 		{
-			if (rp2 is IResourceConsumer)
+			if (rp2 is IResourceConsumer consumer)
 			{
-				((IResourceConsumer)rp2).ConnectedProviders.Clear();
+				consumer.ConnectedProviders.Clear();
 			}
 		}
 		foreach (Room room in idRooms.Values)
@@ -1180,9 +1180,8 @@ public class DistributionManager
 			{
 				((IResourceProvider)gen).Output = 0f;
 			}
-			else if (gen is GeneratorCapacitor && reserved > float.Epsilon)
+			else if (gen is GeneratorCapacitor cap && reserved > float.Epsilon)
 			{
-				GeneratorCapacitor cap = gen as GeneratorCapacitor;
 				cap.Capacity = MathHelper.Clamp(cap.Capacity - reserved * duration, 0f, float.MaxValue);
 			}
 		}
@@ -1206,7 +1205,7 @@ public class DistributionManager
 		{
 			return;
 		}
-		foreach (Generator gen in resourceProviders.Where((IResourceProvider m) => m is Generator && m.OutputType == rc.OutputType && (m as Generator).Status == SystemStatus.OnLine))
+		foreach (Generator gen in resourceProviders.Where((IResourceProvider m) => m is Generator generator && m.OutputType == rc.OutputType && generator.Status == SystemStatus.OnLine))
 		{
 			reservedCapacities.TryGetValue(gen, out var alreadyReserved);
 			float capacityAvailable = gen.MaxOutput - alreadyReserved;
@@ -1244,10 +1243,9 @@ public class DistributionManager
 			{
 				reservedCapacities[gen] = alreadyReserved + tempQty;
 				rc.ChangeQuantityBy(0, rc.Compartments[0].Resources[0].ResourceType, tempQty);
-				if (rc is ResourceContainerAirTank)
+				if (rc is ResourceContainerAirTank airTank)
 				{
-					ResourceContainerAirTank airTank = rc as ResourceContainerAirTank;
-					airTank.AirQuality = MathHelper.Clamp((tempQty * 1f + rc.Compartments[0].Resources[0].Quantity * airTank.AirQuality) / (tempQty + rc.Compartments[0].Resources[0].Quantity), 0f, 1f);
+					airTank.AirQuality = MathHelper.Clamp((tempQty * 1f + airTank.Compartments[0].Resources[0].Quantity * airTank.AirQuality) / (tempQty + airTank.Compartments[0].Resources[0].Quantity), 0f, 1f);
 				}
 			}
 		}
@@ -1285,15 +1283,15 @@ public class DistributionManager
 				{
 					return;
 				}
-				foreach (IResourceProvider rp in resourceProviders.Where((IResourceProvider m) => !(m is Generator) || (m as Generator).Status == SystemStatus.OnLine))
+				foreach (IResourceProvider rp in resourceProviders.Where((IResourceProvider m) => !(m is Generator generator) || generator.Status == SystemStatus.OnLine))
 				{
 					reservedCapacities.TryGetValue(rp, out var reservedCapacity);
 					float capacityAvailable = rp.MaxOutput - reservedCapacity;
-					if (rp is Generator || !(rp is ResourceContainerAirTank))
+					if (rp is Generator || !(rp is ResourceContainerAirTank airTank2))
 					{
 						continue;
 					}
-					ResourceContainerAirTank airTank2 = rp as ResourceContainerAirTank;
+
 					reservedQuantities.TryGetValue(airTank2, out var reservedQuantity);
 					CargoResourceData resource = airTank2.Compartments[0].Resources.FirstOrDefault((CargoResourceData m) => m.ResourceType == ResourceType.Air);
 					if (resource == null)
@@ -1364,7 +1362,7 @@ public class DistributionManager
 		{
 			return;
 		}
-		foreach (GeneratorScrubber scrubber in resourceProviders.Where((IResourceProvider m) => m is GeneratorScrubber && (m as GeneratorScrubber).Status == SystemStatus.OnLine))
+		foreach (GeneratorScrubber scrubber in resourceProviders.Where((IResourceProvider m) => m is GeneratorScrubber scrubber && scrubber.Status == SystemStatus.OnLine))
 		{
 			reservedCapacities.TryGetValue(scrubber, out var alreadyReserved);
 			float scrubberCap = scrubber.MaxOutput - alreadyReserved;
@@ -1408,7 +1406,7 @@ public class DistributionManager
 			reservedCapacities[scrubber] = alreadyReserved + tempQty;
 			float scrubQty = tempQty / (1f - room.CompoundRoom.AirQuality);
 			float airQty = room.CompoundRoom.Volume * room.CompoundRoom.AirPressure;
-			room.CompoundRoom.AirQuality = ((airQty > float.Epsilon) ? ((scrubQty + (airQty - scrubQty) * room.CompoundRoom.AirQuality) / airQty) : 0f);
+			room.CompoundRoom.AirQuality = airQty > float.Epsilon ? (scrubQty + (airQty - scrubQty) * room.CompoundRoom.AirQuality) / airQty : 0f;
 			List<MachineryPart> cartridges = scrubber.MachineryParts.Values.Where((MachineryPart m) => m != null && m.PartType == MachineryPartType.CarbonFilters).ToList();
 			if (cartridges.Count > 0)
 			{
@@ -1446,25 +1444,25 @@ public class DistributionManager
 		HashSet<IResourceUser> consumers = new HashSet<IResourceUser>();
 		foreach (IResourceUser resourceUser2 in node.ResourceUsers)
 		{
-			if (resourceUser2 is IResourceConsumer && (resourceUser2 as IResourceConsumer).ResourceRequirements.ContainsKey(resourceProvider.OutputType))
+			if (resourceUser2 is IResourceConsumer consumer && consumer.ResourceRequirements.ContainsKey(resourceProvider.OutputType))
 			{
 				HashSet<ResourceContainer> containers = null;
-				(resourceUser2 as IResourceConsumer).ResourceContainers.TryGetValue(resourceProvider.OutputType, out containers);
+				consumer.ResourceContainers.TryGetValue(resourceProvider.OutputType, out containers);
 				if (resourceProvider is ResourceContainer && containers != null && containers.Contains(resourceProvider))
 				{
-					exclusiveConsumers.Add(resourceUser2);
+					exclusiveConsumers.Add(consumer);
 				}
 				else if (containers == null)
 				{
-					consumers.Add(resourceUser2);
+					consumers.Add(consumer);
 				}
 			}
-			else if ((resourceProvider is Generator && resourceUser2 is ResourceContainer && (resourceUser2 as ResourceContainer).NominalInput > 0f && (resourceUser2 as ResourceContainer).OutputType == resourceProvider.OutputType) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.Air) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.ScrubbedAir))
+			else if ((resourceProvider is Generator && resourceUser2 is ResourceContainer container && container.NominalInput > 0f && container.OutputType == resourceProvider.OutputType) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.Air) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.ScrubbedAir))
 			{
 				consumers.Add(resourceUser2);
 			}
 		}
-		HashSet<IResourceUser> list = ((exclusiveConsumers.Count > 0) ? exclusiveConsumers : consumers);
+		HashSet<IResourceUser> list = exclusiveConsumers.Count > 0 ? exclusiveConsumers : consumers;
 		foreach (IResourceUser resourceUser in list)
 		{
 			resourceProvider.ConnectedConsumers.Add(resourceUser);
@@ -1473,7 +1471,7 @@ public class DistributionManager
 				SortedSet<IResourceProvider> resourceProviders = null;
 				if (!resourceUser.ConnectedProviders.TryGetValue(resourceProvider.OutputType, out resourceProviders))
 				{
-					resourceProviders = (resourceUser.ConnectedProviders[resourceProvider.OutputType] = new SortedSet<IResourceProvider>(new ResourceproviderComparer()));
+					resourceProviders = resourceUser.ConnectedProviders[resourceProvider.OutputType] = new SortedSet<IResourceProvider>(new ResourceproviderComparer());
 				}
 				if (!resourceProviders.Contains(resourceProvider))
 				{
@@ -1531,7 +1529,7 @@ public class DistributionManager
 			{
 				if (cav.FireCanBurn)
 				{
-					qualityLoss += ((cav.AirPressure > 0f) ? (cons2.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration) : 0f);
+					qualityLoss += cav.AirPressure > 0f ? cons2.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration : 0f;
 					quantityLoss += cons2.AirQuantityDecreaseRate * duration;
 				}
 				else if (!(cons2 as AirConsumerFire).Persistent)
@@ -1551,7 +1549,7 @@ public class DistributionManager
 			{
 				foreach (IAirConsumer cons in cav.AirConsumers.Where((IAirConsumer m) => !(m is AirConsumerFire)))
 				{
-					qualityLoss += ((cav.AirPressure > 0f) ? (cons.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration) : 0f);
+					qualityLoss += cav.AirPressure > 0f ? cons.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration : 0f;
 					quantityLoss += cons.AirQuantityDecreaseRate * duration;
 				}
 			}

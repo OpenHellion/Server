@@ -22,13 +22,13 @@ public class ManeuverCourse
 
 	private Ship parentShip;
 
-	private bool isValid = false;
+	private bool isValid;
 
-	private bool isActivated = false;
+	private bool isActivated;
 
-	private bool isStartingSoonSent = false;
+	private bool isStartingSoonSent;
 
-	private bool isStarted = false;
+	private bool isStarted;
 
 	private ManeuverType type;
 
@@ -64,7 +64,7 @@ public class ManeuverCourse
 
 	private double tparam;
 
-	private SpaceObjectVessel targetVessel = null;
+	private SpaceObjectVessel targetVessel;
 
 	private WarpData warpData;
 
@@ -231,7 +231,7 @@ public class ManeuverCourse
 		targetOrbit.UpdateOrbit();
 		double stopDist = 0.0;
 		ArtificialBody[] artificialBodies = (from m in Server.Instance.SolarSystem.GetArtificialBodieslsInRange(targetOrbit.Parent.CelestialBody, targetOrbit.RelativePosition, 5000.0)
-			where !(m is SpaceObjectVessel) || (m as SpaceObjectVessel).MainVessel != parentShip.MainVessel
+			where !(m is SpaceObjectVessel vessel) || vessel.MainVessel != parentShip.MainVessel
 			select m).ToArray();
 		Vector3D endPos;
 		while (true)
@@ -364,7 +364,7 @@ public class ManeuverCourse
 	{
 		if (parentShip.MainVessel.RigidBody != null)
 		{
-			parentShip.MainVessel.RigidBody.CollisionFlags = ((!value) ? CollisionFlags.NoContactResponse : CollisionFlags.None);
+			parentShip.MainVessel.RigidBody.CollisionFlags = !value ? CollisionFlags.NoContactResponse : CollisionFlags.None;
 		}
 	}
 
@@ -378,7 +378,7 @@ public class ManeuverCourse
 				{
 					return false;
 				}
-				if (parentShip.SceneID == GameScenes.SceneID.AltCorp_Shuttle_SARA && parentShip.DockingPorts.Find((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
+				if (parentShip.SceneID == GameScenes.SceneId.AltCorp_Shuttle_SARA && parentShip.DockingPorts.Find((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
 				{
 					return false;
 				}
@@ -396,7 +396,7 @@ public class ManeuverCourse
 				{
 					foreach (int index in data.WarpCells)
 					{
-						totalCellsFuel += (warpCellFuel[index].HasValue ? warpCellFuel[index].Value : 0f);
+						totalCellsFuel += warpCellFuel[index].HasValue ? warpCellFuel[index].Value : 0f;
 					}
 				}
 				if ((double)totalCellsFuel < (double)warpData.ActivationCellConsumption + travelTime * (double)warpData.CellConsumption * (double)fuelConsumptionMultiplier)
@@ -486,7 +486,7 @@ public class ManeuverCourse
 				StartTime = startSolarSystemTime,
 				EndTime = endSolarSystemTime,
 				StartDirection = startDir.ToFloatArray(),
-				StaringSoon = (isActivated && startSolarSystemTime > Server.SolarSystemTime && Server.SolarSystemTime >= startSolarSystemTime - StartingSoonTime)
+				StaringSoon = isActivated && startSolarSystemTime > Server.SolarSystemTime && Server.SolarSystemTime >= startSolarSystemTime - StartingSoonTime
 			}, -1L, parentShip);
 		}
 	}

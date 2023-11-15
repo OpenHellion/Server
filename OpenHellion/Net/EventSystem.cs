@@ -124,7 +124,7 @@ public class EventSystem
 	{
 		if (_networkDataGroups.ContainsKey(data.GetType()) && _networkDataGroups[data.GetType()] != null)
 		{
-			if (_invokeImmediatelyDataTypes.Contains(data.GetType()) || Thread.CurrentThread.ManagedThreadId == Server.MainThreadID)
+			if (_invokeImmediatelyDataTypes.Contains(data.GetType()) || Thread.CurrentThread.ManagedThreadId == Server.MainThreadId)
 			{
 				_networkDataGroups[data.GetType()](data);
 			}
@@ -142,7 +142,7 @@ public class EventSystem
 	{
 		if (_internalDataGroups.ContainsKey(data.Type) && _internalDataGroups[data.Type] != null)
 		{
-			if (Thread.CurrentThread.ManagedThreadId == Server.MainThreadID)
+			if (Thread.CurrentThread.ManagedThreadId == Server.MainThreadId)
 			{
 				_internalDataGroups[data.Type](data);
 			}

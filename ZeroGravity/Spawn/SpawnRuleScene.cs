@@ -8,7 +8,7 @@ public class SpawnRuleScene
 
 	public int CountMax;
 
-	public GameScenes.SceneID SceneID;
+	public GameScenes.SceneId SceneID;
 
 	public float HealthMax;
 

@@ -27,17 +27,17 @@ public static class Dbg
 		}
 		catch
 		{
+			// ignored
 		}
+
 		Trace.Listeners.Clear();
 
-#if !HELLION_SP
 		// Logging to console creates issues for the client if it is singleplayer. Plus it is pointless.
 		ConsoleTraceListener consoleListener = new ConsoleTraceListener(useErrorStream: false)
 		{
 			TraceOutputOptions = TraceOptions.None
 		};
 		Trace.Listeners.Add(consoleListener);
-#endif
 
 		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false))
 		{
@@ -66,7 +66,7 @@ public static class Dbg
 
 	private static string GetString(object value)
 	{
-		return (value != null) ? value.ToString() : "NULL";
+		return value != null ? value.ToString() : "NULL";
 	}
 
 	[Conditional("DEBUG")]

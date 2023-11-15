@@ -25,14 +25,14 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		Mass = 100000000000.0;
 	}
 
-	public static Asteroid CreateNewAsteroid(GameScenes.SceneID sceneID, string registration = "", long asteroidGUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0, bool isDebrisFragment = false)
+	public static Asteroid CreateNewAsteroid(GameScenes.SceneId sceneID, string registration = "", long asteroidGUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0, bool isDebrisFragment = false)
 	{
 		Vector3D astPos = Vector3D.Zero;
 		Vector3D astVel = Vector3D.Zero;
 		Vector3D astForward = Vector3D.Forward;
 		Vector3D astUp = Vector3D.Up;
 		OrbitParameters orbit = null;
-		Asteroid asteroid = new Asteroid((asteroidGUID < 0) ? GUIDFactory.NextVesselGUID() : asteroidGUID, initializeOrbit: false, astPos, astVel, astForward, astUp);
+		Asteroid asteroid = new Asteroid(asteroidGUID < 0 ? GUIDFactory.NextVesselGUID() : asteroidGUID, initializeOrbit: false, astPos, astVel, astForward, astUp);
 		asteroid.VesselData = new VesselData
 		{
 			SceneID = sceneID,

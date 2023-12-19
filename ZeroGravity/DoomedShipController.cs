@@ -56,9 +56,9 @@ public class DoomedShipController : IPersistantObject
 
 	public void LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		if (!(persistenceData is PersistenceDataDoomController data))
+		if (persistenceData is not PersistenceDataDoomController data)
 		{
-			Dbg.Warning("PersistenceDataDoomController wrong type");
+			Debug.Warning("PersistenceDataDoomController wrong type");
 		}
 		else
 		{

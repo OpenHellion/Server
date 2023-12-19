@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BulletSharp;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -133,14 +133,14 @@ public class ManeuverCourse
 			}
 			if (!isValid)
 			{
-				NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
+				NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 				{
 					IsValid = isValid,
 					CourseGUID = GUID,
 					VesselGUID = parentShip.GUID
 				}, -1L, parentShip);
 			}
-			else if (data.EndOrbit.GUID.HasValue && (data.EndOrbit.ObjectType.Value == SpaceObjectType.Ship || data.EndOrbit.ObjectType.Value == SpaceObjectType.Asteroid))
+			else if (data.EndOrbit.GUID.HasValue && data.EndOrbit.ObjectType.Value is SpaceObjectType.Ship or SpaceObjectType.Asteroid)
 			{
 				targetVessel = Server.Instance.GetVessel(data.EndOrbit.GUID.Value);
 			}
@@ -156,7 +156,7 @@ public class ManeuverCourse
 			{
 				parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			NetworkController.Instance.SendToAllClients(new ManeuverCourseResponse
+			NetworkController.SendToAllClients(new ManeuverCourseResponse
 			{
 				IsValid = false,
 				IsFinished = true,
@@ -192,7 +192,7 @@ public class ManeuverCourse
 
 	private bool FillPositionAndVelocityAtTime(double solarSystemTime, ref Vector3D relativePosition, ref Vector3D relativeVelocity)
 	{
-		if (type == ManeuverType.Engine || type == ManeuverType.Transfer)
+		if (type is ManeuverType.Engine or ManeuverType.Transfer)
 		{
 			tparam = MathHelper.Clamp((solarSystemTime - startSolarSystemTime) / (endSolarSystemTime - startSolarSystemTime), 0.0, 1.0);
 			bezCurve.FillDataAtPart(tparam, ref relativePosition, ref relativeVelocity);
@@ -231,7 +231,7 @@ public class ManeuverCourse
 		targetOrbit.UpdateOrbit();
 		double stopDist = 0.0;
 		ArtificialBody[] artificialBodies = (from m in Server.Instance.SolarSystem.GetArtificialBodieslsInRange(targetOrbit.Parent.CelestialBody, targetOrbit.RelativePosition, 5000.0)
-			where !(m is SpaceObjectVessel vessel) || vessel.MainVessel != parentShip.MainVessel
+			where m is not SpaceObjectVessel vessel || vessel.MainVessel != parentShip.MainVessel
 			select m).ToArray();
 		Vector3D endPos;
 		while (true)
@@ -288,7 +288,7 @@ public class ManeuverCourse
 			{
 				parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
@@ -477,7 +477,7 @@ public class ManeuverCourse
 	{
 		if (isValid)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
@@ -496,7 +496,7 @@ public class ManeuverCourse
 		if (isValid && !isStartingSoonSent)
 		{
 			isStartingSoonSent = true;
-			NetworkController.Instance.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,

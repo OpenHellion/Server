@@ -105,9 +105,9 @@ public class Outfit : Item
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataOutfit data))
+			if (persistenceData is not PersistenceObjectDataOutfit data)
 			{
-				Dbg.Warning("PersistenceObjectDataOutfit data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataOutfit data is null", base.GUID);
 			}
 			else
 			{
@@ -117,7 +117,7 @@ public class Outfit : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

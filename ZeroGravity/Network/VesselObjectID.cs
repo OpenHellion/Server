@@ -26,7 +26,7 @@ public class VesselObjectID
 
 	public override bool Equals(object obj)
 	{
-		if (obj == null || !(obj is VesselObjectID other))
+		if (obj is not VesselObjectID other)
 		{
 			return false;
 		}

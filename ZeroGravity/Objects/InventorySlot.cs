@@ -72,7 +72,7 @@ public class InventorySlot
 		{
 			return Outfit.DynamicObj;
 		}
-		Dbg.Error("Slot has no parent", SlotID, SlotType);
+		Debug.Error("Slot has no parent", SlotID, SlotType);
 		return null;
 	}
 

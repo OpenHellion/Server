@@ -53,9 +53,9 @@ public class DisposableHackingTool : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataHackingTool data))
+			if (persistenceData is not PersistenceObjectDataHackingTool data)
 			{
-				Dbg.Warning("PersistenceObjectDataHackingTool data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataHackingTool data is null", base.GUID);
 			}
 			else
 			{
@@ -65,7 +65,7 @@ public class DisposableHackingTool : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

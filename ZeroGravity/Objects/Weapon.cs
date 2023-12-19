@@ -132,9 +132,9 @@ public class Weapon : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataWeapon data))
+			if (persistenceData is not PersistenceObjectDataWeapon data)
 			{
-				Dbg.Warning("PersistenceObjectDataWeapon data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataWeapon data is null", base.GUID);
 			}
 			else
 			{
@@ -143,7 +143,7 @@ public class Weapon : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

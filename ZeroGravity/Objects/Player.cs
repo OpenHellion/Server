@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -348,7 +348,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		if (lastPlayerStatsMessage != null)
 		{
 			lastPlayerStatsMessage.LockedToTriggerID = null;
-			NetworkController.Instance.SendToClientsSubscribedTo(lastPlayerStatsMessage, GUID, Parent);
+			NetworkController.SendToClientsSubscribedTo(lastPlayerStatsMessage, GUID, Parent);
 		}
 	}
 
@@ -368,7 +368,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			LockedToTriggerID = psm.LockedToTriggerID;
 			IsPilotingVessel = psm.IsPilotingVessel;
-			NetworkController.Instance.SendToClientsSubscribedTo(psm, data.Sender, Parent);
+			NetworkController.SendToClientsSubscribedTo(psm, data.Sender, Parent);
 		}
 	}
 
@@ -386,7 +386,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				PlayerStatsMessage psm = new PlayerStatsMessage();
 				psm.Health = (int)Stats.HealthPoints;
 				psm.GUID = FakeGuid;
-				NetworkController.Instance.SendToGameClient(GUID, psm);
+				NetworkController.SendToGameClient(GUID, psm);
 			}
 		}
 		else
@@ -402,7 +402,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		sending.ShotData = psm.ShotData;
 		sending.HitGUID = psm.HitGUID;
 		sending.GUID = psm.GUID;
-		NetworkController.Instance.SendToAllClients(sending, psm.Sender);
+		NetworkController.SendToAllClients(sending, psm.Sender);
 	}
 
 	protected void PlayerShootingListener(NetworkData data)
@@ -453,7 +453,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (Server.Instance.GetObject(psm.HitGUID) is Player hitPlayer)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(psm, GUID, Parent, hitPlayer.Parent);
+			NetworkController.SendToClientsSubscribedTo(psm, GUID, Parent, hitPlayer.Parent);
 			float realDamage = hitPlayer.Stats.TakeHitDamage(hitPlayer.Stats.QueueHit((PlayerStats.HitBoxType)psm.ShotData.colliderType, damage, psm.ShotData.Orientation.ToVector3D(), psm.ShotData.IsMeleeAttack));
 		}
 	}
@@ -468,7 +468,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			pdmForOtherChar.DrillersGUID = FakeGuid;
 			pdmForOtherChar.dontPlayEffect = pdm.dontPlayEffect;
 			pdmForOtherChar.isDrilling = pdm.isDrilling;
-			NetworkController.Instance.SendToClientsSubscribedTo(pdmForOtherChar, GUID, Parent);
+			NetworkController.SendToClientsSubscribedTo(pdmForOtherChar, GUID, Parent);
 			if (drill.CanDrill && pdm.MiningPointID != null && Server.Instance.GetVessel(pdm.MiningPointID.VesselGUID) is Asteroid asteroid && asteroid.MiningPoints.TryGetValue(pdm.MiningPointID.InSceneID, out var miningPoint))
 			{
 				drill.Battery.ChangeQuantity((0f - drill.BatteryUsage) * pdm.MiningTime * drill.TierMultiplier);
@@ -488,7 +488,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		EnvironmentReady = true;
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
-		NetworkController.Instance.AddCharacterSpawnsToResponse(this, ref res);
+		NetworkController.AddCharacterSpawnsToResponse(this, ref res);
 		if (Parent is SpaceObjectVessel)
 		{
 			SpaceObjectVessel vessel = Parent as SpaceObjectVessel;
@@ -519,8 +519,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				}
 			}
 		}
-		NetworkController.Instance.SendToGameClient(GUID, res);
-		NetworkController.Instance.SendCharacterSpawnToOtherPlayers(this);
+		NetworkController.SendToGameClient(GUID, res);
+		NetworkController.SendCharacterSpawnToOtherPlayers(this);
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		foreach (SpaceObjectVessel ves in from m in subscribedToSpaceObjects
 			select Server.Instance.GetObject(m) into m
@@ -528,14 +528,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			select m as SpaceObjectVessel)
 		{
 			VesselObjects vesselObjects = ves.GetVesselObjects();
-			if (vesselObjects.SceneTriggerExecuters != null)
+			if (vesselObjects.SceneTriggerExecutors != null)
 			{
-				foreach (SceneTriggerExecuterDetails sted in vesselObjects.SceneTriggerExecuters)
+				foreach (SceneTriggerExecutorDetails sted in vesselObjects.SceneTriggerExecutors)
 				{
 					sted.IsImmediate = true;
 				}
 			}
-			NetworkController.Instance.SendToGameClient(GUID, new ShipStatsMessage
+			NetworkController.SendToGameClient(GUID, new ShipStatsMessage
 			{
 				GUID = ves.GUID,
 				VesselObjects = vesselObjects
@@ -568,7 +568,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				where m.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson n) => n.PlayerId == PlayerId) != null
 				select m.GUID).ToArray()
 		};
-		NetworkController.Instance.SendToGameClient(GUID, avr);
+		NetworkController.SendToGameClient(GUID, avr);
 	}
 
 	private void QuestTriggerMessageListener(NetworkData data)
@@ -584,7 +584,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			return;
 		}
 		QuestTrigger qt = quest.QuestTriggers.FirstOrDefault((QuestTrigger m) => m.ID == qtm.TriggerID);
-		if (qt == null || qt.Status != QuestStatus.Active)
+		if (qt is not { Status: QuestStatus.Active })
 		{
 			return;
 		}
@@ -621,7 +621,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					}
 					tasks.Add(new Task(delegate
 					{
-						NetworkController.Instance.SendToGameClient(qtm.Sender, new QuestStatsMessage
+						NetworkController.SendToGameClient(qtm.Sender, new QuestStatsMessage
 						{
 							QuestDetails = aaq.GetDetails()
 						});
@@ -629,7 +629,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				}
 			}
 		}
-		NetworkController.Instance.SendToGameClient(qtm.Sender, new QuestStatsMessage
+		NetworkController.SendToGameClient(qtm.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
@@ -671,13 +671,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			tasks.Add(new Task(delegate
 			{
-				NetworkController.Instance.SendToGameClient(sqm.Sender, new QuestStatsMessage
+				NetworkController.SendToGameClient(sqm.Sender, new QuestStatsMessage
 				{
 					QuestDetails = aaq.GetDetails()
 				});
 			}));
 		}
-		NetworkController.Instance.SendToGameClient(sqm.Sender, new QuestStatsMessage
+		NetworkController.SendToGameClient(sqm.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
@@ -701,7 +701,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				LockedToTriggerID = ltm.TriggerID;
 				IsPilotingVessel = ltm.IsPilotingVessel;
-				NetworkController.Instance.SendToGameClient(data.Sender, ltm);
+				NetworkController.SendToGameClient(data.Sender, ltm);
 			}
 		}
 	}
@@ -837,19 +837,19 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		else if (Parent is SpaceObjectVessel && Parent.GUID != mm.ParentGUID)
 		{
 			SpaceObjectVessel parVessel = Parent as SpaceObjectVessel;
-			if ((mm.ParentType == SpaceObjectType.Ship || mm.ParentType == SpaceObjectType.Asteroid || mm.ParentType == SpaceObjectType.Station) && Server.Instance.DoesObjectExist(mm.ParentGUID))
+			if (mm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(mm.ParentGUID))
 			{
 				Parent = Server.Instance.GetVessel(mm.ParentGUID);
 			}
 			else
 			{
-				Dbg.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
+				Debug.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
 			}
 		}
 		else if (Parent is Pivot && mm.ParentType != SpaceObjectType.PlayerPivot)
 		{
 			Pivot pivot3 = Parent as Pivot;
-			if ((mm.ParentType == SpaceObjectType.Ship || mm.ParentType == SpaceObjectType.Asteroid || mm.ParentType == SpaceObjectType.Station) && Server.Instance.DoesObjectExist(mm.ParentGUID))
+			if (mm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(mm.ParentGUID))
 			{
 				Parent = Server.Instance.GetVessel(mm.ParentGUID);
 				SubscribeTo(Parent);
@@ -857,7 +857,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			else
 			{
-				Dbg.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
+				Debug.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
 			}
 		}
 		else if (Parent is Pivot && pivotPositionCorrection.IsEpsilonZero() && Server.Instance.RunTime.TotalSeconds - lastPivotResetTime > 1.0)
@@ -881,7 +881,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				UpdateArtificialBodyMovement.Add(pivot.GUID);
 				UpdateArtificialBodyMovement.Add(refVessel.GUID);
 			}
-			else if ((nearestVessel == null || (mm.NearestVesselDistance > 50f && (nearestVessel.FTL == null || nearestVessel.FTL.Status != SystemStatus.OnLine || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !mm.StickToVessel)
+			else if ((nearestVessel == null || (mm.NearestVesselDistance > 50f && (nearestVessel.FTL is not
+			         {
+				         Status: SystemStatus.OnLine
+			         } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !mm.StickToVessel)
 			{
 				pivotPositionCorrection = LocalPosition;
 				pivot.AdjustPositionAndVelocity(pivotPositionCorrection, pivotVelocityCorrection);
@@ -904,12 +907,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			return;
 		}
 		updateTemperature(deltaTime);
-		if (CoreTemperature < 20f || CoreTemperature > 45f)
+		if (CoreTemperature is < 20f or > 45f)
 		{
 		}
 		float suffocateDamage = 0f;
 		float pressureDamage = 0f;
-		float exposureDamage = !(Parent is Ship) ? StaticData.GetPlayerExposureDamage(Parent.Position.Magnitude) * (float)deltaTime : 0f;
+		float exposureDamage = Parent is not Ship ? StaticData.GetPlayerExposureDamage(Parent.Position.Magnitude) * (float)deltaTime : 0f;
 		if (!IsInsideSpawnPoint)
 		{
 			if (CurrentHelmet != null && (!CurrentHelmet.IsVisorToggleable || CurrentHelmet.IsVisorActive))
@@ -989,7 +992,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			ItemInHands.SendAllStats();
 		}
-		if (!(ItemInHands is HandDrill) && ItemInHands is Weapon)
+		if (ItemInHands is not HandDrill && ItemInHands is Weapon)
 		{
 			Weapon wep = ItemInHands as Weapon;
 			if (wep.DynamicObj.StatsChanged)
@@ -1013,7 +1016,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (doim.Infos.Count > 0)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(doim, -1L, Parent);
+			NetworkController.SendToClientsSubscribedTo(doim, -1L, Parent);
 		}
 		updateItemTimer = 0.0;
 	}
@@ -1021,7 +1024,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public void SubscribeTo(SpaceObject spaceObject)
 	{
 		subscribedToSpaceObjects.Add(spaceObject.GUID);
-		if (!(spaceObject is SpaceObjectVessel ves))
+		if (spaceObject is not SpaceObjectVessel ves)
 		{
 			return;
 		}
@@ -1037,7 +1040,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				return;
 			}
 		}
-		if (ves.AllDockedVessels == null || ves.AllDockedVessels.Count <= 0)
+		if (ves.AllDockedVessels is not { Count: > 0 })
 		{
 			return;
 		}
@@ -1317,7 +1320,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			RagdollData.Clear();
 			RagdollData = null;
 		}
-		NetworkController.Instance.SendToClientsSubscribedToParents(new KillPlayerMessage
+		NetworkController.SendToClientsSubscribedToParents(new KillPlayerMessage
 		{
 			GUID = FakeGuid,
 			CauseOfDeath = causeOfdeath,
@@ -1327,10 +1330,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		Parent = null;
 		CurrentRoom = null;
 		isOutsideRoom = false;
-		if (NetworkController.Instance.ContainsClient(GUID))
+		if (NetworkController.ContainsClient(GUID))
 		{
-			NetworkController.Instance.LogOutPlayer(GUID);
-			NetworkController.Instance.SendToGameClient(GUID, new KillPlayerMessage
+			NetworkController.LogOutPlayer(GUID);
+			NetworkController.SendToGameClient(GUID, new KillPlayerMessage
 			{
 				GUID = FakeGuid,
 				CauseOfDeath = causeOfdeath,
@@ -1354,7 +1357,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					continue;
 				}
 				qt.Status = QuestStatus.Inactive;
-				if (qt.SpawnRuleName == null || !(qt.SpawnRuleName != ""))
+				if (qt.SpawnRuleName is null or "")
 				{
 					continue;
 				}
@@ -1379,7 +1382,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		lateDisconnectWait += dbl;
 		if (lateDisconnectWait > 1.0)
 		{
-			NetworkController.Instance.DisconnectClient(GUID);
+			NetworkController.DisconnectClient(GUID);
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, LateDisconnect);
 			lateDisconnectWait = 0.0;
 		}
@@ -1389,7 +1392,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		if (Parent is Ship)
 		{
-			(Parent as Ship).RemovePlayerFromExecuters(this);
+			(Parent as Ship).RemovePlayerFromExecutors(this);
 		}
 		UnsubscribeFromAll();
 		EnvironmentReady = false;
@@ -1478,7 +1481,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			if (persistenceData is not PersistenceObjectDataPlayer data)
 			{
-				Dbg.Warning("PersistenceObjectDataPlayer data is null", GUID);
+				Debug.Warning("PersistenceObjectDataPlayer data is null", GUID);
 				return;
 			}
 
@@ -1520,7 +1523,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				if (data.ParentGUID != -1 && parent == null)
 				{
-					Dbg.Error("Player parent object not found, SAVE MIGHT BE CORRUPTED", GUID, data.ParentGUID, data.ParentType);
+					Debug.Error("Player parent object not found, SAVE MIGHT BE CORRUPTED", GUID, data.ParentGUID, data.ParentType);
 					return;
 				}
 				Parent = null;
@@ -1562,7 +1565,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

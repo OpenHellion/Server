@@ -2047,7 +2047,7 @@
         "Items": [
           {
             "ItemType": "GenericItem",
-            "GenericItemSubType": "DamagedTransmiter",
+            "GenericItemSubType": "DamagedTransmitter",
             "Health": {
               "Min": 15,
               "Max": 100

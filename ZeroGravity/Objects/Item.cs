@@ -230,7 +230,7 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public virtual void SetAttachPoint(AttachPointDetails data)
 	{
-		if (data == null || data.InSceneID <= 0)
+		if (data is not { InSceneID: > 0 })
 		{
 			if (AttachPointID != null)
 			{
@@ -499,7 +499,7 @@ public abstract class Item : IPersistantObject, IDamageable
 				}
 				catch (Exception ex)
 				{
-					Dbg.Exception(ex);
+					Debug.Exception(ex);
 				}
 			}
 			if (DynamicObj.Parent is DynamicObject dynamicObject && data.ItemSlotID.HasValue && dynamicObject.Item.Slots != null && dynamicObject.Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
@@ -510,7 +510,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

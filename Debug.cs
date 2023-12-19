@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 
-public static class Dbg
+public static class Debug
 {
 	public static string OutputDir = "";
 
@@ -61,6 +61,7 @@ public static class Dbg
 		}
 		catch
 		{
+			// ignored
 		}
 	}
 

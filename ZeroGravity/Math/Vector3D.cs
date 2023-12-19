@@ -243,7 +243,7 @@ public struct Vector3D
 
 	public override bool Equals(object other)
 	{
-		if (!(other is Vector3D vector))
+		if (other is not Vector3D vector)
 		{
 			return false;
 		}

@@ -59,7 +59,7 @@ public static class Serializer
 		}
 		catch (Exception ex)
 		{
-			Dbg.Error("Failed to deserialize communication data", ex.Message, ex.StackTrace);
+			Debug.Error("Failed to deserialize communication data", ex.Message, ex.StackTrace);
 		}
 		if (statisticsLogUpdateTime > 0.0)
 		{
@@ -78,7 +78,7 @@ public static class Serializer
 
 	public static NetworkData ReceiveData(Socket soc)
 	{
-		if (soc == null || !soc.Connected)
+		if (soc is not { Connected: true })
 		{
 			return null;
 		}
@@ -131,7 +131,7 @@ public static class Serializer
 		}
 		catch (Exception ex)
 		{
-			Dbg.Error("Failed to serialize communication data", ex.Message, ex.StackTrace);
+			Debug.Error("Failed to serialize communication data", ex.Message, ex.StackTrace);
 			return null;
 		}
 		if (statisticsLogUpdateTime > 0.0)

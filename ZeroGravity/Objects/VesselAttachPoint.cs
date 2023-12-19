@@ -21,7 +21,7 @@ public class VesselAttachPoint : IItemSlot
 
 	public SpaceObject Parent => Vessel;
 
-	public bool CanSpawnItems => Type == AttachPointType.Simple || Type == AttachPointType.Active || Type == AttachPointType.MachineryPartSlot || Type == AttachPointType.Scrap;
+	public bool CanSpawnItems => Type is AttachPointType.Simple or AttachPointType.Active or AttachPointType.MachineryPartSlot or AttachPointType.Scrap;
 
 	public bool CanFitItem(Item item)
 	{

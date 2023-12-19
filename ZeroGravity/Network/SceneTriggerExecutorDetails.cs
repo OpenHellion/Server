@@ -3,7 +3,7 @@ using ProtoBuf;
 namespace ZeroGravity.Network;
 
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-public class SceneTriggerExecuterDetails
+public class SceneTriggerExecutorDetails
 {
 	public int InSceneID;
 

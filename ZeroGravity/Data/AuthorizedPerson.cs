@@ -10,4 +10,6 @@ public class AuthorizedPerson : ISceneData
 	public string PlayerId;
 
 	public string Name;
+
+	public bool IsFriend;
 }

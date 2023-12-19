@@ -1,6 +1,6 @@
 namespace ZeroGravity;
 
-public class PersistenceObjectDataExecuter : PersistenceObjectData
+public class PersistenceObjectDataExecutor : PersistenceObjectData
 {
 	public int InSceneID;
 

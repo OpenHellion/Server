@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -19,15 +19,15 @@ public class ShipSpawnPoint
 
 	public string InvitedPlayerName;
 
-	public SceneTriggerExecuter Executer;
+	public SceneTriggerExecutor Executor;
 
-	public int ExecuterStateID;
+	public int ExecutorStateID;
 
 	public Ship Ship;
 
 	public SpawnPointState State;
 
-	public List<int> ExecuterOccupiedStateIDs;
+	public List<int> ExecutorOccupiedStateIDs;
 
 	public SpawnPointStats SetStats(SpawnPointStats stats, Player sender)
 	{
@@ -132,7 +132,7 @@ public class ShipSpawnPoint
 						PlayerId = sender.PlayerId
 					});
 					retMsg.SelfDestructTime = sender.AuthorizedSpawnPoint.Ship.SelfDestructTimer?.Time;
-					NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
+					NetworkController.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
 				}
 				State = SpawnPointState.Authorized;
 				Player = sender;
@@ -177,7 +177,7 @@ public class ShipSpawnPoint
 					InvitedPlayerId = InvitedPlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}
@@ -207,7 +207,7 @@ public class ShipSpawnPoint
 					PlayerId = Player.PlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}

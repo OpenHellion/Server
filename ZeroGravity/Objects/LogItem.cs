@@ -67,9 +67,9 @@ internal class LogItem : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataLogItem data))
+			if (persistenceData is not PersistenceObjectDataLogItem data)
 			{
-				Dbg.Warning("PersistenceObjectDataLogItem data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataLogItem data is null", base.GUID);
 			}
 			else
 			{
@@ -78,7 +78,7 @@ internal class LogItem : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

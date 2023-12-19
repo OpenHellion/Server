@@ -160,12 +160,12 @@ public static class SpawnSerialization
 			{
 				if (ser_cat.CategoryName.IsNullOrEmpty())
 				{
-					Dbg.Error("SPAWN MANAGER - Loot category cannot be empty");
+					Debug.Error("SPAWN MANAGER - Loot category cannot be empty");
 					continue;
 				}
 				if (categories.ContainsKey(ser_cat.CategoryName))
 				{
-					Dbg.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" already exists");
+					Debug.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" already exists");
 					continue;
 				}
 				Dictionary<LootTier, List<LootItemData>> dict = new Dictionary<LootTier, List<LootItemData>>();
@@ -174,12 +174,12 @@ public static class SpawnSerialization
 				{
 					if (ser_tier.TierName.IsNullOrEmpty() || !Enum.TryParse<LootTier>(ser_tier.TierName, out tmpLootTier))
 					{
-						Dbg.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" tier \"{ser_tier.TierName}\" is not valid");
+						Debug.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" tier \"{ser_tier.TierName}\" is not valid");
 						continue;
 					}
 					if (dict.ContainsKey(tmpLootTier))
 					{
-						Dbg.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" tier \"{ser_tier.TierName}\" already exists");
+						Debug.Error($"SPAWN MANAGER - Loot category \"{ser_cat.CategoryName}\" tier \"{ser_tier.TierName}\" already exists");
 						continue;
 					}
 					List<LootItemData> lootItems = new List<LootItemData>();
@@ -208,27 +208,27 @@ public static class SpawnSerialization
 		AttachPointPriority attachPointPriority = AttachPointPriority.Default;
 		if (!data.AttachPointPriority.IsNullOrEmpty() && !Enum.TryParse<AttachPointPriority>(data.AttachPointPriority, out attachPointPriority))
 		{
-			Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" has unknown AttachPointPriority \"{data.ItemType}\"");
+			Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" has unknown AttachPointPriority \"{data.ItemType}\"");
 			return null;
 		}
 		if (!Enum.TryParse<ItemType>(data.ItemType, out tmpItemType))
 		{
-			Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" has unknown item type \"{data.ItemType}\"");
+			Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" has unknown item type \"{data.ItemType}\"");
 			return null;
 		}
 		if (data.Health.HasValue && (data.Health.Value.Min < 0f || data.Health.Value.Max <= 0f || data.Health.Value.Min > data.Health.Value.Max))
 		{
-			Dbg.Error($"SPAWN MANAGER - Loot category \"{categoryName}\" tier \"{tier.ToString()}\" health is not valid (min: {data.Health.Value.Min}, max: {data.Health.Value.Max})");
+			Debug.Error($"SPAWN MANAGER - Loot category \"{categoryName}\" tier \"{tier.ToString()}\" health is not valid (min: {data.Health.Value.Min}, max: {data.Health.Value.Max})");
 			return null;
 		}
 		if (tmpItemType == ItemType.GenericItem && (data.GenericItemSubType.IsNullOrEmpty() || !Enum.TryParse<GenericItemSubType>(data.GenericItemSubType, out tmpGenericSubType)))
 		{
-			Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" item \"{data.ItemType}\" has unknown sub type \"{data.GenericItemSubType}\"");
+			Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" item \"{data.ItemType}\" has unknown sub type \"{data.GenericItemSubType}\"");
 			return null;
 		}
 		if (tmpItemType == ItemType.MachineryPart && (data.MachineryPartType.IsNullOrEmpty() || !Enum.TryParse<MachineryPartType>(data.MachineryPartType, out tmpMachPartType)))
 		{
-			Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" item \"{data.ItemType}\" has unknown sub type \"{data.MachineryPartType}\"");
+			Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier.ToString()}\" item \"{data.ItemType}\" has unknown sub type \"{data.MachineryPartType}\"");
 			return null;
 		}
 		return new LootItemData
@@ -260,12 +260,12 @@ public static class SpawnSerialization
 		{
 			if (item.Resources == null || item.Resources.Count == 0)
 			{
-				Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo has no resource set");
+				Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo has no resource set");
 				continue;
 			}
 			if (item.Quantity.Max < 0f || item.Quantity.Min > item.Quantity.Max)
 			{
-				Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo quantity is not valid (min: {item.Quantity.Min}, max: {item.Quantity.Max})");
+				Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo quantity is not valid (min: {item.Quantity.Min}, max: {item.Quantity.Max})");
 				continue;
 			}
 			LootItemData.CargoResourceData tmpData = new LootItemData.CargoResourceData
@@ -277,7 +277,7 @@ public static class SpawnSerialization
 			{
 				if (!Enum.TryParse<ResourceType>(res, out tmpResType))
 				{
-					Dbg.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo resource type \"{res}\" does not exit");
+					Debug.Error($"SPAWN MANAGER - Loot cateory \"{categoryName}\" tier \"{tier}\", cargo resource type \"{res}\" does not exit");
 				}
 				else
 				{
@@ -1304,87 +1304,87 @@ public static class SpawnSerialization
 			{
 				if (srd.RuleName.IsNullOrEmpty())
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule name is not set");
+					Debug.Error($"SPAWN MANAGER - Spawn rule name is not set");
 					continue;
 				}
 				foreach (SpawnRule ex2 in spawnRules)
 				{
 					if (ex2.Name == srd.RuleName)
 					{
-						Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" already exists");
+						Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" already exists");
 					}
 				}
 				if (srd.Orbit == null)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit is not set");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit is not set");
 					continue;
 				}
 				if (srd.Orbit.CelestialBody.IsNullOrEmpty() || !Enum.TryParse<CelestialBodyGUID>(srd.Orbit.CelestialBody, out tmpCelBody))
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit celestial body \"{srd.Orbit.CelestialBody}\" does not exist");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit celestial body \"{srd.Orbit.CelestialBody}\" does not exist");
 					continue;
 				}
 				if (srd.Orbit.PeriapsisDistance_Km.Min < 0.0 || srd.Orbit.PeriapsisDistance_Km.Max <= 0.0 || srd.Orbit.PeriapsisDistance_Km.Min > srd.Orbit.PeriapsisDistance_Km.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit periapsis distance is not valid (min: {srd.Orbit.PeriapsisDistance_Km.Min}, max: {srd.Orbit.PeriapsisDistance_Km.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit periapsis distance is not valid (min: {srd.Orbit.PeriapsisDistance_Km.Min}, max: {srd.Orbit.PeriapsisDistance_Km.Max})");
 					continue;
 				}
 				if (srd.Orbit.ApoapsisDistance_Km.Min < 0.0 || srd.Orbit.ApoapsisDistance_Km.Max <= 0.0 || srd.Orbit.ApoapsisDistance_Km.Min > srd.Orbit.ApoapsisDistance_Km.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit apoapsis distance is not valid (min: {srd.Orbit.ApoapsisDistance_Km.Min}, max: {srd.Orbit.ApoapsisDistance_Km.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit apoapsis distance is not valid (min: {srd.Orbit.ApoapsisDistance_Km.Min}, max: {srd.Orbit.ApoapsisDistance_Km.Max})");
 					continue;
 				}
 				if (srd.LocationType.IsNullOrEmpty() || !Enum.TryParse<SpawnRuleLocationType>(srd.LocationType, out tmpLocType))
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" location type \"{srd.LocationType}\" is not valid");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" location type \"{srd.LocationType}\" is not valid");
 					continue;
 				}
 				if (srd.Orbit.Inclination_Deg.Min > srd.Orbit.Inclination_Deg.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit inclination is not valid (min: {srd.Orbit.Inclination_Deg.Min}, max: {srd.Orbit.Inclination_Deg.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit inclination is not valid (min: {srd.Orbit.Inclination_Deg.Min}, max: {srd.Orbit.Inclination_Deg.Max})");
 					continue;
 				}
 				if (srd.Orbit.ArgumentOfPeriapsis_Deg.Min > srd.Orbit.ArgumentOfPeriapsis_Deg.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit argument of periapsis is not valid (min: {srd.Orbit.ArgumentOfPeriapsis_Deg.Min}, max: {srd.Orbit.ArgumentOfPeriapsis_Deg.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit argument of periapsis is not valid (min: {srd.Orbit.ArgumentOfPeriapsis_Deg.Min}, max: {srd.Orbit.ArgumentOfPeriapsis_Deg.Max})");
 					continue;
 				}
 				if (srd.Orbit.LongitudeOfAscendingNode_Deg.Min > srd.Orbit.LongitudeOfAscendingNode_Deg.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit longitude of ascending node is not valid (min: {srd.Orbit.LongitudeOfAscendingNode_Deg.Min}, max: {srd.Orbit.LongitudeOfAscendingNode_Deg.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit longitude of ascending node is not valid (min: {srd.Orbit.LongitudeOfAscendingNode_Deg.Min}, max: {srd.Orbit.LongitudeOfAscendingNode_Deg.Max})");
 					continue;
 				}
 				if (srd.Orbit.TrueAnomaly_Deg.Min < 0f || srd.Orbit.TrueAnomaly_Deg.Max < 0f || srd.Orbit.TrueAnomaly_Deg.Min > srd.Orbit.TrueAnomaly_Deg.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit true anomaly is not valid (min: {srd.Orbit.TrueAnomaly_Deg.Min}, max: {srd.Orbit.TrueAnomaly_Deg.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" orbit true anomaly is not valid (min: {srd.Orbit.TrueAnomaly_Deg.Min}, max: {srd.Orbit.TrueAnomaly_Deg.Max})");
 					continue;
 				}
 				if (tmpLocType == SpawnRuleLocationType.Random && (srd.NumberOfClusters.Min < 0 || srd.NumberOfClusters.Max <= 0 || srd.NumberOfClusters.Min > srd.NumberOfClusters.Max))
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" number of clusters are not valid (min: {srd.NumberOfClusters.Min}, max: {srd.NumberOfClusters.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" number of clusters are not valid (min: {srd.NumberOfClusters.Min}, max: {srd.NumberOfClusters.Max})");
 					continue;
 				}
 				tmpScenePool = null;
 				if (tmpLocType == SpawnRuleLocationType.Random && !GenerateScenePoolData(srd, out tmpScenePool))
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" scenes are not valid");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" scenes are not valid");
 					continue;
 				}
 				tmpLootPool = null;
 				if (!GenerateLootPoolData(srd, tmpLocType, out tmpLootPool))
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" loot is not valid");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{srd.RuleName}\" loot is not valid");
 					continue;
 				}
 				CelestialBody cb = Server.Instance.SolarSystem.GetCelestialBody((long)tmpCelBody);
 				if (srd.Orbit.PeriapsisDistance_Km.Min > cb.Orbit.GravityInfluenceRadius / 1000.0 || srd.Orbit.PeriapsisDistance_Km.Max > cb.Orbit.GravityInfluenceRadius / 1000.0)
 				{
-					Dbg.Error(string.Format("SPAWN MANAGER - Spawn rule \"{0}\" orbit periapsis distance is larger than gravity influence radius \"{3}\" (min: {1}, max: {2})", srd.RuleName, srd.Orbit.PeriapsisDistance_Km.Min, srd.Orbit.PeriapsisDistance_Km.Max, cb.Orbit.GravityInfluenceRadius / 1000.0));
+					Debug.Error(string.Format("SPAWN MANAGER - Spawn rule \"{0}\" orbit periapsis distance is larger than gravity influence radius \"{3}\" (min: {1}, max: {2})", srd.RuleName, srd.Orbit.PeriapsisDistance_Km.Min, srd.Orbit.PeriapsisDistance_Km.Max, cb.Orbit.GravityInfluenceRadius / 1000.0));
 					continue;
 				}
 				if (srd.Orbit.ApoapsisDistance_Km.Min > cb.Orbit.GravityInfluenceRadius / 1000.0 || srd.Orbit.ApoapsisDistance_Km.Max > cb.Orbit.GravityInfluenceRadius / 1000.0)
 				{
-					Dbg.Error(string.Format("SPAWN MANAGER - Spawn rule \"{0}\" orbit periapsis distance is larger than gravity influence radius \"{3}\" (min: {1}, max: {2})", srd.RuleName, srd.Orbit.ApoapsisDistance_Km.Min, srd.Orbit.ApoapsisDistance_Km.Max, cb.Orbit.GravityInfluenceRadius / 1000.0));
+					Debug.Error(string.Format("SPAWN MANAGER - Spawn rule \"{0}\" orbit periapsis distance is larger than gravity influence radius \"{3}\" (min: {1}, max: {2})", srd.RuleName, srd.Orbit.ApoapsisDistance_Km.Min, srd.Orbit.ApoapsisDistance_Km.Max, cb.Orbit.GravityInfluenceRadius / 1000.0));
 					continue;
 				}
 				SpawnRule rule = new SpawnRule
@@ -1437,11 +1437,11 @@ public static class SpawnSerialization
 			{
 				if (sc.Scene.IsNullOrEmpty() || !Enum.TryParse<GameScenes.SceneId>(sc.Scene, out tmpSceneID))
 				{
-					Dbg.Warning($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" scene \"{sc.Scene}\" is not valid");
+					Debug.Warning($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" scene \"{sc.Scene}\" is not valid");
 				}
 				else if (sc.SceneCount.Min < 0 || sc.SceneCount.Max <= 0 || sc.SceneCount.Min > sc.SceneCount.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" scene \"{sc.Scene}\" count is not valid (min: {sc.SceneCount.Min}, max: {sc.SceneCount.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" scene \"{sc.Scene}\" count is not valid (min: {sc.SceneCount.Min}, max: {sc.SceneCount.Max})");
 				}
 				else
 				{
@@ -1470,12 +1470,12 @@ public static class SpawnSerialization
 			{
 				if (lc.Tier.IsNullOrEmpty() || !Enum.TryParse<LootTier>(lc.Tier, out tmpTier))
 				{
-					Dbg.Warning($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" tier \"{lc.Tier}\" is not valid");
+					Debug.Warning($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" tier \"{lc.Tier}\" is not valid");
 					continue;
 				}
 				if (lc.LootCount.Max <= 0 || lc.LootCount.Min > lc.LootCount.Max)
 				{
-					Dbg.Error($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" tier \"{lc.Tier}\" loot count is not valid (min: {lc.LootCount.Min}, max: {lc.LootCount.Max})");
+					Debug.Error($"SPAWN MANAGER - Spawn rule \"{data.RuleName}\" tier \"{lc.Tier}\" loot count is not valid (min: {lc.LootCount.Min}, max: {lc.LootCount.Max})");
 					continue;
 				}
 				int poolSize = MathHelper.RandomRange(lc.LootCount.Min, lc.LootCount.Max + 1);

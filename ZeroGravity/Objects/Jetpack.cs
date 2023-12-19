@@ -62,7 +62,7 @@ public class Jetpack : Item, ICargo
 
 	protected override void ChangeEquip(Inventory.EquipType equipType)
 	{
-		if (!(base.DynamicObj.Parent is Player))
+		if (base.DynamicObj.Parent is not Player)
 		{
 			return;
 		}
@@ -171,9 +171,9 @@ public class Jetpack : Item, ICargo
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataJetpack data))
+			if (persistenceData is not PersistenceObjectDataJetpack data)
 			{
-				Dbg.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
 			}
 			else
 			{
@@ -182,7 +182,7 @@ public class Jetpack : Item, ICargo
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

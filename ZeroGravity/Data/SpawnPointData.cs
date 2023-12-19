@@ -12,9 +12,9 @@ public class SpawnPointData : ISceneData
 
 	public SpawnPointType Type;
 
-	public int ExecuterID;
+	public int ExecutorID;
 
-	public int ExecuterStateID;
+	public int ExecutorStateID;
 
-	public List<int> ExecuterOccupiedStateIDs;
+	public List<int> ExecutorOccupiedStateIDs;
 }

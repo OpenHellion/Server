@@ -53,9 +53,9 @@ internal class MeleeWeapon : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataMeleeWeapon data))
+			if (persistenceData is not PersistenceObjectDataMeleeWeapon data)
 			{
-				Dbg.Warning("PersistenceObjectDataMeleeWeapon data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataMeleeWeapon data is null", base.GUID);
 			}
 			else
 			{
@@ -64,7 +64,7 @@ internal class MeleeWeapon : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

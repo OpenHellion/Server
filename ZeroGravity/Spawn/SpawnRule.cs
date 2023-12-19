@@ -56,7 +56,7 @@ public class SpawnRule
 
 	public int NumberOfClustersCurr => clusterVesselsCount.Count;
 
-	public bool IsOneTimeSpawnRule => LocationType == SpawnRuleLocationType.StartingScene || LocationType == SpawnRuleLocationType.Quest;
+	public bool IsOneTimeSpawnRule => LocationType is SpawnRuleLocationType.StartingScene or SpawnRuleLocationType.Quest;
 
 	private void removeVesselFromCluster(int cluster)
 	{
@@ -109,12 +109,12 @@ public class SpawnRule
 		}
 		if (totalScenes.Max > 0 && totalScenes.Max < NumberOfClusters.Max)
 		{
-			Dbg.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" max number of clusters \"{NumberOfClusters.Max}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
+			Debug.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" max number of clusters \"{NumberOfClusters.Max}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
 			NumberOfClusters.Max = totalScenes.Max;
 		}
 		if (totalScenes.Max > 0 && totalScenes.Max < NumberOfClusters.Min)
 		{
-			Dbg.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" min number of clusters \"{NumberOfClusters.Min}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
+			Debug.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" min number of clusters \"{NumberOfClusters.Min}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
 			NumberOfClusters.Min = totalScenes.Max;
 		}
 		if (NumberOfClusters.Min > NumberOfClusters.Max)
@@ -268,7 +268,7 @@ public class SpawnRule
 						Vector3D relativePos = FindEmptyRelativePosition(currVessel, ref clusterVessels);
 						if (relativePos.IsEpsilonZero())
 						{
-							Dbg.Error("SPAWN MANAGER - Failed to find empty spawn position for rule", Name);
+							Debug.Error("SPAWN MANAGER - Failed to find empty spawn position for rule", Name);
 							Server.Instance.DestroyArtificialBody(currVessel);
 							continue;
 						}
@@ -343,8 +343,8 @@ public class SpawnRule
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
-			Dbg.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
+			Debug.Exception(ex);
+			Debug.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
 		}
 		return null;
 	}
@@ -403,8 +403,8 @@ public class SpawnRule
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
-			Dbg.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
+			Debug.Exception(ex);
+			Debug.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
 		}
 		return null;
 	}
@@ -478,7 +478,7 @@ public class SpawnRule
 				}
 				catch (Exception e)
 				{
-					Dbg.Warning(e.Message);
+					Debug.Warning(e.Message);
 					removeLoot.Add(loot);
 					lootToSpawn--;
 				}

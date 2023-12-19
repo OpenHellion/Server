@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BulletSharp;
 using BulletSharp.Math;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -96,7 +96,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 					rotDiff = it.Player.LocalRotation.Inverse() * it.RotFromParent;
 				}
 				it.Player.ModifyLocalPositionAndRotation(posDiff, rotDiff);
-				if (NetworkController.Instance.ContainsClient(it.Player.GUID) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
+				if (NetworkController.ContainsClient(it.Player.GUID) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
 				{
 					it.Player.SetDockUndockCorrection(posDiff, rotDiff);
 				}
@@ -210,7 +210,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public string EmblemId = "";
 
-	public List<SceneTriggerExecuter> SceneTriggerExecuters = new List<SceneTriggerExecuter>();
+	public List<SceneTriggerExecutor> SceneTriggerExecutors = new List<SceneTriggerExecutor>();
 
 	public VesselDamageType LastVesselDamageType;
 
@@ -601,7 +601,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -889,7 +889,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		if (HasSecuritySystem)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(new VesselSecurityResponse
+			NetworkController.SendToClientsSubscribedTo(new VesselSecurityResponse
 			{
 				VesselGUID = GUID,
 				Data = GetVesselSecurityData(includeVesselName)
@@ -1211,12 +1211,12 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		if (port.ParentVessel.MainVessel == dockToVessel.MainVessel)
 		{
-			Dbg.Error("Circular docking");
+			Debug.Error("Circular docking");
 			return false;
 		}
 		if (dockToPort == null || port == null || port.DockingStatus || dockToPort.DockingStatus)
 		{
-			Dbg.Error("DockToShip returned at start, check if some port IDs changed", Environment.StackTrace);
+			Debug.Error("DockToShip returned at start, check if some port IDs changed", Environment.StackTrace);
 			return false;
 		}
 		if (disableStabilization)
@@ -1265,32 +1265,32 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		DockedToMainVessel.Orbit.InitFromCurrentStateVectors(useCurrentSolarSystemTime ? Server.SolarSystemTime : 0.0);
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(DockedToMainVessel);
 		DockedToMainVessel.SetPhysicsParameters();
-		SceneTriggerExecuter closestExecuter = null;
-		if (port.MergeExecuters != null && dockToPort.MergeExecuters != null)
+		SceneTriggerExecutor closestExecutor = null;
+		if (port.MergeExecutors != null && dockToPort.MergeExecutors != null)
 		{
-			foreach (KeyValuePair<SceneTriggerExecuter, Vector3D> exec in port.MergeExecuters)
+			foreach (KeyValuePair<SceneTriggerExecutor, Vector3D> exec in port.MergeExecutors)
 			{
 				if (exec.Key.IsMerged)
 				{
 					continue;
 				}
-				closestExecuter = null;
-				double closestExecuterDistance = -1.0;
-				foreach (KeyValuePair<SceneTriggerExecuter, Vector3D> execOther in dockToPort.MergeExecuters)
+				closestExecutor = null;
+				double closestExecutorDistance = -1.0;
+				foreach (KeyValuePair<SceneTriggerExecutor, Vector3D> execOther in dockToPort.MergeExecutors)
 				{
 					if (!execOther.Key.IsMerged)
 					{
 						double currDistance = (exec.Value - QuaternionD.AngleAxis(180.0, Vector3D.Up) * execOther.Value).Magnitude;
-						if ((currDistance < closestExecuterDistance || closestExecuterDistance == -1.0) && exec.Key.AreStatesEqual(execOther.Key))
+						if ((currDistance < closestExecutorDistance || closestExecutorDistance == -1.0) && exec.Key.AreStatesEqual(execOther.Key))
 						{
-							closestExecuterDistance = currDistance;
-							closestExecuter = execOther.Key;
+							closestExecutorDistance = currDistance;
+							closestExecutor = execOther.Key;
 						}
 					}
 				}
-				if (closestExecuter != null && closestExecuterDistance <= port.MergeExecutersDistance)
+				if (closestExecutor != null && closestExecutorDistance <= port.MergeExecutorsDistance)
 				{
-					closestExecuter.MergeWith(exec.Key);
+					closestExecutor.MergeWith(exec.Key);
 				}
 			}
 		}
@@ -1349,7 +1349,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public bool UndockFromVessel(VesselDockingPort port, SpaceObjectVessel dockedToVessel, VesselDockingPort dockedToPort, ref SceneDockingPortDetails details)
 	{
-		if (!port.DockingStatus || port.DockedToID == null || port.DockedVessel == null || !(port.DockedVessel is Ship))
+		if (!port.DockingStatus || port.DockedToID == null || port.DockedVessel is not Ship)
 		{
 			return false;
 		}
@@ -1456,9 +1456,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			resultVesselOther.CompoundDistributionManager = null;
 		}
 		resultVesselOther.ConnectionsChanged = true;
-		if (port.MergeExecuters != null)
+		if (port.MergeExecutors != null)
 		{
-			foreach (KeyValuePair<SceneTriggerExecuter, Vector3D> exec in port.MergeExecuters)
+			foreach (KeyValuePair<SceneTriggerExecutor, Vector3D> exec in port.MergeExecutors)
 			{
 				if (exec.Key.IsMerged)
 				{
@@ -1621,7 +1621,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		Player ret = null;
 		double dist = double.MaxValue;
 		distance = 0.0;
-		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in NetworkController.Instance.GetAllPlayers() select m)
+		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in NetworkController.GetAllPlayers() select m)
 			where m.IsAlive
 			select m)
 		{
@@ -1657,12 +1657,12 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		ss.RepairPoints = GetVesselRepairPointsDetails(changedOnly: false);
 		ss.NameTags = NameTags;
 		ss.Doors = DistributionManager.GetDoorsDetails(changedOnly: false, -1L);
-		ss.SceneTriggerExecuters = new List<SceneTriggerExecuterDetails>();
-		if (SceneTriggerExecuters != null && SceneTriggerExecuters.Count > 0)
+		ss.SceneTriggerExecutors = new List<SceneTriggerExecutorDetails>();
+		if (SceneTriggerExecutors != null && SceneTriggerExecutors.Count > 0)
 		{
-			foreach (SceneTriggerExecuter sc in SceneTriggerExecuters)
+			foreach (SceneTriggerExecutor sc in SceneTriggerExecutors)
 			{
-				ss.SceneTriggerExecuters.Add(new SceneTriggerExecuterDetails
+				ss.SceneTriggerExecutors.Add(new SceneTriggerExecutorDetails
 				{
 					InSceneID = sc.InSceneID,
 					CurrentStateID = sc.StateID,
@@ -1687,7 +1687,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 						RelativePosition = RelativePositionFromParent.ToFloatArray(),
 						RelativeRotation = RelativeRotationFromParent.ToFloatArray(),
 						CollidersCenterOffset = IsDocked ? DockedToMainVessel.VesselData.CollidersCenterOffset : VesselData.CollidersCenterOffset,
-						ExecutersMerge = port.GetMergedExecuters(null),
+						ExecutorsMerge = port.GetMergedExecutors(null),
 						PairedDoors = GetPairedDoors(port)
 					});
 				}

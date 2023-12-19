@@ -161,9 +161,9 @@ public class Door : IAirConsumer, IPersistantObject
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataDoor data))
+			if (persistenceData is not PersistenceObjectDataDoor data)
 			{
-				Dbg.Warning("PersistenceObjectDataDoor data is null");
+				Debug.Warning("PersistenceObjectDataDoor data is null");
 				return;
 			}
 			HasPower = data.HasPower;
@@ -172,7 +172,7 @@ public class Door : IAirConsumer, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

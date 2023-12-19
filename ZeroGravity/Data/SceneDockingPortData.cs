@@ -18,7 +18,7 @@ public class SceneDockingPortData : ISceneData
 
 	public bool Locked;
 
-	public List<SceneDockingPortExecuterMerge> MergeExecuters;
+	public List<SceneDockingPortExecutorMerge> MergeExecutors;
 
-	public float MergeExecuterDistance;
+	public float MergeExecutorDistance;
 }

@@ -1,4 +1,4 @@
-// GSConnection.cs
+// GsConnection.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -23,27 +23,27 @@ using ZeroGravity;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
 
-namespace OpenHellion.Networking;
+namespace OpenHellion.Net;
 
 /// <summary>
 /// 	Handles connections to the clients.<br />
 /// 	This works as an abstraction layer between the controller and the networking library.
-/// 	Most funcions in this method is absracted by the <c>NetworkController</c>
+/// 	Most functions in this method is abstracted by the <c>NetworkController</c>
 /// </summary>
-internal class GSConnection
+internal class GsConnection
 {
 
-	private readonly Dictionary<int, Player> m_ClientConnections = new();
+	private readonly Dictionary<int, Player> _clientConnections = new();
 
-	private Telepathy.Server m_Server;
+	private Telepathy.Server _server;
 
 	internal void Start(int port)
 	{
-		Telepathy.Log.Info = Dbg.Info;
-		Telepathy.Log.Warning = Dbg.Warning;
-		Telepathy.Log.Error = Dbg.Error;
+		Telepathy.Log.Info = Debug.Info;
+		Telepathy.Log.Warning = Debug.Warning;
+		Telepathy.Log.Error = Debug.Error;
 
-		m_Server = new(80000)
+		_server = new(80000)
 		{
 			OnConnected = OnConnected,
 			OnData = OnData,
@@ -56,9 +56,9 @@ internal class GSConnection
 #endif
 		};
 
-		m_Server.Start(port);
+		_server.Start(port);
 
-		Dbg.Log("Started server game thread.");
+		Debug.Log("Started server game thread.");
 	}
 
 	/// <summary>
@@ -72,30 +72,30 @@ internal class GSConnection
 			ArraySegment<byte> binary = new(Serializer.Package(data));
 
 			// Send data to server.
-			bool success = m_Server.Send(connectionId, binary);
+			bool success = _server.Send(connectionId, binary);
 
 			if (!success)
 			{
-				Dbg.Log("Failed to send data to a client.", connectionId);
+				Debug.Log("Failed to send data to a client.", connectionId);
 			}
 		}
 		catch (ArgumentNullException)
 		{
-			Dbg.Error("Serialized data buffer is null", data.GetType().ToString(), data);
+			Debug.Error("Serialized data buffer is null", data.GetType().ToString(), data);
 		}
 		catch (Exception ex)
 		{
-			Dbg.Error("Error when sending data", ex.Message, ex.StackTrace);
+			Debug.Error("Error when sending data", ex.Message, ex.StackTrace);
 		}
 	}
 
 	// Request to send to all clients.
-	internal void SendToAll(NetworkData data, long skipPlayerGUID = -1L)
+	internal void SendToAll(NetworkData data, long skipPlayerGuid = -1L)
 	{
-		foreach (KeyValuePair<int, Player> pl in m_ClientConnections)
+		foreach (KeyValuePair<int, Player> pl in _clientConnections)
 		{
 			Player player = pl.Value;
-			if (player != null && player.IsAlive && player.EnvironmentReady && player.GUID != skipPlayerGUID)
+			if (player != null && player.IsAlive && player.EnvironmentReady && player.GUID != skipPlayerGuid)
 			{
 				Send(pl.Key, data);
 			}
@@ -112,31 +112,31 @@ internal class GSConnection
 	// Disconnect a client with the provided id.
 	internal void Disconnect(int connectionId)
 	{
-		if (m_ClientConnections.ContainsKey(connectionId))
+		if (_clientConnections.ContainsKey(connectionId))
 		{
 			// If there is a player, make sure it has been disconnected.
-			Player player = m_ClientConnections[connectionId];
+			Player player = _clientConnections[connectionId];
 			player?.LogoutDisconnectReset();
 			player?.DiconnectFromNetworkContoller();
 
 			// Remove it.
-			m_ClientConnections.Remove(connectionId);
+			_clientConnections.Remove(connectionId);
 		}
 		else
 		{
-			Dbg.Error("Tried to remove non-existent player with connection id", connectionId);
+			Debug.Error("Tried to remove non-existent player with connection id", connectionId);
 		}
 
-		m_Server.Disconnect(connectionId);
+		_server.Disconnect(connectionId);
 	}
 
 	// Disconnects all clients.
 	internal void DisconnectAll()
 	{
 		// Loop through all client and do the neccecary actions for them to exit.
-		foreach (KeyValuePair<int, Player> pl in m_ClientConnections)
+		foreach (KeyValuePair<int, Player> pl in _clientConnections)
 		{
-			m_Server.Disconnect(pl.Key);
+			_server.Disconnect(pl.Key);
 			if (pl.Value != null)
 			{
 				pl.Value.LogoutDisconnectReset();
@@ -145,48 +145,48 @@ internal class GSConnection
 		}
 
 		// Clean.
-		m_ClientConnections.Clear();
+		_clientConnections.Clear();
 	}
 
 	internal void Tick()
 	{
-		m_Server.Tick(50);
+		_server.Tick(50);
 	}
 
 	internal void Stop()
 	{
-		NetworkController.Instance.DisconnectAllClients();
-		m_Server.Stop();
+		NetworkController.DisconnectAllClients();
+		_server.Stop();
 	}
 
 	// Create a bare client with a temporary id.
 	// Partial implementation of the corresponding function in NetworkController.
 	internal void AddBareClient(int connectionId)
 	{
-		m_ClientConnections.Add(connectionId, null);
+		_clientConnections.Add(connectionId, null);
 	}
 
 	internal void SetPlayer(int connectionId, Player player)
 	{
-		if (m_ClientConnections.ContainsKey(connectionId))
+		if (_clientConnections.ContainsKey(connectionId))
 		{
-			m_ClientConnections[connectionId] = player;
+			_clientConnections[connectionId] = player;
 		}
 		else
 		{
-			Dbg.Error("Error setting player for client", connectionId);
+			Debug.Error("Error setting player for client", connectionId);
 		}
 	}
 
 	internal Player GetPlayer(int connectionId)
 	{
-		if (m_ClientConnections.ContainsKey(connectionId) && m_ClientConnections[connectionId] != null)
+		if (_clientConnections.ContainsKey(connectionId) && _clientConnections[connectionId] != null)
 		{
-			return m_ClientConnections[connectionId];
+			return _clientConnections[connectionId];
 		}
 		else
 		{
-			Dbg.Error("Error getting player for client", connectionId);
+			Debug.Error("Error getting player for client", connectionId);
 		}
 
 		return null;
@@ -194,22 +194,22 @@ internal class GSConnection
 
 	internal Player[] GetAllPlayers()
 	{
-		return m_ClientConnections.Values.ToList().ToArray();
+		return _clientConnections.Values.ToArray();
 	}
 
 	private void OnConnected(int connectionId)
 	{
-		string ipAddress = m_Server.GetClientAddress(connectionId);
+		string ipAddress = _server.GetClientAddress(connectionId);
 
-		Dbg.Log("Client connected", connectionId, ipAddress);
+		Debug.Log("Client connected", connectionId, ipAddress);
 
 		try
 		{
-			NetworkController.Instance.AddBareClient(connectionId);
+			NetworkController.AddBareClient(connectionId);
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -217,16 +217,16 @@ internal class GSConnection
 	{
 		try
 		{
-			NetworkData networkData = Serializer.Unpackage(new MemoryStream(message.Array));
+			NetworkData networkData = Serializer.Unpackage(new MemoryStream(message.ToArray()));
 			if (networkData != null)
 			{
-				if (m_ClientConnections[connectionId] != null)
+				if (_clientConnections[connectionId] != null)
 				{
-					networkData.Sender = m_ClientConnections[connectionId].GUID;
+					networkData.Sender = _clientConnections[connectionId].GUID;
 				}
 				else
 				{
-					networkData.Sender = connectionId;
+					networkData.Sender = NetworkController.Clients.First(entry => entry.Value == connectionId).Key;
 				}
 
 				EventSystem.Instance.Invoke(networkData);
@@ -234,20 +234,20 @@ internal class GSConnection
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
-			NetworkController.Instance.DisconnectClient(connectionId);
+			Debug.Exception(ex);
+			NetworkController.DisconnectClient(connectionId);
 		}
 	}
 
 	private void OnDisconnected(int connectionId)
 	{
-		if (m_ClientConnections.TryGetValue(connectionId, out Player player))
+		if (_clientConnections.TryGetValue(connectionId, out Player player))
 		{
-			player.RemovePlayerFromTrigger();
-			m_ClientConnections.Remove(connectionId);
-			NetworkController.Instance.OnDisconnect(connectionId);
+			player?.RemovePlayerFromTrigger();
+			_clientConnections.Remove(connectionId);
+			NetworkController.OnDisconnect(connectionId);
 		}
 
-		Dbg.Info("Client disconnected", Server.IsRunning, connectionId);
+		Debug.Info("Client disconnected", Server.IsRunning, connectionId);
 	}
 }

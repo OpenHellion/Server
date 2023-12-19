@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -138,7 +138,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		dosm.Info.Stats = StatsNew;
 		if (Parent != null)
 		{
-			NetworkController.Instance.SendToClientsSubscribedToParents(dosm, Parent, -1L);
+			NetworkController.SendToClientsSubscribedToParents(dosm, Parent, -1L);
 		}
 		StatsChanged = false;
 		LastStatsSendTime = Server.SolarSystemTime;
@@ -290,7 +290,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	private bool CanBePickedUp(Player player, DynamicObject parentDObj)
 	{
-		return parentDObj.Parent == player || (parentDObj.Item != null && parentDObj.Item is Outfit && !(parentDObj.Parent is Player));
+		return parentDObj.Parent == player || (parentDObj.Item != null && parentDObj.Item is Outfit && parentDObj.Parent is not Player);
 	}
 
 	private void DynamicObjectStatsMessageListener(NetworkData data)
@@ -379,12 +379,12 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					if (dosm.AttachData.ParentType == SpaceObjectType.Player)
 					{
 						newParent = Server.Instance.GetObject(dosm.AttachData.ParentGUID) as Player;
-						if ((newParent as Player).PlayerInventory.AddItemToInventory(Item, dosm.AttachData.InventorySlotID) && !(oldParent is Player))
+						if ((newParent as Player).PlayerInventory.AddItemToInventory(Item, dosm.AttachData.InventorySlotID) && oldParent is not Player)
 						{
 							removeFromOldParent.RunSynchronously();
 						}
 					}
-					else if (dosm.AttachData.ParentType == SpaceObjectType.Ship || dosm.AttachData.ParentType == SpaceObjectType.Asteroid || dosm.AttachData.ParentType == SpaceObjectType.Station)
+					else if (dosm.AttachData.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station)
 					{
 						newParent = Server.Instance.GetObject(dosm.AttachData.ParentGUID) as SpaceObjectVessel;
 						if (dosm.AttachData.IsAttached)
@@ -412,7 +412,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 							LocalRotation = dosm.AttachData.LocalPosition.ToQuaternionD();
 						}
 					}
-					else if (dosm.AttachData.ParentType == SpaceObjectType.PlayerPivot || dosm.AttachData.ParentType == SpaceObjectType.CorpsePivot || dosm.AttachData.ParentType == SpaceObjectType.DynamicObjectPivot)
+					else if (dosm.AttachData.ParentType is SpaceObjectType.PlayerPivot or SpaceObjectType.CorpsePivot or SpaceObjectType.DynamicObjectPivot)
 					{
 						ArtificialBody refObject = SpaceObject.GetParent<ArtificialBody>(oldParent);
 						if (refObject is SpaceObjectVessel vessel)
@@ -475,7 +475,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 		if (!StatsChanged && dosm.AttachData == null)
 		{
@@ -504,7 +504,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			parents.AddRange(oldParent.GetParents(includeMe: true));
 		}
-		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, parents.ToArray());
+		NetworkController.SendToClientsSubscribedTo(dosm, -1L, parents.ToArray());
 		if (DynamicObjects.Count > 0)
 		{
 			DynamicObjectsInfoMessage doim = new DynamicObjectsInfoMessage();
@@ -523,7 +523,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			}
 			if (doim.Infos.Count > 0)
 			{
-				NetworkController.Instance.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
+				NetworkController.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
 			}
 		}
 		StatsChanged = false;
@@ -697,7 +697,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
@@ -776,7 +776,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		NetworkController.Instance.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
+		NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
 		dobj.SendStatsToClient();
 		return true;
 	}

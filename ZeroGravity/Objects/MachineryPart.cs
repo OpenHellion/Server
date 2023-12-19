@@ -45,7 +45,7 @@ public class MachineryPart : Item, IPersistantObject
 				base.MaxHealth *= base.AuxValue;
 				base.Health *= base.AuxValue;
 			}
-			else if (PartType == MachineryPartType.NaniteCore || PartType == MachineryPartType.MillitaryNaniteCore || PartType == MachineryPartType.WarpCell)
+			else if (PartType is MachineryPartType.NaniteCore or MachineryPartType.MillitaryNaniteCore or MachineryPartType.WarpCell)
 			{
 				base.MaxHealth *= base.TierMultiplier;
 				base.Health *= base.TierMultiplier;
@@ -67,9 +67,9 @@ public class MachineryPart : Item, IPersistantObject
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataMachineryPart data))
+			if (persistenceData is not PersistenceObjectDataMachineryPart data)
 			{
-				Dbg.Warning("PersistenceObjectDataMachineryPart data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataMachineryPart data is null", base.GUID);
 			}
 			else
 			{
@@ -78,7 +78,7 @@ public class MachineryPart : Item, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

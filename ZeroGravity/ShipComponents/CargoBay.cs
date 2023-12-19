@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -123,7 +123,7 @@ public class CargoBay : ICargo, IPersistantObject
 		{
 			compartment.Resources.Remove(res);
 		}
-		NetworkController.Instance.SendToClientsSubscribedTo(new ShipStatsMessage
+		NetworkController.SendToClientsSubscribedTo(new ShipStatsMessage
 		{
 			GUID = ParentVessel.GUID,
 			Temperature = ParentVessel.Temperature,
@@ -150,9 +150,9 @@ public class CargoBay : ICargo, IPersistantObject
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataCargo data))
+			if (persistenceData is not PersistenceObjectDataCargo data)
 			{
-				Dbg.Warning("PersistenceObjectDataCargo data is null");
+				Debug.Warning("PersistenceObjectDataCargo data is null");
 				return;
 			}
 			CargoCompartments = data.CargoCompartments;
@@ -163,7 +163,7 @@ public class CargoBay : ICargo, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

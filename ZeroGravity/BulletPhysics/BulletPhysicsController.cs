@@ -266,7 +266,7 @@ public class BulletPhysicsController
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -280,7 +280,7 @@ public class BulletPhysicsController
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -302,7 +302,7 @@ public class BulletPhysicsController
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 		return false;
 	}

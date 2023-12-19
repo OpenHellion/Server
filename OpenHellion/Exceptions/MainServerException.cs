@@ -16,12 +16,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using System;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 
 namespace OpenHellion.Exceptions;
 
 public class MainServerException : Exception
 {
 	public MainServerException(string message) : base(message) { }
-	public MainServerException(string message, StatusCode statusCode) : base($"{message}. Error code: {statusCode}") { }
+	public MainServerException(string message, StatusCode statusCode) : base($"Didn't get valid response from main server. Perhaps you should check if your http_key config is correct?: {message}. Error code: {statusCode}") { }
 }

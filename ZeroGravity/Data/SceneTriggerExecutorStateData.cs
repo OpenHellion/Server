@@ -1,6 +1,6 @@
-namespace ZeroGravity.Objects;
+namespace ZeroGravity.Data;
 
-public class SceneTriggerExceuterState
+public class SceneTriggerExecutorStateData : ISceneData
 {
 	public int StateID;
 

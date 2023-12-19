@@ -108,7 +108,7 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 
 	protected override void ChangeEquip(Inventory.EquipType equipType)
 	{
-		if (!(base.DynamicObj.Parent is Player))
+		if (base.DynamicObj.Parent is not Player)
 		{
 			return;
 		}
@@ -154,9 +154,9 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataHelmet data))
+			if (persistenceData is not PersistenceObjectDataHelmet data)
 			{
-				Dbg.Warning("PersistenceObjectDataHelmet data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataHelmet data is null", base.GUID);
 			}
 			else
 			{
@@ -165,7 +165,7 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

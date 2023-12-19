@@ -18,7 +18,7 @@
 using Newtonsoft.Json;
 using OpenHellion.IO;
 
-namespace OpenHellion.Networking.Message.MainServer;
+namespace OpenHellion.Net.Message.MainServer;
 
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
 public class NakamaResponse

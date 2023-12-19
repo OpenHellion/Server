@@ -44,7 +44,7 @@ public class StructureSceneData : ISceneData
 
 	public List<DoorData> Doors;
 
-	public List<SceneTriggerExecuterData> SceneTriggerExecuters;
+	public List<SceneTriggerExecutorData> SceneTriggerExecutors;
 
 	public List<SceneDockingPortData> DockingPorts;
 

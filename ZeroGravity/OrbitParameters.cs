@@ -711,7 +711,7 @@ public class OrbitParameters
 		}
 		else
 		{
-			Dbg.Warning("ATTEMPTED TO UPDATE INVALID ORBIT");
+			Debug.Warning("ATTEMPTED TO UPDATE INVALID ORBIT");
 		}
 	}
 

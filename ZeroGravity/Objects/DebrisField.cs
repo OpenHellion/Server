@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -111,7 +111,7 @@ public class DebrisField
 		double i = vo / vs * (double)data.DamageVesselChance;
 		if (i > (double)maxSteps)
 		{
-			Dbg.Warning("Debris field DamageVesselChance can't be achieved", data.Name, "Possible solutions: increase radius and/or scale down orbit.");
+			Debug.Warning("Debris field DamageVesselChance can't be achieved", data.Name, "Possible solutions: increase radius and/or scale down orbit.");
 		}
 		steps = (int)MathHelper.Clamp(System.Math.Ceiling(i), 1.0, maxSteps);
 	}
@@ -173,7 +173,7 @@ public class DebrisField
 				}
 				else
 				{
-					if (!(ab is SpaceObjectVessel objectVessel) || Server.Instance.AllPlayers.Count((Player m) => m.Parent is SpaceObjectVessel spaceObjectVessel && spaceObjectVessel.MainVessel == (ab as SpaceObjectVessel).MainVessel && m.IsAlive && Server.Instance.SolarSystem.CurrentTime - m.LastMovementMessageSolarSystemTime < 10.0) <= 0)
+					if (ab is not SpaceObjectVessel objectVessel || Server.Instance.AllPlayers.Count((Player m) => m.Parent is SpaceObjectVessel spaceObjectVessel && spaceObjectVessel.MainVessel == (ab as SpaceObjectVessel).MainVessel && m.IsAlive && Server.Instance.SolarSystem.CurrentTime - m.LastMovementMessageSolarSystemTime < 10.0) <= 0)
 					{
 						continue;
 					}
@@ -201,7 +201,7 @@ public class DebrisField
 				ShipOne = v.GUID,
 				ShipTwo = -1L
 			};
-			NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, v);
+			NetworkController.SendToClientsSubscribedTo(scm, -1L, v);
 			v.ChangeHealthBy(0f - MathHelper.RandomRange(Data.Damage.Min, Data.Damage.Max), null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.SmallDebrisHit, time);
 		}
 	}

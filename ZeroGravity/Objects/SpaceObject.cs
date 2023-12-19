@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.Spawn;
@@ -80,11 +80,11 @@ public abstract class SpaceObject
 		};
 		if (this is SpaceObjectVessel)
 		{
-			NetworkController.Instance.SendToAllClients(dom, -1L);
+			NetworkController.SendToAllClients(dom, -1L);
 		}
 		else
 		{
-			NetworkController.Instance.SendToClientsSubscribedToParents(dom, this, -1L);
+			NetworkController.SendToClientsSubscribedToParents(dom, this, -1L);
 		}
 		if (this is Player)
 		{
@@ -129,7 +129,7 @@ public abstract class SpaceObject
 		}
 		else
 		{
-			if (!(this is SpaceObjectTransferable) || !(Parent is Pivot))
+			if (this is not SpaceObjectTransferable || Parent is not Pivot)
 			{
 				return false;
 			}

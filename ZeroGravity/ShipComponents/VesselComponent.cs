@@ -78,7 +78,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 	{
 		get
 		{
-			if (_Status == SystemStatus.OnLine || _Status == SystemStatus.CoolDown)
+			if (_Status is SystemStatus.OnLine or SystemStatus.CoolDown)
 			{
 				return baseRadarSignature * radarSignatureMultiplier;
 			}
@@ -96,7 +96,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		{
 			if (_Defective != (_Defective = value))
 			{
-				if (value && (Status == SystemStatus.OnLine || Status == SystemStatus.PowerUp))
+				if (value && Status is SystemStatus.OnLine or SystemStatus.PowerUp)
 				{
 					GoOffLine(autoRestart: true);
 				}
@@ -104,7 +104,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 				{
 					SecondaryStatus = SystemSecondaryStatus.Defective;
 				}
-				else if ((Status == SystemStatus.OffLine || Status == SystemStatus.CoolDown) && shouldAutoReactivate)
+				else if (Status is SystemStatus.OffLine or SystemStatus.CoolDown && shouldAutoReactivate)
 				{
 					GoOnLine();
 				}
@@ -345,7 +345,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 	public virtual void GoOffLine(bool autoRestart, bool malfunction = false)
 	{
 		shouldAutoReactivate = autoRestart && AutoReactivate;
-		if (Status == SystemStatus.OnLine || Status == SystemStatus.PowerUp)
+		if (Status is SystemStatus.OnLine or SystemStatus.PowerUp)
 		{
 			if (CoolDownTime > 0f)
 			{
@@ -466,7 +466,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 			debugText = debugText + name[name.Length - 1] + ": MALFUNCTION\n";
 			return false;
 		}
-		if (!(this is VesselBaseSystem) && IsPowerConsumer && !(this is GeneratorCapacitor) && ParentVessel.VesselBaseSystem.Status != SystemStatus.OnLine)
+		if (this is not VesselBaseSystem && IsPowerConsumer && this is not GeneratorCapacitor && ParentVessel.VesselBaseSystem.Status != SystemStatus.OnLine)
 		{
 			debugText += "Vessel power turned off\n";
 			return false;
@@ -629,9 +629,9 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataVesselComponent data))
+			if (persistenceData is not PersistenceObjectDataVesselComponent data)
 			{
-				Dbg.Warning("PersistenceObjectDataVesselComponent data is null");
+				Debug.Warning("PersistenceObjectDataVesselComponent data is null");
 				return;
 			}
 			_AutoReactivate = data.AutoReactivate;
@@ -643,7 +643,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

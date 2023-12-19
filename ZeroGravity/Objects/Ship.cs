@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -401,7 +401,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				RotationTrust = CurrRcsRotationThrust.HasValue ? CurrRcsRotationThrust.Value.ToFloatArray() : null
 			};
 			rcsThrustChanged = false;
-			NetworkController.Instance.SendToClientsSubscribedTo(ssm, -1L, this);
+			NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		}
 	}
 
@@ -587,20 +587,20 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				sendShipStatsMsg = true;
 			}
 		}
-		if (sm.VesselObjects.SceneTriggerExecuters != null)
+		if (sm.VesselObjects.SceneTriggerExecutors != null)
 		{
-			List<SceneTriggerExecuterDetails> sceneTriggerExecutersChanged = new List<SceneTriggerExecuterDetails>();
-			foreach (SceneTriggerExecuterDetails stDetails2 in sm.VesselObjects.SceneTriggerExecuters)
+			List<SceneTriggerExecutorDetails> SceneTriggerExecutorsChanged = new List<SceneTriggerExecutorDetails>();
+			foreach (SceneTriggerExecutorDetails stDetails2 in sm.VesselObjects.SceneTriggerExecutors)
 			{
-				SceneTriggerExecuter ste = SceneTriggerExecuters.Find((SceneTriggerExecuter m) => m.InSceneID == stDetails2.InSceneID);
+				SceneTriggerExecutor ste = SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == stDetails2.InSceneID);
 				if (ste != null && stDetails2 != null)
 				{
-					sceneTriggerExecutersChanged.Add(ste.ChangeState(sm.Sender, stDetails2));
+					SceneTriggerExecutorsChanged.Add(ste.ChangeState(sm.Sender, stDetails2));
 				}
 			}
-			if (sceneTriggerExecutersChanged.Count > 0)
+			if (SceneTriggerExecutorsChanged.Count > 0)
 			{
-				retMsg.VesselObjects.SceneTriggerExecuters = sceneTriggerExecutersChanged;
+				retMsg.VesselObjects.SceneTriggerExecutors = SceneTriggerExecutorsChanged;
 				sendShipStatsMsg = true;
 			}
 		}
@@ -641,7 +641,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 						stDetails.RelativePositionUpdate.Add(s.GUID, s.RelativePositionFromParent.ToFloatArray());
 						stDetails.RelativeRotationUpdate.Add(s.GUID, s.RelativeRotationFromParent.ToFloatArray());
 					}
-					stDetails.ExecutersMerge = port.GetMergedExecuters(parentPort);
+					stDetails.ExecutorsMerge = port.GetMergedExecutors(parentPort);
 					stDetails.PairedDoors = GetPairedDoors(port);
 					stDetails.RelativePosition = RelativePositionFromParent.ToFloatArray();
 					stDetails.RelativeRotation = RelativeRotationFromParent.ToFloatArray();
@@ -656,10 +656,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					{
 						continue;
 					}
-					stDetails.ExecutersMerge = new List<ExecuterMergeDetails>();
-					foreach (SceneTriggerExecuter exec in port.MergeExecuters.Keys)
+					stDetails.ExecutorsMerge = new List<ExecutorMergeDetails>();
+					foreach (SceneTriggerExecutor exec in port.MergeExecutors.Keys)
 					{
-						stDetails.ExecutersMerge.Add(new ExecuterMergeDetails
+						stDetails.ExecutorsMerge.Add(new ExecutorMergeDetails
 						{
 							ParentTriggerID = new VesselObjectID(GUID, exec.InSceneID)
 						});
@@ -670,7 +670,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				}
 				else
 				{
-					Dbg.Warning("Tried to undock non-docked docking port", port.ID);
+					Debug.Warning("Tried to undock non-docked docking port", port.ID);
 				}
 			}
 			if (dockingPortsChanged.Count > 0)
@@ -770,7 +770,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (sendShipStatsMsg)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, this);
+			NetworkController.SendToClientsSubscribedTo(retMsg, -1L, this);
 		}
 	}
 
@@ -808,7 +808,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				ShipOne = GUID,
 				ShipTwo = otherShipGUID
 			};
-			NetworkController.Instance.SendToClientsSubscribedTo(scm, -1L, this, otherShipGUID != -1 ? Server.Instance.GetVessel(otherShipGUID) : null);
+			NetworkController.SendToClientsSubscribedTo(scm, -1L, this, otherShipGUID != -1 ? Server.Instance.GetVessel(otherShipGUID) : null);
 		}
 	}
 
@@ -979,9 +979,9 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				Rooms.Add(room);
 			}
 		}
-		if (data.SceneTriggerExecuters != null && data.SceneTriggerExecuters.Count > 0)
+		if (data.SceneTriggerExecutors != null && data.SceneTriggerExecutors.Count > 0)
 		{
-			foreach (SceneTriggerExecuterData std2 in data.SceneTriggerExecuters)
+			foreach (SceneTriggerExecutorData std2 in data.SceneTriggerExecutors)
 			{
 				if (std2.TagAction != 0)
 				{
@@ -991,7 +991,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 						continue;
 					}
 				}
-				SceneTriggerExecuter ex2 = new SceneTriggerExecuter
+				SceneTriggerExecutor ex2 = new SceneTriggerExecutor
 				{
 					InSceneID = std2.InSceneID,
 					ParentShip = this
@@ -1011,7 +1011,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 						});
 					}
 				}
-				SceneTriggerExecuters.Add(ex2);
+				SceneTriggerExecutors.Add(ex2);
 			}
 		}
 		if (data.DockingPorts != null && data.DockingPorts.Count > 0)
@@ -1032,13 +1032,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					DoorPairingDistance = std.DoorPairingDistance,
 					OrderID = std.OrderID,
 					Locked = std.Locked,
-					MergeExecuters = new Dictionary<SceneTriggerExecuter, Vector3D>(),
-					MergeExecutersDistance = std.MergeExecuterDistance
+					MergeExecutors = new Dictionary<SceneTriggerExecutor, Vector3D>(),
+					MergeExecutorsDistance = std.MergeExecutorDistance
 				};
-				foreach (SceneDockingPortExecuterMerge mer in std.MergeExecuters)
+				foreach (SceneDockingPortExecutorMerge mer in std.MergeExecutors)
 				{
-					SceneTriggerExecuter ex = SceneTriggerExecuters.Find((SceneTriggerExecuter m) => m.InSceneID == mer.InSceneID);
-					newPort.MergeExecuters.Add(ex, mer.Position.ToVector3D());
+					SceneTriggerExecutor ex = SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == mer.InSceneID);
+					newPort.MergeExecutors.Add(ex, mer.Position.ToVector3D());
 				}
 				DockingPorts.Add(newPort);
 			}
@@ -1055,21 +1055,21 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 						continue;
 					}
 				}
-				SceneTriggerExecuter executer = spd.ExecuterID > 0 ? SceneTriggerExecuters.Find((SceneTriggerExecuter m) => m.InSceneID == spd.ExecuterID) : null;
+				SceneTriggerExecutor executor = spd.ExecutorID > 0 ? SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == spd.ExecutorID) : null;
 				ShipSpawnPoint newSpawnPoint = new ShipSpawnPoint
 				{
 					SpawnPointID = spd.InSceneID,
 					Type = spd.Type,
-					Executer = executer,
-					ExecuterStateID = spd.ExecuterStateID,
+					Executor = executor,
+					ExecutorStateID = spd.ExecutorStateID,
 					Ship = this,
 					State = SpawnPointState.Unlocked,
 					Player = null
 				};
-				if (newSpawnPoint.Executer != null)
+				if (newSpawnPoint.Executor != null)
 				{
-					executer.SpawnPoint = newSpawnPoint;
-					newSpawnPoint.ExecuterOccupiedStateIDs = new List<int>(spd.ExecuterOccupiedStateIDs);
+					executor.SpawnPoint = newSpawnPoint;
+					newSpawnPoint.ExecutorOccupiedStateIDs = new List<int>(spd.ExecutorOccupiedStateIDs);
 				}
 				SpawnPoints.Add(newSpawnPoint);
 			}
@@ -1139,7 +1139,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				});
 			}
 		}
-		if (!loadDynamicObjects || data.DynamicObjects == null || data.DynamicObjects.Count <= 0)
+		if (!loadDynamicObjects || data.DynamicObjects is not { Count: > 0 })
 		{
 			return;
 		}
@@ -1309,7 +1309,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		if (!VesselCrew.Contains(pl))
 		{
 			VesselCrew.Add(pl);
-			RemovePlayerFromExecuters(pl);
+			RemovePlayerFromExecutors(pl);
 		}
 	}
 
@@ -1318,31 +1318,31 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		VesselCrew.Remove(pl);
 		if (checkDetails)
 		{
-			RemovePlayerFromExecuters(pl);
+			RemovePlayerFromExecutors(pl);
 		}
 	}
 
-	public void RemovePlayerFromExecuters(Player pl)
+	public void RemovePlayerFromExecutors(Player pl)
 	{
-		List<SceneTriggerExecuterDetails> executers = new List<SceneTriggerExecuterDetails>();
-		foreach (SceneTriggerExecuter ex in SceneTriggerExecuters)
+		List<SceneTriggerExecutorDetails> executors = new List<SceneTriggerExecutorDetails>();
+		foreach (SceneTriggerExecutor ex in SceneTriggerExecutors)
 		{
-			SceneTriggerExecuterDetails det = ex.RemovePlayerFromExecuter(pl);
+			SceneTriggerExecutorDetails det = ex.RemovePlayerFromExecutor(pl);
 			if (det == null)
 			{
 				det = ex.RemovePlayerFromProximity(pl);
 			}
 			if (det != null)
 			{
-				executers.Add(det);
+				executors.Add(det);
 			}
 		}
-		if (executers.Count > 0)
+		if (executors.Count > 0)
 		{
 			ShipStatsMessage retStatsMsg = new ShipStatsMessage();
 			retStatsMsg.VesselObjects = new VesselObjects();
 			retStatsMsg.GUID = GUID;
-			retStatsMsg.VesselObjects.SceneTriggerExecuters = executers;
+			retStatsMsg.VesselObjects.SceneTriggerExecutors = executors;
 			ShipStatsMessageListener(retStatsMsg);
 		}
 	}
@@ -1413,7 +1413,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			prevDestructionSolarSystemTime = SelfDestructTimer.DestructionSolarSystemTime;
 			ssm.SelfDestructTime = SelfDestructTimer?.Time;
 		}
-		NetworkController.Instance.SendToClientsSubscribedTo(ssm, -1L, this);
+		NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		foreach (DynamicObject dobj in DynamicObjects.Values.Where((DynamicObject x) => x.Item != null && x.Item.AttachPointType != AttachPointType.None))
 		{
 			if (dobj.Item.AttachPointType == AttachPointType.BatteryRechargePoint && dobj.Item is Battery bat)
@@ -1575,10 +1575,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			data.DockingPorts.Add(dp.GetPersistenceData() as PersistenceObjectDataDockingPort);
 		}
-		data.Executers = new List<PersistenceObjectDataExecuter>();
-		foreach (SceneTriggerExecuter exe in SceneTriggerExecuters)
+		data.Executors = new List<PersistenceObjectDataExecutor>();
+		foreach (SceneTriggerExecutor exe in SceneTriggerExecutors)
 		{
-			data.Executers.Add(exe.GetPersistenceData() as PersistenceObjectDataExecuter);
+			data.Executors.Add(exe.GetPersistenceData() as PersistenceObjectDataExecutor);
 		}
 		data.NameTags = new List<PersistenceObjectDataNameTag>();
 		foreach (NameTagData nameTag in NameTags)
@@ -1690,11 +1690,11 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					DockingPorts.Find((VesselDockingPort x) => x.ID.InSceneID == dp.InSceneID)?.LoadPersistenceData(dp);
 				}
 			}
-			if (data.Executers != null)
+			if (data.Executors != null)
 			{
-				foreach (PersistenceObjectDataExecuter e2 in data.Executers)
+				foreach (PersistenceObjectDataExecutor e2 in data.Executors)
 				{
-					SceneTriggerExecuters.Find((SceneTriggerExecuter x) => x.InSceneID == e2.InSceneID)?.LoadPersistenceData(e2);
+					SceneTriggerExecutors.Find((SceneTriggerExecutor x) => x.InSceneID == e2.InSceneID)?.LoadPersistenceData(e2);
 				}
 			}
 			if (data.NameTags != null)
@@ -1756,7 +1756,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
@@ -1776,14 +1776,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			vrr.Time = (float)(RespawnTimeForShip - timePassedSinceRequest);
 			foreach (Player p3 in base.MainVessel.VesselCrew)
 			{
-				NetworkController.Instance.SendToGameClient(p3.GUID, vrr);
+				NetworkController.SendToGameClient(p3.GUID, vrr);
 			}
 			{
 				foreach (Ship shp3 in base.MainVessel.AllDockedVessels)
 				{
 					foreach (Player pl3 in shp3.VesselCrew)
 					{
-						NetworkController.Instance.SendToGameClient(pl3.GUID, vrr);
+						NetworkController.SendToGameClient(pl3.GUID, vrr);
 					}
 				}
 				return;
@@ -1800,14 +1800,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
 			foreach (Player p2 in base.MainVessel.VesselCrew)
 			{
-				NetworkController.Instance.SendToGameClient(p2.GUID, vrr);
+				NetworkController.SendToGameClient(p2.GUID, vrr);
 			}
 			{
 				foreach (Ship shp2 in base.MainVessel.AllDockedVessels)
 				{
 					foreach (Player pl2 in shp2.VesselCrew)
 					{
-						NetworkController.Instance.SendToGameClient(pl2.GUID, vrr);
+						NetworkController.SendToGameClient(pl2.GUID, vrr);
 					}
 				}
 				return;
@@ -1816,13 +1816,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		vrr.Message = RescueShipMessages.AnotherShipInRange;
 		foreach (Player p in base.MainVessel.VesselCrew)
 		{
-			NetworkController.Instance.SendToGameClient(p.GUID, vrr);
+			NetworkController.SendToGameClient(p.GUID, vrr);
 		}
 		foreach (Ship shp in base.MainVessel.AllDockedVessels)
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				NetworkController.Instance.SendToGameClient(pl.GUID, vrr);
+				NetworkController.SendToGameClient(pl.GUID, vrr);
 			}
 		}
 	}
@@ -1856,13 +1856,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		vrr.Message = RescueShipMessages.ShipArrived;
 		foreach (Player p in base.MainVessel.VesselCrew)
 		{
-			NetworkController.Instance.SendToGameClient(p.GUID, vrr);
+			NetworkController.SendToGameClient(p.GUID, vrr);
 		}
 		foreach (Ship shp in base.MainVessel.AllDockedVessels)
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				NetworkController.Instance.SendToGameClient(pl.GUID, vrr);
+				NetworkController.SendToGameClient(pl.GUID, vrr);
 			}
 		}
 	}
@@ -2025,7 +2025,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				if (craftingResources != null && craftingResources.Count > 0)
 				{
 					pl.Blueprints.Add(cit);
-					NetworkController.Instance.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
+					NetworkController.SendToGameClient(pl.GUID, new UpdateBlueprintsMessage
 					{
 						Blueprints = pl.Blueprints
 					});
@@ -2102,7 +2102,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (retMsg != null)
 		{
-			NetworkController.Instance.SendToClientsSubscribedTo(retMsg, -1L, this);
+			NetworkController.SendToClientsSubscribedTo(retMsg, -1L, this);
 		}
 	}
 

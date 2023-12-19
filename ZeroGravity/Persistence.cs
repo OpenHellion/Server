@@ -40,7 +40,7 @@ public class Persistence
 				SaveVesselPersistence(ref per, child2);
 			}
 		}
-		if (ves.StabilizedToTargetChildren == null || ves.StabilizedToTargetChildren.Count <= 0)
+		if (ves.StabilizedToTargetChildren is not { Count: > 0 })
 		{
 			return;
 		}
@@ -110,7 +110,7 @@ public class Persistence
 
 			foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 			{
-				if (!ves.IsDocked && ves.StabilizeToTargetObj == null && (ves.ObjectType == SpaceObjectType.Ship || ves.ObjectType == SpaceObjectType.Asteroid))
+				if (!ves.IsDocked && ves.StabilizeToTargetObj == null && ves.ObjectType is SpaceObjectType.Ship or SpaceObjectType.Asteroid)
 				{
 					SaveVesselPersistence(ref per, ves);
 				}
@@ -131,7 +131,7 @@ public class Persistence
 
 			foreach (SpaceObjectVessel ves2 in Server.Instance.AllVessels)
 			{
-				if (ves2.SpawnPoints == null || ves2.SpawnPoints.Count <= 0)
+				if (ves2.SpawnPoints is not { Count: > 0 })
 				{
 					continue;
 				}
@@ -167,7 +167,7 @@ public class Persistence
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -176,7 +176,7 @@ public class Persistence
 		SpaceObject parentObj = Server.Instance.GetObject(data.ParentGUID);
 		if (parentObj == null)
 		{
-			Dbg.Error("Could not find parent object for respawn object persistence", data.ItemID);
+			Debug.Error("Could not find parent object for respawn object persistence", data.ItemID);
 			return;
 		}
 		AttachPointDetails apd = null;
@@ -237,7 +237,7 @@ public class Persistence
 		}
 		catch (Exception ex)
 		{
-			Dbg.Error("Failed to load spawn point from persistence", ex.Message, ex.StackTrace);
+			Debug.Error("Failed to load spawn point from persistence", ex.Message, ex.StackTrace);
 		}
 	}
 
@@ -383,7 +383,7 @@ public class Persistence
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 			return null;
 		}
 	}

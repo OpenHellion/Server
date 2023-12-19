@@ -19,7 +19,7 @@ public class VesselObjects
 
 	public List<DoorDetails> Doors;
 
-	public List<SceneTriggerExecuterDetails> SceneTriggerExecuters;
+	public List<SceneTriggerExecutorDetails> SceneTriggerExecutors;
 
 	public List<AttachPointDetails> AttachPoints;
 

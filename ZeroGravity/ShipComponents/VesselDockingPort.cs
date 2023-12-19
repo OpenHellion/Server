@@ -28,13 +28,13 @@ public class VesselDockingPort : IPersistantObject
 
 	public bool Locked;
 
-	public Dictionary<SceneTriggerExecuter, Vector3D> MergeExecuters;
+	public Dictionary<SceneTriggerExecutor, Vector3D> MergeExecutors;
 
-	public double MergeExecutersDistance;
+	public double MergeExecutorsDistance;
 
 	public SpaceObjectVessel ParentVessel = null;
 
-	public List<ExecuterMergeDetails> GetMergedExecuters(VesselDockingPort parentPort)
+	public List<ExecutorMergeDetails> GetMergedExecutors(VesselDockingPort parentPort)
 	{
 		if (!DockingStatus)
 		{
@@ -44,14 +44,14 @@ public class VesselDockingPort : IPersistantObject
 		{
 			parentPort = DockedVessel.DockingPorts.Find((VesselDockingPort m) => m.ID.InSceneID == DockedToID.InSceneID);
 		}
-		List<ExecuterMergeDetails> retVal = new List<ExecuterMergeDetails>();
-		foreach (SceneTriggerExecuter exec in parentPort.MergeExecuters.Keys)
+		List<ExecutorMergeDetails> retVal = new List<ExecutorMergeDetails>();
+		foreach (SceneTriggerExecutor exec in parentPort.MergeExecutors.Keys)
 		{
-			SceneTriggerExecuter parent = exec.Child != null ? exec : exec.Parent;
-			SceneTriggerExecuter child = exec.Parent != null ? exec : exec.Child;
+			SceneTriggerExecutor parent = exec.Child != null ? exec : exec.Parent;
+			SceneTriggerExecutor child = exec.Parent != null ? exec : exec.Child;
 			if (parent != null && child != null)
 			{
-				retVal.Add(new ExecuterMergeDetails
+				retVal.Add(new ExecutorMergeDetails
 				{
 					ParentTriggerID = new VesselObjectID(parent.ParentShip.GUID, parent.InSceneID),
 					ChildTriggerID = new VesselObjectID(child.ParentShip.GUID, child.InSceneID)
@@ -74,9 +74,9 @@ public class VesselDockingPort : IPersistantObject
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataDockingPort data))
+			if (persistenceData is not PersistenceObjectDataDockingPort data)
 			{
-				Dbg.Warning("PersistenceObjectDataDoor data is null");
+				Debug.Warning("PersistenceObjectDataDoor data is null");
 			}
 			else
 			{
@@ -85,7 +85,7 @@ public class VesselDockingPort : IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
@@ -100,7 +100,7 @@ public class VesselDockingPort : IPersistantObject
 			RelativePosition = ParentVessel.RelativePositionFromParent.ToFloatArray(),
 			RelativeRotation = ParentVessel.RelativeRotationFromParent.ToFloatArray(),
 			CollidersCenterOffset = ParentVessel.IsDocked ? ParentVessel.DockedToMainVessel.VesselData.CollidersCenterOffset : ParentVessel.VesselData.CollidersCenterOffset,
-			ExecutersMerge = GetMergedExecuters(null),
+			ExecutorsMerge = GetMergedExecutors(null),
 			PairedDoors = ParentVessel.GetPairedDoors(this)
 		};
 	}

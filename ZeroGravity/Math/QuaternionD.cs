@@ -257,7 +257,7 @@ public struct QuaternionD
 
 	public override bool Equals(object other)
 	{
-		if (!(other is QuaternionD quaternion))
+		if (other is not QuaternionD quaternion)
 		{
 			return false;
 		}

@@ -80,9 +80,9 @@ public class Medpack : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataMedpack data))
+			if (persistenceData is not PersistenceObjectDataMedpack data)
 			{
-				Dbg.Warning("PersistenceObjectDataMedpack data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataMedpack data is null", base.GUID);
 			}
 			else
 			{
@@ -91,7 +91,7 @@ public class Medpack : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

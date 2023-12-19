@@ -7,5 +7,5 @@ public class PlayerSpawnRequest : NetworkData
 {
 	public SpawnSetupType SpawnSetupType;
 
-	public long SpawPointParentID;
+	public long SpawnPointParentId;
 }

@@ -108,9 +108,9 @@ public class Battery : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataBattery data))
+			if (persistenceData is not PersistenceObjectDataBattery data)
 			{
-				Dbg.Warning("PersistenceObjectDataBattery data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataBattery data is null", base.GUID);
 			}
 			else
 			{
@@ -119,7 +119,7 @@ public class Battery : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

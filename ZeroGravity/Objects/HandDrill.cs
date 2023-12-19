@@ -121,9 +121,9 @@ internal class HandDrill : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataHandDrill data))
+			if (persistenceData is not PersistenceObjectDataHandDrill data)
 			{
-				Dbg.Warning("PersistenceObjectDataHandDrill data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataHandDrill data is null", base.GUID);
 			}
 			else
 			{
@@ -132,7 +132,7 @@ internal class HandDrill : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

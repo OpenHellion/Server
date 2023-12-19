@@ -116,7 +116,7 @@ public class DeathMatchArenaController : IPersistantObject
 		}
 		else
 		{
-			Dbg.Warning("PersistenceArenaControllerData wrong type");
+			Debug.Warning("PersistenceArenaControllerData wrong type");
 		}
 	}
 }

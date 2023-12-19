@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ZeroGravity.Data;
 
-public class SceneTriggerExecuterData : ISceneData
+public class SceneTriggerExecutorData : ISceneData
 {
 	public int InSceneID;
 
@@ -12,7 +12,7 @@ public class SceneTriggerExecuterData : ISceneData
 
 	public string Tags;
 
-	public List<SceneTriggerExecuterStateData> States;
+	public List<SceneTriggerExecutorStateData> States;
 
 	public List<SceneTriggerProximityData> ProximityTriggers;
 }

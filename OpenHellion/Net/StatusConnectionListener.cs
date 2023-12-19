@@ -4,51 +4,52 @@ using System.Net.Sockets;
 using System.Threading;
 using ZeroGravity;
 
-namespace OpenHellion.Networking;
+namespace OpenHellion.Net;
 
 public class StatusConnectionListener
 {
-	private volatile bool runThread;
+	private volatile bool _runThread;
 
-	private Thread listeningThread;
+	private Thread _listeningThread;
 
-	private TcpListener tcpListener;
+	private TcpListener _tcpListener;
 
 	public void Stop()
 	{
-		runThread = false;
-		tcpListener.Stop();
+		_runThread = false;
+		_tcpListener.Stop();
 	}
 
 	public void Start(int port)
 	{
-		runThread = true;
-		tcpListener = new TcpListener(new IPEndPoint(IPAddress.Any, port));
-		tcpListener.Start();
-		listeningThread = new Thread(Listen)
+		_runThread = true;
+		_tcpListener = new TcpListener(new IPEndPoint(IPAddress.Any, port));
+		_tcpListener.Start();
+		_listeningThread = new Thread(Listen)
 		{
 			IsBackground = true,
 			Priority = ThreadPriority.AboveNormal
 		};
-		listeningThread.Start();
+		_listeningThread.Start();
 	}
 
 	private void Listen()
 	{
-		while (Server.IsRunning && runThread)
+		while (Server.IsRunning && _runThread)
 		{
 			try
 			{
-				Socket soc = tcpListener.AcceptSocket();
-				if (!runThread)
+				Socket soc = _tcpListener.AcceptSocket();
+				if (!_runThread)
 				{
 					break;
 				}
 				StatusConnection connection = new StatusConnection(soc);
 				connection.Start();
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
+				Debug.Exception(ex);
 			}
 		}
 	}

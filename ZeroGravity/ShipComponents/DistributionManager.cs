@@ -435,7 +435,7 @@ public class DistributionManager
 				VesselObjectID id1 = new VesselObjectID(vessel.GUID, door1Id);
 				VesselObjectID matchingID = null;
 				Door door1 = GetDoor(id1);
-				if (door1 == null || !door1.isExternal)
+				if (door1 is not { isExternal: true })
 				{
 					continue;
 				}
@@ -724,7 +724,7 @@ public class DistributionManager
 			else
 			{
 				VesselComponent vc2 = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == ssData.InSceneID);
-				if (vc2 == null || !(vc2 is SubSystem system))
+				if (vc2 is not SubSystem system)
 				{
 					continue;
 				}
@@ -809,7 +809,7 @@ public class DistributionManager
 			else
 			{
 				VesselComponent vc = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == gData.InSceneID);
-				if (vc == null || !(vc is Generator generator))
+				if (vc is not Generator generator)
 				{
 					continue;
 				}
@@ -1095,14 +1095,14 @@ public class DistributionManager
 		{
 			ss.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
 		}
-		foreach (SubSystem ss2 in idSubSystems.Values.Where((SubSystem m) => !(m is VesselBaseSystem)))
+		foreach (SubSystem ss2 in idSubSystems.Values.Where((SubSystem m) => m is not VesselBaseSystem))
 		{
 			ss2.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
 		}
 		reservedCapacities = new Dictionary<IResourceProvider, float>();
 		reservedQuantities = new Dictionary<ResourceContainer, float>();
 		foreach (SubSystem pc in from m in idSubSystems.Values
-			where m.IsPowerConsumer && !(m is VesselBaseSystem)
+			where m.IsPowerConsumer && m is not VesselBaseSystem
 			orderby consumersOrder.IndexOf(m.GetType()) descending
 			select m)
 		{
@@ -1283,11 +1283,11 @@ public class DistributionManager
 				{
 					return;
 				}
-				foreach (IResourceProvider rp in resourceProviders.Where((IResourceProvider m) => !(m is Generator generator) || generator.Status == SystemStatus.OnLine))
+				foreach (IResourceProvider rp in resourceProviders.Where((IResourceProvider m) => m is not Generator generator || generator.Status == SystemStatus.OnLine))
 				{
 					reservedCapacities.TryGetValue(rp, out var reservedCapacity);
 					float capacityAvailable = rp.MaxOutput - reservedCapacity;
-					if (rp is Generator || !(rp is ResourceContainerAirTank airTank2))
+					if (rp is Generator || rp is not ResourceContainerAirTank airTank2)
 					{
 						continue;
 					}
@@ -1466,7 +1466,7 @@ public class DistributionManager
 		foreach (IResourceUser resourceUser in list)
 		{
 			resourceProvider.ConnectedConsumers.Add(resourceUser);
-			if (!(resourceUser is GeneratorCapacitor) || !(resourceProvider is GeneratorCapacitor))
+			if (resourceUser is not GeneratorCapacitor || resourceProvider is not GeneratorCapacitor)
 			{
 				SortedSet<IResourceProvider> resourceProviders = null;
 				if (!resourceUser.ConnectedProviders.TryGetValue(resourceProvider.OutputType, out resourceProviders))
@@ -1496,7 +1496,7 @@ public class DistributionManager
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -1547,7 +1547,7 @@ public class DistributionManager
 			quantityLoss = 0f;
 			if (duration > 0f)
 			{
-				foreach (IAirConsumer cons in cav.AirConsumers.Where((IAirConsumer m) => !(m is AirConsumerFire)))
+				foreach (IAirConsumer cons in cav.AirConsumers.Where((IAirConsumer m) => m is not AirConsumerFire))
 				{
 					qualityLoss += cav.AirPressure > 0f ? cons.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration : 0f;
 					quantityLoss += cons.AirQuantityDecreaseRate * duration;

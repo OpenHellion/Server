@@ -86,7 +86,7 @@ public class SubSystemRadar : SubSystem
 			}
 			catch (Exception ex)
 			{
-				Dbg.Exception(ex);
+				Debug.Exception(ex);
 			}
 		});
 	}
@@ -123,7 +123,7 @@ public class SubSystemRadar : SubSystem
 			}
 			catch (Exception ex)
 			{
-				Dbg.Exception(ex);
+				Debug.Exception(ex);
 			}
 		});
 	}

@@ -119,7 +119,7 @@ internal class RepairTool : Item, ICargo
 	public void RepairItem(long guid)
 	{
 		SpaceObject obj = Server.Instance.GetObject(guid);
-		if (!(obj is DynamicObject dynamicObject))
+		if (obj is not DynamicObject dynamicObject)
 		{
 			return;
 		}
@@ -204,9 +204,9 @@ internal class RepairTool : Item, ICargo
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataRepairTool data))
+			if (persistenceData is not PersistenceObjectDataRepairTool data)
 			{
-				Dbg.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
 			}
 			else
 			{
@@ -215,7 +215,7 @@ internal class RepairTool : Item, ICargo
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

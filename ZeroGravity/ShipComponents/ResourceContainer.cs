@@ -239,7 +239,7 @@ public class ResourceContainer : IResourceProvider, IResourceUser, ICargo, IPers
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

@@ -3,9 +3,9 @@ using ProtoBuf;
 namespace ZeroGravity.Network;
 
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-public class ServerStatusRequest : NetworkData
+public class ExecutorMergeDetails
 {
-	public string PlayerId;
+	public VesselObjectID ParentTriggerID;
 
-	public bool SendDetails;
+	public VesselObjectID ChildTriggerID;
 }

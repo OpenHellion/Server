@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 
@@ -106,7 +106,7 @@ public class PlayerStats
 
 	public void SendAcumulatedMessage(double time)
 	{
-		NetworkController.Instance.SendToGameClient(pl.GUID, psm);
+		NetworkController.SendToGameClient(pl.GUID, psm);
 	}
 
 	public void TakeDamage(HurtType hurtType, float amount)
@@ -144,11 +144,11 @@ public class PlayerStats
 
 	public void TakeDamage(Vector3D? shotDirection, float deltaTime, params PlayerDamage[] damages)
 	{
-		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executer != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
+		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executor != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
 		{
 			return;
 		}
-		float amount = damages.Where((PlayerDamage m) => m.Amount > 0f && (m.HurtType == HurtType.Suffocate || m.HurtType == HurtType.Pressure)).Sum((PlayerDamage m) => m.Amount);
+		float amount = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType is HurtType.Suffocate or HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
 		float hurt = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType != HurtType.Suffocate && m.HurtType != HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
 		amount = pl.PlayerInventory.CurrOutfit == null ? amount + hurt : amount + MathHelper.Clamp(hurt - pl.PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue);
 		if (amount <= float.Epsilon)
@@ -180,7 +180,7 @@ public class PlayerStats
 		{
 			psm.GUID = pl.FakeGuid;
 			psm.Health = (int)HealthPoints;
-			NetworkController.Instance.SendToGameClient(pl.GUID, psm);
+			NetworkController.SendToGameClient(pl.GUID, psm);
 			psm = new PlayerStatsMessage();
 			acummulatedDamage = 0f;
 		}
@@ -197,7 +197,7 @@ public class PlayerStats
 				GUID = pl.FakeGuid,
 				Health = (int)HealthPoints
 			};
-			NetworkController.Instance.SendToGameClient(pl.GUID, psm);
+			NetworkController.SendToGameClient(pl.GUID, psm);
 		}
 	}
 
@@ -245,7 +245,7 @@ public class PlayerStats
 
 	public float TakeHitDamage(int id)
 	{
-		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executer != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
+		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executor != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
 		{
 			return 0f;
 		}
@@ -269,7 +269,7 @@ public class PlayerStats
 		{
 		case HitBoxType.None:
 			resistanceMulti = 0f;
-			Dbg.Error("UNKNOWN HITBOX TYPE", pl.GUID);
+			Debug.Error("UNKNOWN HITBOX TYPE", pl.GUID);
 			break;
 		case HitBoxType.Head:
 			bodyDmgMulti = 10f;
@@ -309,7 +309,7 @@ public class PlayerStats
 			}
 			break;
 		default:
-			Dbg.Error("UNKNOWN HITBOX TYPE DEFAULT", pl.GUID);
+			Debug.Error("UNKNOWN HITBOX TYPE DEFAULT", pl.GUID);
 			break;
 		}
 		if (isMelee)

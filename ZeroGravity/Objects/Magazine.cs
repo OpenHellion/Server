@@ -111,9 +111,9 @@ public class Magazine : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataMagazine data))
+			if (persistenceData is not PersistenceObjectDataMagazine data)
 			{
-				Dbg.Warning("PersistenceObjectDataMagazine data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataMagazine data is null", base.GUID);
 			}
 			else
 			{
@@ -122,7 +122,7 @@ public class Magazine : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

@@ -75,7 +75,7 @@ public class PersistenceObjectDataShip : PersistenceObjectData
 
 	public List<PersistenceObjectDataDockingPort> DockingPorts;
 
-	public List<PersistenceObjectDataExecuter> Executers;
+	public List<PersistenceObjectDataExecutor> Executors;
 
 	public List<PersistenceObjectDataNameTag> NameTags;
 

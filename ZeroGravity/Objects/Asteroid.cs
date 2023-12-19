@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -147,7 +147,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 
 	public void ReadInfoFromJson()
 	{
-		AsteroidSceneData asd = StaticData.AsteroidDataList.Find((AsteroidSceneData x) => x.ItemID == (short)base.SceneID);
+		CelestialSceneData asd = StaticData.AsteroidDataList.Find((CelestialSceneData x) => x.ItemID == (short)base.SceneID);
 		Radius = asd.Radius;
 		RadarSignature = asd.RadarSignature;
 		foreach (AsteroidMiningPointData ampd in asd.MiningPoints)
@@ -302,7 +302,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
@@ -313,7 +313,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		{
 			if (amp.CheckGasBurst())
 			{
-				NetworkController.Instance.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					GasBurst = true
@@ -322,7 +322,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 			}
 			if (amp.StatusChanged)
 			{
-				NetworkController.Instance.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					Quantity = amp.Quantity

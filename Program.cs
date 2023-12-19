@@ -13,7 +13,7 @@ public static class Program
 
 	private static void ProcessExit(object sender, EventArgs e)
 	{
-		Dbg.Log("Exiting safely...");
+		Debug.Log("Exiting safely...");
 		CancelToken.Cancel();
 		Server.IsRunning = false;
 		if (Server.PersistenceSaveInterval > 0.0)
@@ -33,10 +33,10 @@ public static class Program
 		Server.InitProperties(args);
 
 		// Enable debugger.
-		Dbg.OutputDir = Server.ConfigDir;
-		Dbg.Initialize();
+		Debug.OutputDir = Server.ConfigDir;
+		Debug.Initialize();
 
-		Dbg.Log("Starting server with args:", string.Join(" ", args));
+		Debug.Log("Starting server with args:", string.Join(" ", args));
 
 		bool shutdown = false;
 		for (int i = 0; i < args.Length; i++)
@@ -65,7 +65,7 @@ public static class Program
 
 		if (!File.Exists(Server.ConfigDir + "GameServer.ini"))
 		{
-			Dbg.Info("GameServer.ini not found in folder " + Server.ConfigDir);
+			Debug.Info("GameServer.ini not found in folder " + Server.ConfigDir);
 			return;
 		}
 
@@ -83,8 +83,8 @@ public static class Program
 		catch (Exception ex)
 		{
 			HiResTime.Stop();
-			Dbg.UnformattedMessage("******************** MAIN EXCEPTION ********************");
-			Dbg.Exception(ex);
+			Debug.UnformattedMessage("******************** MAIN EXCEPTION ********************");
+			Debug.Exception(ex);
 		}
 	}
 
@@ -96,7 +96,7 @@ public static class Program
 		}
 		catch
 		{
-			Dbg.Error("Invalid 'game_port' field.");
+			Debug.Error("Invalid 'game_port' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -105,7 +105,7 @@ public static class Program
 		}
 		catch
 		{
-			Dbg.Error("Invalid 'status_port' field.");
+			Debug.Error("Invalid 'status_port' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -114,7 +114,7 @@ public static class Program
 		}
 		catch
 		{
-			Dbg.Error("Invalid 'auth_key' field.");
+			Debug.Error("Invalid 'auth_key' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -123,7 +123,7 @@ public static class Program
 		}
 		catch
 		{
-			Dbg.Error("Invalid 'http_key' field.");
+			Debug.Error("Invalid 'http_key' field.");
 			Environment.Exit(0);
 		}
 	}
@@ -193,7 +193,7 @@ public static class Program
 	{
 		try
 		{
-			Dbg.Exception((Exception)args.ExceptionObject);
+			Debug.Exception((Exception)args.ExceptionObject);
 		}
 		catch
 		{

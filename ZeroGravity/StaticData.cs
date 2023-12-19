@@ -14,7 +14,7 @@ public static class StaticData
 
 	private static List<StructureSceneData> _StructuresDataList;
 
-	private static List<AsteroidSceneData> _AsteroidDataList;
+	private static List<CelestialSceneData> _AsteroidDataList;
 
 	private static Dictionary<short, DynamicObjectData> _DynamicObjectsDataList;
 
@@ -60,7 +60,7 @@ public static class StaticData
 		}
 	}
 
-	public static List<AsteroidSceneData> AsteroidDataList
+	public static List<CelestialSceneData> AsteroidDataList
 	{
 		get
 		{
@@ -126,7 +126,7 @@ public static class StaticData
 		_SolarSystem = JsonSerialiser.Load<SolarSystemData>(dir + "Data/SolarSystem.json");
 		_StructuresDataList = JsonSerialiser.Load<List<StructureSceneData>>(dir + "Data/Structures.json");
 		_CollisionDataList = new Dictionary<string, ServerCollisionData>();
-		_AsteroidDataList = JsonSerialiser.Load<List<AsteroidSceneData>>(dir + "Data/Asteroids.json");
+		_AsteroidDataList = JsonSerialiser.Load<List<CelestialSceneData>>(dir + "Data/Asteroids.json");
 		_ItemsIngredients = JsonSerialiser.Load<List<ItemIngredientsData>>(dir + "Data/ItemsIngredients.json");
 		_QuestsData = JsonSerialiser.Load<List<QuestData>>(dir + "Data/Quests.json");
 		_DefaultBlueprints = new List<ItemCompoundType>();
@@ -148,7 +148,7 @@ public static class StaticData
 				_CollisionDataList.Add(a2.Collision, a2.Colliders);
 			}
 		}
-		foreach (AsteroidSceneData a in _AsteroidDataList)
+		foreach (CelestialSceneData a in _AsteroidDataList)
 		{
 			if (a != null && a.Collision != null && !_CollisionDataList.ContainsKey(a.Collision))
 			{

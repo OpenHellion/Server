@@ -63,9 +63,9 @@ public class GenericItem : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataGenericItem data))
+			if (persistenceData is not PersistenceObjectDataGenericItem data)
 			{
-				Dbg.Warning("PersistenceObjectDataGenericItem data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataGenericItem data is null", base.GUID);
 			}
 			else
 			{
@@ -74,7 +74,7 @@ public class GenericItem : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

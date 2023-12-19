@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 
@@ -220,19 +220,19 @@ public class Corpse : SpaceObjectTransferable
 				Server.Instance.SolarSystem.RemoveArtificialBody(pivot2);
 			}
 		}
-		else if (dosm.ParentType == SpaceObjectType.Ship || dosm.ParentType == SpaceObjectType.Station || dosm.ParentType == SpaceObjectType.Asteroid)
+		else if (dosm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Station or SpaceObjectType.Asteroid)
 		{
 			Parent = Server.Instance.GetObject(dosm.ParentGUID);
 		}
 		else
 		{
-			Dbg.Error("Dont know what happened to corpse parent", oldParent.GUID, oldParent.ObjectType, dosm.ParentGUID, dosm.ParentType);
+			Debug.Error("Dont know what happened to corpse parent", oldParent.GUID, oldParent.ObjectType, dosm.ParentGUID, dosm.ParentType);
 		}
 		if (oldParent != Parent)
 		{
 		}
 		ListenToSenderID = dosm.Sender;
-		NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, Parent != null ? Parent.Parent : null);
+		NetworkController.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, Parent != null ? Parent.Parent : null);
 	}
 
 	internal void CheckInventoryDestroy()

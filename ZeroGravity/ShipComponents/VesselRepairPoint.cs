@@ -173,9 +173,9 @@ public class VesselRepairPoint : IPersistantObject
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataRepairPoint data))
+			if (persistenceData is not PersistenceObjectDataRepairPoint data)
 			{
-				Dbg.Warning("PersistenceObjectDataRoom data is null");
+				Debug.Warning("PersistenceObjectDataRoom data is null");
 				return;
 			}
 			_MaxHealth = data.MaxHealth;
@@ -184,13 +184,13 @@ public class VesselRepairPoint : IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
 	public VesselRepairPointDetails GetDetails()
 	{
-		bool dmgSpecActive = (DamageType == RepairPointDamageType.System && AffectedSystem != null && AffectedSystem.Defective) || ((DamageType == RepairPointDamageType.Fire || DamageType == RepairPointDamageType.Breach) && AirCousumer != null);
+		bool dmgSpecActive = (DamageType == RepairPointDamageType.System && AffectedSystem != null && AffectedSystem.Defective) || (DamageType is RepairPointDamageType.Fire or RepairPointDamageType.Breach && AirCousumer != null);
 		return new VesselRepairPointDetails
 		{
 			InSceneID = ID.InSceneID,

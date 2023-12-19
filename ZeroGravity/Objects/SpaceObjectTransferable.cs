@@ -14,7 +14,7 @@ public abstract class SpaceObjectTransferable : SpaceObject
 		{
 			if (Parent == null)
 			{
-				Dbg.Error(ObjectType.ToString() + " parent is null!", GUID);
+				Debug.Error(ObjectType.ToString() + " parent is null!", GUID);
 				return LocalPosition;
 			}
 			if (Parent is SpaceObjectVessel)

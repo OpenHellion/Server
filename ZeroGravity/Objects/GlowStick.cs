@@ -43,9 +43,9 @@ internal class GlowStick : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataGlowStick data))
+			if (persistenceData is not PersistenceObjectDataGlowStick data)
 			{
-				Dbg.Warning("PersistenceObjectDataGlowStick data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataGlowStick data is null", base.GUID);
 			}
 			else
 			{
@@ -54,7 +54,7 @@ internal class GlowStick : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

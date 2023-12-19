@@ -18,7 +18,7 @@
 
 using OpenHellion.IO;
 
-namespace OpenHellion.Networking.Message.MainServer;
+namespace OpenHellion.Net.Message.MainServer;
 
 public abstract class NakamaMessage
 {

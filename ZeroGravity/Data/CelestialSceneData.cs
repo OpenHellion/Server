@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ZeroGravity.Data;
 
-public class AsteroidSceneData : ISceneData
+public class CelestialSceneData : ISceneData
 {
 	public short ItemID;
 

@@ -227,7 +227,7 @@ public class ArtificialBody : SpaceObject
 
 	private void ApplyRotation(double deltaTime)
 	{
-		if (ObjectType == SpaceObjectType.Player || ObjectType == SpaceObjectType.Ship || ObjectType == SpaceObjectType.Asteroid)
+		if (ObjectType is SpaceObjectType.Player or SpaceObjectType.Ship or SpaceObjectType.Asteroid)
 		{
 			Rotation.X = MathHelper.Clamp(Rotation.X, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
 			Rotation.Y = MathHelper.Clamp(Rotation.Y, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
@@ -297,7 +297,7 @@ public class ArtificialBody : SpaceObject
 
 	public void UpdateStabilization()
 	{
-		if (StabilizeToTargetObj == null || !(this is Ship) || (this as Ship).IsDocked)
+		if (StabilizeToTargetObj == null || this is not Ship || (this as Ship).IsDocked)
 		{
 			return;
 		}
@@ -334,7 +334,7 @@ public class ArtificialBody : SpaceObject
 
 	private bool CheckCurrentCourse()
 	{
-		if (CurrentCourse == null || !CurrentCourse.IsValid)
+		if (CurrentCourse is not { IsValid: true })
 		{
 			return false;
 		}
@@ -365,7 +365,7 @@ public class ArtificialBody : SpaceObject
 			CurrentCourse.FillPositionAndVelocityAtCurrentTime(ref relativePosition, ref relativeVelocity);
 			Orbit.RelativePosition = relativePosition;
 			Orbit.RelativeVelocity = relativeVelocity;
-			if (CurrentCourse.Type == ManeuverType.Engine || CurrentCourse.Type == ManeuverType.Transfer)
+			if (CurrentCourse.Type is ManeuverType.Engine or ManeuverType.Transfer)
 			{
 				Vector3D right = Vector3D.Cross(Forward, Up);
 				Forward = Vector3D.Lerp(Forward, Orbit.RelativeVelocity.Normalized, Server.Instance.DeltaTime).Normalized;
@@ -557,7 +557,7 @@ public class ArtificialBody : SpaceObject
 
 	public bool StabilizeToTarget(SpaceObjectVessel vessel, bool forceStabilize = false)
 	{
-		if (!(this is SpaceObjectVessel) || vessel == null)
+		if (this is not SpaceObjectVessel || vessel == null)
 		{
 			return false;
 		}
@@ -604,7 +604,7 @@ public class ArtificialBody : SpaceObject
 
 	public void DisableStabilization(bool disableForChildren, bool updateBeforeDisable)
 	{
-		if (!(this is SpaceObjectVessel))
+		if (this is not SpaceObjectVessel)
 		{
 			return;
 		}
@@ -632,7 +632,7 @@ public class ArtificialBody : SpaceObject
 		}
 		if (sanityCheck >= 1000)
 		{
-			Dbg.Error("When disabling stabilization for", GUID, "children, sanity check reached", sanityCheck);
+			Debug.Error("When disabling stabilization for", GUID, "children, sanity check reached", sanityCheck);
 		}
 		if (reStabilizeChildren.Count <= 1)
 		{

@@ -110,9 +110,9 @@ public class Grenade : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataGrenade data))
+			if (persistenceData is not PersistenceObjectDataGrenade data)
 			{
-				Dbg.Warning("PersistenceObjectDataHandheldGrenade data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataHandheldGrenade data is null", base.GUID);
 			}
 			else
 			{
@@ -121,7 +121,7 @@ public class Grenade : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

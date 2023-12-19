@@ -23,9 +23,11 @@ using System.Text;
 using System.Threading.Tasks;
 using OpenHellion.Exceptions;
 using OpenHellion.IO;
-using OpenHellion.Networking.Message.MainServer;
+using OpenHellion.Net.Message.MainServer;
+using Telepathy;
+using Server = ZeroGravity.Server;
 
-namespace OpenHellion.Networking;
+namespace OpenHellion.Net;
 
 /// <summary>
 /// 	Handles connections to the main server. This is the Nakama docker repository located at: https://github.com/OpenHellion/Nakama
@@ -51,8 +53,8 @@ public static class MsConnection
 		// Create new client if one doesn't exist.
 		_httpClient ??= new HttpClient();
 
-		Dbg.Log("Sending data to main server:", message.ToString());
-		Dbg.Log($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap");
+		Debug.Log("Sending data to main server:", message.ToString());
+		Debug.Log($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap");
 
 		byte[] jsonBytes = Encoding.UTF8.GetBytes(message.ToString());
 
@@ -68,13 +70,23 @@ public static class MsConnection
 			Version = new Version("2.0")
 		};
 
-		var response = await _httpClient.SendAsync(request, Program.CancelToken.Token);
+		HttpResponseMessage response = null;
+		try
+		{
+			response = await _httpClient.SendAsync(request, Program.CancelToken.Token);
+		}
+		catch (TimeoutException)
+		{
+			Debug.Warning("Connecting to main server timed out. Closing server.");
+			Server.IsRunning = false;
+			return default;
+		}
 
 		// Read data as string.
 		string str = await response.Content.ReadAsStringAsync(Program.CancelToken.Token);
-		response.Content?.Dispose();
+		response.Content.Dispose();
 
-		Dbg.Log("Response with data:", str);
+		Debug.Log("Response with data:", str);
 
 		// Clean up.
 		response.Dispose();

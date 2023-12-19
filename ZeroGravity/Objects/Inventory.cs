@@ -1,5 +1,5 @@
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Network;
 
 namespace ZeroGravity.Objects;
@@ -209,7 +209,7 @@ public class Inventory
 				},
 				AttachData = targetSlotItem.DynamicObj.GetCurrAttachData()
 			};
-			NetworkController.Instance.SendToClientsSubscribedTo(dosm, -1L, targetSlotItem.DynamicObj.GetParents(includeMe: false).ToArray());
+			NetworkController.SendToClientsSubscribedTo(dosm, -1L, targetSlotItem.DynamicObj.GetParents(includeMe: false).ToArray());
 		}
 		item.SetInventorySlot(newSlot);
 		if (parentCorpse != null)

@@ -47,7 +47,7 @@ public class AttachPointDataJsonConverter : JsonConverter
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 		return null;
 	}

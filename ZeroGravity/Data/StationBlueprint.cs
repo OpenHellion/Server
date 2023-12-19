@@ -319,7 +319,7 @@ public class StationBlueprint
 			}
 			catch (Exception ex)
 			{
-				Dbg.Exception(ex);
+				Debug.Exception(ex);
 			}
 		}
 		return null;

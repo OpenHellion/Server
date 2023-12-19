@@ -239,9 +239,9 @@ public class Room : IPersistantObject, IResourceUser
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataRoom data))
+			if (persistenceData is not PersistenceObjectDataRoom data)
 			{
-				Dbg.Warning("PersistenceObjectDataRoom data is null");
+				Debug.Warning("PersistenceObjectDataRoom data is null");
 				return;
 			}
 			_AirPressure = data.AirPressure;
@@ -255,7 +255,7 @@ public class Room : IPersistantObject, IResourceUser
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

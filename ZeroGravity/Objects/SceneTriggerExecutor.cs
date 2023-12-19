@@ -5,7 +5,7 @@ using ZeroGravity.Network;
 
 namespace ZeroGravity.Objects;
 
-public class SceneTriggerExecuter : IPersistantObject
+public class SceneTriggerExecutor : IPersistantObject
 {
 	public int InSceneID;
 
@@ -15,15 +15,15 @@ public class SceneTriggerExecuter : IPersistantObject
 
 	private int _stateID;
 
-	public Dictionary<int, SceneTriggerExceuterState> States = new Dictionary<int, SceneTriggerExceuterState>();
+	public Dictionary<int, SceneTriggerExecutorState> States = new Dictionary<int, SceneTriggerExecutorState>();
 
 	public long PlayerThatActivated;
 
 	public ShipSpawnPoint SpawnPoint;
 
-	public SceneTriggerExecuter Child;
+	public SceneTriggerExecutor Child;
 
-	public SceneTriggerExecuter Parent;
+	public SceneTriggerExecutor Parent;
 
 	public Dictionary<int, SceneTriggerProximity> ProximityTriggers;
 
@@ -52,7 +52,7 @@ public class SceneTriggerExecuter : IPersistantObject
 
 	public bool IsMerged => Child != null || Parent != null;
 
-	public void MergeWith(SceneTriggerExecuter child)
+	public void MergeWith(SceneTriggerExecutor child)
 	{
 		if (child == null)
 		{
@@ -75,11 +75,11 @@ public class SceneTriggerExecuter : IPersistantObject
 		}
 	}
 
-	public void SetStates(List<SceneTriggerExecuterStateData> states, int defaultStateID)
+	public void SetStates(List<SceneTriggerExecutorStateData> states, int defaultStateID)
 	{
-		foreach (SceneTriggerExecuterStateData st in states)
+		foreach (SceneTriggerExecutorStateData st in states)
 		{
-			States.Add(st.StateID, new SceneTriggerExceuterState
+			States.Add(st.StateID, new SceneTriggerExecutorState
 			{
 				StateID = st.StateID,
 				PlayerDisconnectToStateID = st.PlayerDisconnectToStateID,
@@ -93,7 +93,7 @@ public class SceneTriggerExecuter : IPersistantObject
 		}
 	}
 
-	public SceneTriggerExecuterDetails ChangeState(long sender, SceneTriggerExecuterDetails details)
+	public SceneTriggerExecutorDetails ChangeState(long sender, SceneTriggerExecutorDetails details)
 	{
 		Player pl = null;
 		try
@@ -153,7 +153,7 @@ public class SceneTriggerExecuter : IPersistantObject
 			StateID = details.NewStateID;
 			if (SpawnPoint != null && SpawnPoint.Player != null)
 			{
-				if (StateID == SpawnPoint.ExecuterStateID || (SpawnPoint.ExecuterOccupiedStateIDs != null && SpawnPoint.ExecuterOccupiedStateIDs.Contains(StateID)))
+				if (StateID == SpawnPoint.ExecutorStateID || (SpawnPoint.ExecutorOccupiedStateIDs != null && SpawnPoint.ExecutorOccupiedStateIDs.Contains(StateID)))
 				{
 					SpawnPoint.Player.IsInsideSpawnPoint = true;
 					SpawnPoint.IsPlayerInSpawnPoint = true;
@@ -181,13 +181,13 @@ public class SceneTriggerExecuter : IPersistantObject
 		return details;
 	}
 
-	public SceneTriggerExecuterDetails RemovePlayerFromExecuter(Player pl)
+	public SceneTriggerExecutorDetails RemovePlayerFromExecutor(Player pl)
 	{
 		if (PlayerThatActivated != pl.FakeGuid || !States.ContainsKey(_stateID) || States[_stateID].PlayerDisconnectToStateID == 0 || !States.ContainsKey(States[_stateID].PlayerDisconnectToStateID))
 		{
 			return null;
 		}
-		return new SceneTriggerExecuterDetails
+		return new SceneTriggerExecutorDetails
 		{
 			InSceneID = InSceneID,
 			IsFail = false,
@@ -198,7 +198,7 @@ public class SceneTriggerExecuter : IPersistantObject
 		};
 	}
 
-	public SceneTriggerExecuterDetails RemovePlayerFromProximity(Player pl)
+	public SceneTriggerExecutorDetails RemovePlayerFromProximity(Player pl)
 	{
 		if (ProximityTriggers == null || ProximityTriggers.Count == 0)
 		{
@@ -225,7 +225,7 @@ public class SceneTriggerExecuter : IPersistantObject
 		{
 			return null;
 		}
-		return new SceneTriggerExecuterDetails
+		return new SceneTriggerExecutorDetails
 		{
 			InSceneID = InSceneID,
 			IsFail = false,
@@ -237,14 +237,14 @@ public class SceneTriggerExecuter : IPersistantObject
 		};
 	}
 
-	public bool AreStatesEqual(SceneTriggerExecuter other)
+	public bool AreStatesEqual(SceneTriggerExecutor other)
 	{
 		return States.Count == other.States.Count;
 	}
 
 	public PersistenceObjectData GetPersistenceData()
 	{
-		return new PersistenceObjectDataExecuter
+		return new PersistenceObjectDataExecutor
 		{
 			InSceneID = InSceneID,
 			StateID = StateID,
@@ -256,9 +256,9 @@ public class SceneTriggerExecuter : IPersistantObject
 	{
 		try
 		{
-			if (!(persistenceData is PersistenceObjectDataExecuter data))
+			if (persistenceData is not PersistenceObjectDataExecutor data)
 			{
-				Dbg.Warning("PersistenceObjectDataExecuter data is null");
+				Debug.Warning("PersistenceObjectDataExecutor data is null");
 				return;
 			}
 			StateID = data.StateID;
@@ -266,7 +266,7 @@ public class SceneTriggerExecuter : IPersistantObject
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

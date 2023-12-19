@@ -44,9 +44,9 @@ public class HandheldAsteroidScanner : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataHandheldAsteroidScanner data))
+			if (persistenceData is not PersistenceObjectDataHandheldAsteroidScanner data)
 			{
-				Dbg.Warning("PersistenceObjectDataHandheldAsteroidScanner data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataHandheldAsteroidScanner data is null", base.GUID);
 			}
 			else
 			{
@@ -55,7 +55,7 @@ public class HandheldAsteroidScanner : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 

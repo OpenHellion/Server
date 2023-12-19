@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using OpenHellion;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -107,7 +107,7 @@ public class SolarSystem
 				}
 				catch (Exception ex3)
 				{
-					Dbg.Exception(ex3);
+					Debug.Exception(ex3);
 				}
 			});
 			Parallel.ForEach(abs, delegate(ArtificialBody ab)
@@ -118,7 +118,7 @@ public class SolarSystem
 				}
 				catch (Exception ex2)
 				{
-					Dbg.Exception(ex2);
+					Debug.Exception(ex2);
 				}
 			});
 			if (!CheckDestroyMarkedBodies)
@@ -133,7 +133,7 @@ public class SolarSystem
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 	}
 
@@ -163,7 +163,7 @@ public class SolarSystem
 
 			if (!wh.WaitOne(10000))
 			{
-				Dbg.Warning("SendMovementMessage thread timeout. Aborting...");
+				Debug.Warning("SendMovementMessage thread timeout. Aborting...");
 
 				// Request cancellation.
 				cts.Cancel();
@@ -347,10 +347,10 @@ public class SolarSystem
 			if (bodyTransform.Orbit == null && bodyTransform.Realtime == null && bodyTransform.Maneuver == null && bodyTransform.Forward == null && bodyTransform.CharactersMovement.Count <= 0)
 			{
 				List<CorpseMovementMessage> corpsesMovement = bodyTransform.CorpsesMovement;
-				if (corpsesMovement == null || corpsesMovement.Count <= 0)
+				if (corpsesMovement is not { Count: > 0 })
 				{
 					List<DynamicObectMovementMessage> dynamicObjectsMovement = bodyTransform.DynamicObjectsMovement;
-					if ((dynamicObjectsMovement == null || dynamicObjectsMovement.Count <= 0) && !bodyTransform.StabilizeToTargetGUID.HasValue)
+					if (dynamicObjectsMovement is not { Count: > 0 } && !bodyTransform.StabilizeToTargetGUID.HasValue)
 					{
 						continue;
 					}
@@ -369,7 +369,7 @@ public class SolarSystem
 
 		player.LastMovementMessageSolarSystemTime = CurrentTime;
 		player.UpdateArtificialBodyMovement.Clear();
-		NetworkController.Instance.SendToGameClient(player.GUID, movementMessage);
+		NetworkController.SendToGameClient(player.GUID, movementMessage);
 	}
 
 	public void InitializeData()

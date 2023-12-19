@@ -15,11 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace OpenHellion.Networking.Message.MainServer;
+namespace OpenHellion.Net.Message.MainServer;
 
 public enum ResponseResult : byte {
 	Success = 0,
 	Error = 1,
-	ClientVersionError = 5,
-	ServerNotFound = 6,
+	ClientVersionError = 5
 }

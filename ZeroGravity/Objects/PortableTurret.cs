@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -57,9 +57,9 @@ internal class PortableTurret : Item
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataPortableTurret data))
+			if (persistenceData is not PersistenceObjectDataPortableTurret data)
 			{
-				Dbg.Warning("PersistenceObjectDataPortableTurret data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataPortableTurret data is null", base.GUID);
 			}
 			else
 			{
@@ -69,7 +69,7 @@ internal class PortableTurret : Item
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 
@@ -88,7 +88,7 @@ internal class PortableTurret : Item
 		if (ptsm.TurretGUID == base.GUID && !isStunned)
 		{
 			targetPlayer = Server.Instance.GetPlayer(ptsm.Sender);
-			NetworkController.Instance.SendToClientsSubscribedTo(ptsm, -1L, targetPlayer.Parent);
+			NetworkController.SendToClientsSubscribedTo(ptsm, -1L, targetPlayer.Parent);
 			if (ptsm.IsShooting)
 			{
 				Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, DamagePlayer);

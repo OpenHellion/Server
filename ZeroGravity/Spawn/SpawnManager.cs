@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using OpenHellion.Networking;
+using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -122,9 +122,9 @@ public static class SpawnManager
 		SpawnSerialization.AttachPointPriority priority = data.AttachPointPriority;
 		if (priority == SpawnSerialization.AttachPointPriority.Default)
 		{
-			priority = data.PartType != 0 ? SpawnSerialization.AttachPointPriority.MachineryPartSlot : data.Type == ItemType.PortableTurret ? SpawnSerialization.AttachPointPriority.Active : data.GenericSubType != GenericItemSubType.BrokenArmature && data.GenericSubType != GenericItemSubType.BurnedPDU && data.GenericSubType != GenericItemSubType.DamagedTransmiter && data.GenericSubType != GenericItemSubType.FriedElectronics && data.GenericSubType != GenericItemSubType.RupturedInsulation && data.GenericSubType != GenericItemSubType.ShatteredPlating ? SpawnSerialization.AttachPointPriority.Simple : SpawnSerialization.AttachPointPriority.Scrap;
+			priority = data.PartType != 0 ? SpawnSerialization.AttachPointPriority.MachineryPartSlot : data.Type == ItemType.PortableTurret ? SpawnSerialization.AttachPointPriority.Active : data.GenericSubType != GenericItemSubType.BrokenArmature && data.GenericSubType != GenericItemSubType.BurnedPDU && data.GenericSubType != GenericItemSubType.DamagedTransmitter && data.GenericSubType != GenericItemSubType.FriedElectronics && data.GenericSubType != GenericItemSubType.RupturedInsulation && data.GenericSubType != GenericItemSubType.ShatteredPlating ? SpawnSerialization.AttachPointPriority.Simple : SpawnSerialization.AttachPointPriority.Scrap;
 		}
-		if (priority == SpawnSerialization.AttachPointPriority.Item || priority == SpawnSerialization.AttachPointPriority.TransportBox)
+		if (priority is SpawnSerialization.AttachPointPriority.Item or SpawnSerialization.AttachPointPriority.TransportBox)
 		{
 			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox) : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
 				.FirstOrDefault((ItemSlot m) => m.Item == null && m.CanFitItem(data.Type, data.GenericSubType, data.PartType));
@@ -327,7 +327,7 @@ public static class SpawnManager
 	{
 		if (ap == null)
 		{
-			Dbg.Warning("SPAWN MANAGER - Unable to spawn item because atach point is null", loot.Data.Type);
+			Debug.Warning("SPAWN MANAGER - Unable to spawn item because atach point is null", loot.Data.Type);
 			return false;
 		}
 		if (!itemTypeItemID.ContainsKey(loot.Data.Type))
@@ -398,7 +398,7 @@ public static class SpawnManager
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		NetworkController.Instance.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
+		NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
 		return true;
 	}
 
@@ -406,12 +406,12 @@ public static class SpawnManager
 	{
 		if (!lootCategories.ContainsKey(categoryName))
 		{
-			Dbg.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" does not exist");
+			Debug.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" does not exist");
 			return new List<LootItemData>();
 		}
 		if (!lootCategories[categoryName].ContainsKey(tier))
 		{
-			Dbg.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" has no tier \"{tier.ToString()}\"");
+			Debug.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" has no tier \"{tier.ToString()}\"");
 			return new List<LootItemData>();
 		}
 		return lootCategories[categoryName][tier];
@@ -525,7 +525,7 @@ public static class SpawnManager
 				}
 			}
 		}
-		Dbg.Info(dbgString + "\n");
+		Debug.Info(dbgString + "\n");
 	}
 
 	private static void GenerateSampleData(bool force)
@@ -623,7 +623,7 @@ public static class SpawnManager
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 		return data;
 	}
@@ -631,7 +631,7 @@ public static class SpawnManager
 	public static void LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		Initialize(isPersistenceInitialize: true);
-		if (!(persistenceData is PersistenceObjectDataSpawnManager data) || data.SpawnRules == null)
+		if (persistenceData is not PersistenceObjectDataSpawnManager data || data.SpawnRules == null)
 		{
 			return;
 		}
@@ -745,7 +745,7 @@ public static class SpawnManager
 		}
 		else
 		{
-			if (!(obj is SpaceObjectVessel ves) || !SpawnedVessels.ContainsKey(ves.GUID))
+			if (obj is not SpaceObjectVessel ves || !SpawnedVessels.ContainsKey(ves.GUID))
 			{
 				return;
 			}
@@ -806,7 +806,7 @@ public static class SpawnManager
 	public static bool RespawnBlueprintRule(string name)
 	{
 		SpawnRule sr = spawnRules.FirstOrDefault((SpawnRule m) => m.Name.ToLower().Replace(' ', '_').Contains(name.ToLower()));
-		if (sr == null || sr.LocationType != SpawnRuleLocationType.Station)
+		if (sr is not { LocationType: SpawnRuleLocationType.Station })
 		{
 			return false;
 		}

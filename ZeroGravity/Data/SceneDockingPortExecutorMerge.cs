@@ -1,6 +1,6 @@
 namespace ZeroGravity.Data;
 
-public class SceneDockingPortExecuterMerge : ISceneData
+public class SceneDockingPortExecutorMerge : ISceneData
 {
 	public int InSceneID;
 

@@ -2,11 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using OpenHellion.Networking.Message.MainServer;
+using OpenHellion.Net.Message.MainServer;
 using ZeroGravity;
 using ZeroGravity.Network;
 
-namespace OpenHellion.Networking;
+namespace OpenHellion.Net;
 
 public class EventSystem
 {
@@ -153,7 +153,7 @@ public class EventSystem
 		}
 		else
 		{
-			Dbg.Error("Cannot invoke ", data.Type, data);
+			Debug.Error("Cannot invoke ", data.Type, data);
 		}
 	}
 
@@ -173,7 +173,7 @@ public class EventSystem
 			}
 			catch (Exception ex)
 			{
-				Dbg.Exception(ex);
+				Debug.Exception(ex);
 			}
 		}
 		while (_internalBuffer.Count > 0)
@@ -187,7 +187,7 @@ public class EventSystem
 			}
 			catch (Exception ex2)
 			{
-				Dbg.Exception(ex2);
+				Debug.Exception(ex2);
 			}
 		}
 	}

@@ -25,7 +25,7 @@ public class PersistenceJsonConverter : JsonConverter
 		}
 		catch (Exception ex)
 		{
-			Dbg.Exception(ex);
+			Debug.Exception(ex);
 		}
 		return null;
 	}

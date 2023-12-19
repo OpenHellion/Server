@@ -23,7 +23,7 @@ public class Quest
 
 	public Player Player;
 
-	public bool IsFineshed => Status == QuestStatus.Completed || Status == QuestStatus.Failed;
+	public bool IsFineshed => Status is QuestStatus.Completed or QuestStatus.Failed;
 
 	public Quest(QuestData data, Player player)
 	{

@@ -59,7 +59,7 @@ internal class Canister : Item, ICargo
 
 	public override bool ChangeStats(DynamicObjectStats stats)
 	{
-		if (!(stats is CanisterStats data))
+		if (stats is not CanisterStats data)
 		{
 			return false;
 		}
@@ -197,9 +197,9 @@ internal class Canister : Item, ICargo
 		try
 		{
 			base.LoadPersistenceData(persistenceData);
-			if (!(persistenceData is PersistenceObjectDataCanister data))
+			if (persistenceData is not PersistenceObjectDataCanister data)
 			{
-				Dbg.Warning("PersistenceObjectDataCanister data is null", base.GUID);
+				Debug.Warning("PersistenceObjectDataCanister data is null", base.GUID);
 			}
 			else
 			{
@@ -208,7 +208,7 @@ internal class Canister : Item, ICargo
 		}
 		catch (Exception e)
 		{
-			Dbg.Exception(e);
+			Debug.Exception(e);
 		}
 	}
 }

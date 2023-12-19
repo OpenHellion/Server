@@ -77,12 +77,12 @@ public static class GameScenes
 
 		public static bool IsDerelict(SceneId sceneId)
 		{
-			return sceneId == SceneId.Generic_Debris_JuncRoom001 || sceneId == SceneId.Generic_Debris_JuncRoom002 || sceneId == SceneId.Generic_Debris_Corridor001 || sceneId == SceneId.Generic_Debris_Corridor002;
+			return sceneId is SceneId.Generic_Debris_JuncRoom001 or SceneId.Generic_Debris_JuncRoom002 or SceneId.Generic_Debris_Corridor001 or SceneId.Generic_Debris_Corridor002;
 		}
 
 		public static bool IsShip(SceneId sceneId)
 		{
-			return sceneId == SceneId.AltCorp_Shuttle_SARA || sceneId == SceneId.AltCorp_Ship_Tamara || sceneId == SceneId.Slavica || sceneId == SceneId.AltCorp_Shuttle_CECA;
+			return sceneId is SceneId.AltCorp_Shuttle_SARA or SceneId.AltCorp_Ship_Tamara or SceneId.Slavica or SceneId.AltCorp_Shuttle_CECA;
 		}
 
 		public static bool IsAsteroid(SceneId sceneId)

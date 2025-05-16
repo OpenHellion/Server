@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -50,15 +50,6 @@ public class VesselRepairPoint : IPersistantObject
 		{
 			return _MaxHealth;
 		}
-		set
-		{
-			if (_MaxHealth != value)
-			{
-				StatusChanged = true;
-			}
-			_MaxHealth = value;
-			Update();
-		}
 	}
 
 	public float Health
@@ -67,20 +58,31 @@ public class VesselRepairPoint : IPersistantObject
 		{
 			return _Health;
 		}
-		set
-		{
-			float newHealth = MathHelper.Clamp(MaxHealth - value < 1f ? MaxHealth : value, 0f, MaxHealth);
-			if (_Health != newHealth)
-			{
-				StatusChanged = true;
-				takingDamage = newHealth < _Health;
-			}
-			_Health = newHealth;
-			Update();
-		}
 	}
 
-	public void Update()
+	private VesselRepairPoint()
+	{
+	}
+
+	public static async Task<VesselRepairPoint> CreateVesselRepairPointAsync(SpaceObjectVessel vessel, VesselRepairPointData data, float maxHealth)
+	{
+		VesselRepairPoint repairPoint = new();
+		repairPoint.ID = new VesselObjectID(vessel.Guid, data.InSceneID);
+		repairPoint.ParentVessel = vessel;
+		repairPoint.Room = vessel.Rooms.Find((Room m) => m.ID.InSceneID == data.RoomID);
+		repairPoint._MaxHealth = maxHealth;
+		repairPoint._Health = maxHealth;
+		repairPoint.DamageType = data.DamageType;
+		repairPoint.External = data.External;
+		repairPoint.AffectedSystem = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == data.AffectedSystemID);
+		repairPoint.MalfunctionThreshold = data.MalfunctionThreshold;
+		repairPoint.RepairThreshold = data.RepairThreshold;
+		await repairPoint.Update();
+
+		return repairPoint;
+	}
+
+	public async Task Update()
 	{
 		if (DamageType == RepairPointDamageType.None)
 		{
@@ -91,11 +93,11 @@ public class VesselRepairPoint : IPersistantObject
 		{
 			if (hPerc <= MalfunctionThreshold && !AffectedSystem.Defective && AffectedSystem.Status == SystemStatus.OnLine && takingDamage)
 			{
-				AffectedSystem.Defective = true;
+				await AffectedSystem.SetDefectiveAsync(true);
 			}
 			else if (hPerc >= RepairThreshold && AffectedSystem.Defective)
 			{
-				AffectedSystem.Defective = false;
+				await AffectedSystem.SetDefectiveAsync(false);
 			}
 		}
 		else if (DamageType == RepairPointDamageType.Gravity && Room != null)
@@ -143,54 +145,44 @@ public class VesselRepairPoint : IPersistantObject
 		}
 	}
 
-	public VesselRepairPoint(SpaceObjectVessel vessel, VesselRepairPointData data, float maxHealth)
+	public async Task SetHealthAsync(float health)
 	{
-		ID = new VesselObjectID(vessel.GUID, data.InSceneID);
-		ParentVessel = vessel;
-		Room = vessel.Rooms.Find((Room m) => m.ID.InSceneID == data.RoomID);
-		_MaxHealth = maxHealth;
-		_Health = maxHealth;
-		DamageType = data.DamageType;
-		External = data.External;
-		AffectedSystem = vessel.Systems.Find((VesselComponent m) => m.ID.InSceneID == data.AffectedSystemID);
-		MalfunctionThreshold = data.MalfunctionThreshold;
-		RepairThreshold = data.RepairThreshold;
-		Update();
+		float newHealth = MathHelper.Clamp(MaxHealth - health < 1f ? MaxHealth : health, 0f, MaxHealth);
+		if (_Health != newHealth)
+		{
+			StatusChanged = true;
+			takingDamage = newHealth < _Health;
+		}
+		_Health = newHealth;
+		await Update();
 	}
 
 	public PersistenceObjectData GetPersistenceData()
 	{
 		return new PersistenceObjectDataRepairPoint
 		{
-			GUID = ParentVessel.GUID,
+			GUID = ParentVessel.Guid,
 			InSceneID = ID.InSceneID,
 			MaxHealth = MaxHealth,
 			Health = Health
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataRepairPoint data)
 		{
-			if (persistenceData is not PersistenceObjectDataRepairPoint data)
-			{
-				Debug.Warning("PersistenceObjectDataRoom data is null");
-				return;
-			}
-			_MaxHealth = data.MaxHealth;
-			_Health = data.Health;
-			Update();
+			Debug.LogWarning("PersistenceObjectDataRoom data is null");
+			return;
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		_MaxHealth = data.MaxHealth;
+		_Health = data.Health;
+		await Update();
 	}
 
 	public VesselRepairPointDetails GetDetails()
 	{
-		bool dmgSpecActive = (DamageType == RepairPointDamageType.System && AffectedSystem != null && AffectedSystem.Defective) || (DamageType is RepairPointDamageType.Fire or RepairPointDamageType.Breach && AirCousumer != null);
+		bool dmgSpecActive = (DamageType == RepairPointDamageType.System && AffectedSystem is { Defective: true }) || (DamageType is RepairPointDamageType.Fire or RepairPointDamageType.Breach && AirCousumer != null);
 		return new VesselRepairPointDetails
 		{
 			InSceneID = ID.InSceneID,

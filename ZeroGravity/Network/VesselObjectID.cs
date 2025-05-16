@@ -9,10 +9,6 @@ public class VesselObjectID
 
 	public int InSceneID;
 
-	public VesselObjectID()
-	{
-	}
-
 	public VesselObjectID(long vesselGUID, int inSceneID)
 	{
 		VesselGUID = vesselGUID;

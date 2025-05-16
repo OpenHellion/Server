@@ -6,6 +6,7 @@ public enum SpaceObjectType
 	Player = 1,
 	Ship = 2,
 	Station = 3,
+	CelestialBody = 4,
 	DynamicObject = 5,
 	Corpse = 6,
 	PlayerPivot = 7,

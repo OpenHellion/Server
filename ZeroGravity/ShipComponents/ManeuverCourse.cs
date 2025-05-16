@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using BulletSharp;
 using OpenHellion.Net;
 using ZeroGravity.Data;
@@ -40,7 +41,7 @@ public class ManeuverCourse
 
 	private BezierD bezCurve;
 
-	private double bezCurveScale;
+	private double bezCurveScale = 1;
 
 	private int currentCourseDataIndex = -1;
 
@@ -104,7 +105,7 @@ public class ManeuverCourse
 		}
 	}
 
-	public bool ReadNextManeuverCourse()
+	public async Task<bool> ReadNextManeuverCourse()
 	{
 		currentCourseDataIndex++;
 		if (courseItems != null && courseItems.Count > currentCourseDataIndex)
@@ -117,7 +118,7 @@ public class ManeuverCourse
 			SetCollisionEnable(value: true);
 			if (parentShip.FTL != null && currentCourseDataIndex > 0)
 			{
-				parentShip.FTL.GoOffLine(autoRestart: false);
+				await parentShip.FTL.GoOffLine(autoRestart: false);
 			}
 			if (data.Type == ManeuverType.Engine)
 			{
@@ -129,15 +130,15 @@ public class ManeuverCourse
 			}
 			else if (data.Type == ManeuverType.Warp)
 			{
-				isValid = CheckWarpManeuverData(data);
+				isValid = await CheckWarpManeuverData(data);
 			}
 			if (!isValid)
 			{
-				NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+				await NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 				{
 					IsValid = isValid,
 					CourseGUID = GUID,
-					VesselGUID = parentShip.GUID
+					VesselGUID = parentShip.Guid
 				}, -1L, parentShip);
 			}
 			else if (data.EndOrbit.GUID.HasValue && data.EndOrbit.ObjectType.Value is SpaceObjectType.Ship or SpaceObjectType.Asteroid)
@@ -154,20 +155,20 @@ public class ManeuverCourse
 			SetCollisionEnable(value: true);
 			if (parentShip.FTL != null)
 			{
-				parentShip.FTL.GoOffLine(autoRestart: false);
+				await parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			NetworkController.SendToAllClients(new ManeuverCourseResponse
+			await NetworkController.SendToAll(new ManeuverCourseResponse
 			{
 				IsValid = false,
 				IsFinished = true,
 				CourseGUID = GUID,
-				VesselGUID = parentShip.GUID
+				VesselGUID = parentShip.Guid
 			}, -1L);
 		}
 		return isValid;
 	}
 
-	public void ToggleActivated(bool activate)
+	public async Task ToggleActivated(bool activate)
 	{
 		if (activate == isActivated)
 		{
@@ -175,7 +176,7 @@ public class ManeuverCourse
 		}
 		if (StartSolarSystemTime < Server.SolarSystemTime)
 		{
-			Invalidate();
+			await Invalidate();
 			return;
 		}
 		double angle = Vector3D.Angle(parentShip.Forward, startDir);
@@ -199,7 +200,7 @@ public class ManeuverCourse
 			relativeVelocity /= bezCurveScale;
 			return true;
 		}
-		if (type == ManeuverType.Warp)
+		if (type is ManeuverType.Warp)
 		{
 			double timePassed = MathHelper.Clamp(solarSystemTime - startSolarSystemTime, 0.0, endSolarSystemTime - startSolarSystemTime);
 			if (timePassed < travelTime / 2.0)
@@ -260,7 +261,7 @@ public class ManeuverCourse
 		parentShip.Orbit.UpdateOrbit();
 	}
 
-	public void Invalidate()
+	public async Task Invalidate()
 	{
 		if (isValid)
 		{
@@ -286,22 +287,22 @@ public class ManeuverCourse
 			SetCollisionEnable(value: true);
 			if (parentShip?.FTL != null)
 			{
-				parentShip.FTL.GoOffLine(autoRestart: false);
+				await parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			await NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
-				VesselGUID = parentShip.GUID
+				VesselGUID = parentShip.Guid
 			}, -1L, parentShip);
 		}
 	}
 
-	public void OrbitParentChanged()
+	public async Task OrbitParentChanged()
 	{
 		if (type != ManeuverType.Warp)
 		{
-			Invalidate();
+			await Invalidate();
 		}
 	}
 
@@ -315,7 +316,7 @@ public class ManeuverCourse
 		return false;
 	}
 
-	private bool CheckWarpManeuverData(CourseItemData data)
+	private async Task<bool> CheckWarpManeuverData(CourseItemData data)
 	{
 		startOrbit = parentShip.Orbit;
 		targetOrbit = new OrbitParameters();
@@ -332,7 +333,7 @@ public class ManeuverCourse
 		targetOrbit.FillPositionAndVelocityAfterTime(data.EndSolarSystemTime - Server.SolarSystemTime, isSameParentWarp, ref targetPos, ref targetVel);
 		warpDistance = (startPos - targetPos).Magnitude;
 		warpAcceleration = 4.0 * warpDistance / (travelTime * travelTime);
-		if (!CheckManeuverStartData(data, checkSystems: false, consumeResources: false))
+		if (!await CheckManeuverStartData(data, checkSystems: false, consumeResources: false))
 		{
 			return false;
 		}
@@ -342,21 +343,21 @@ public class ManeuverCourse
 		return true;
 	}
 
-	public bool StartManeuver()
+	public async Task<bool> StartManeuver()
 	{
 		if (!isValid)
 		{
 			return false;
 		}
-		if (!isActivated || Vector3D.Angle(parentShip.Forward, startDir) > _activationDirectionDifference || !CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
+		if (!isActivated || Vector3D.Angle(parentShip.Forward, startDir) > _activationDirectionDifference || !await CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
 		{
-			Invalidate();
+			await Invalidate();
 			return false;
 		}
 		isStarted = true;
 		SetCollisionEnable(value: false);
 		parentShip.RemoveFromSpawnSystem();
-		parentShip.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
+		await parentShip.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
 		return true;
 	}
 
@@ -368,44 +369,44 @@ public class ManeuverCourse
 		}
 	}
 
-	private bool CheckManeuverStartData(CourseItemData data, bool checkSystems, bool consumeResources)
+	private async Task<bool> CheckManeuverStartData(CourseItemData data, bool checkSystems, bool consumeResources)
 	{
 		try
 		{
 			if (data.Type == ManeuverType.Warp)
 			{
-				if (parentShip.GetCompoundMass() > parentShip.Mass + (double)parentShip.FTL.TowingCapacity || (data.WarpIndex == 0 && parentShip.MainVessel.AllDockedVessels.Count > 0))
+				if (parentShip.GetCompoundMass() > parentShip.Mass + parentShip.FTL.TowingCapacity || (data.WarpIndex == 0 && parentShip.MainVessel.AllDockedVessels.Count > 0))
 				{
 					return false;
 				}
-				if (parentShip.SceneID == GameScenes.SceneId.AltCorp_Shuttle_SARA && parentShip.DockingPorts.Find((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
+				if (parentShip.SceneID == GameScenes.SceneId.AltCorp_Shuttle_SARA && parentShip.DockingPorts.First((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
 				{
 					return false;
 				}
 				float fuelConsumptionMultiplier = (float)(parentShip.GetCompoundMass() / parentShip.Mass);
 				warpData = parentShip.FTL.WarpsData[data.WarpIndex];
 				endPosDeviation = new Vector3D(MathHelper.RandomRange(-1.0, 1.0), MathHelper.RandomRange(-1.0, 1.0), MathHelper.RandomRange(-1.0, 1.0)).Normalized * MathHelper.RandomRange(0f, warpData.EndPositionDeviation);
-				if (warpAcceleration > (double)warpData.MaxAcceleration || warpAcceleration < (double)warpData.MinAcceleration)
+				if (warpAcceleration > warpData.MaxAcceleration || warpAcceleration < warpData.MinAcceleration)
 				{
 					return false;
 				}
 				Dictionary<int, float?> warpCellFuel = parentShip.FTL.GetWarpCellsFuel();
 				float totalCellsFuel = 0f;
 				List<int> warpCells = data.WarpCells;
-				if (warpCells != null && warpCells.Count > 0)
+				if (warpCells is { Count: > 0 })
 				{
 					foreach (int index in data.WarpCells)
 					{
 						totalCellsFuel += warpCellFuel[index].HasValue ? warpCellFuel[index].Value : 0f;
 					}
 				}
-				if ((double)totalCellsFuel < (double)warpData.ActivationCellConsumption + travelTime * (double)warpData.CellConsumption * (double)fuelConsumptionMultiplier)
+				if (totalCellsFuel < warpData.ActivationCellConsumption + travelTime * warpData.CellConsumption * fuelConsumptionMultiplier)
 				{
 					return false;
 				}
 				if (checkSystems)
 				{
-					parentShip.FTL.GoOnLine();
+					await parentShip.FTL.GoOnLine();
 					if (parentShip.FTL.Status != SystemStatus.OnLine)
 					{
 						return false;
@@ -417,7 +418,7 @@ public class ManeuverCourse
 				}
 				if (consumeResources)
 				{
-					parentShip.FTL.ConsumeWarpResources(data.WarpCells, (int)((double)warpData.ActivationCellConsumption + travelTime * (double)warpData.CellConsumption * (double)fuelConsumptionMultiplier), warpData.PowerConsumption);
+					await parentShip.FTL.ConsumeWarpResources(data.WarpCells, (int)(warpData.ActivationCellConsumption + travelTime * warpData.CellConsumption * fuelConsumptionMultiplier), warpData.PowerConsumption);
 				}
 			}
 			return true;
@@ -441,7 +442,7 @@ public class ManeuverCourse
 		return course;
 	}
 
-	public static ManeuverCourse ParsePersistenceData(CourseItemData data, Ship sh)
+	public static async Task<ManeuverCourse> ParsePersistenceData(CourseItemData data, Ship sh)
 	{
 		ManeuverCourse course = new ManeuverCourse();
 		course.parentShip = sh;
@@ -453,7 +454,7 @@ public class ManeuverCourse
 		course.isActivated = true;
 		course.isStarted = true;
 		course.isStartingSoonSent = true;
-		course.CheckWarpManeuverData(data);
+		await course.CheckWarpManeuverData(data);
 		return course;
 	}
 
@@ -473,15 +474,15 @@ public class ManeuverCourse
 		};
 	}
 
-	public void SendCourseStartResponse()
+	public async Task SendCourseStartResponse()
 	{
 		if (isValid)
 		{
-			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			await NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
-				VesselGUID = parentShip.GUID,
+				VesselGUID = parentShip.Guid,
 				IsActivated = isActivated,
 				StartTime = startSolarSystemTime,
 				EndTime = endSolarSystemTime,
@@ -491,16 +492,16 @@ public class ManeuverCourse
 		}
 	}
 
-	public void SendCourseStartingSoonResponse()
+	public async Task SendCourseStartingSoonResponse()
 	{
 		if (isValid && !isStartingSoonSent)
 		{
 			isStartingSoonSent = true;
-			NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
+			await NetworkController.SendToClientsSubscribedTo(new ManeuverCourseResponse
 			{
 				IsValid = isValid,
 				CourseGUID = GUID,
-				VesselGUID = parentShip.GUID,
+				VesselGUID = parentShip.Guid,
 				IsActivated = isActivated,
 				StartTime = startSolarSystemTime,
 				EndTime = endSolarSystemTime,

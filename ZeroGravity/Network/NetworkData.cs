@@ -1,3 +1,4 @@
+using System;
 using OpenHellion.IO;
 using ProtoBuf;
 
@@ -37,7 +38,7 @@ namespace ZeroGravity.Network;
 [ProtoInclude(304, typeof(PlayerStatsMessage))]
 [ProtoInclude(305, typeof(PlayerShootingMessage))]
 [ProtoInclude(306, typeof(PlayerHitMessage))]
-[ProtoInclude(307, typeof(DynamicObectMovementMessage))]
+[ProtoInclude(307, typeof(DynamicObjectMovementMessage))]
 [ProtoInclude(308, typeof(MovementMessage))]
 [ProtoInclude(309, typeof(ShipStatsMessage))]
 [ProtoInclude(311, typeof(KillPlayerMessage))]
@@ -68,7 +69,7 @@ namespace ZeroGravity.Network;
 [ProtoInclude(340, typeof(RepairVesselMessage))]
 [ProtoInclude(341, typeof(HurtPlayerMessage))]
 [ProtoInclude(343, typeof(RoomPressureMessage))]
-[ProtoInclude(344, typeof(RecycleItemMessage))]
+[ProtoInclude(344, typeof(VesselRequest))]
 [ProtoInclude(345, typeof(CancelFabricationMessage))]
 [ProtoInclude(346, typeof(LockToTriggerMessage))]
 [ProtoInclude(347, typeof(ConsoleMessage))]
@@ -83,7 +84,28 @@ namespace ZeroGravity.Network;
 [ProtoInclude(506, typeof(DeleteCharacterResponse))]
 public abstract class NetworkData
 {
-	public long Sender;
+		public enum MessageStatus : byte
+		{
+			Normal = 0,
+			Success = 1,
+			Failure = 2,
+			Removed = 7,
+			Shutdown = 8,
+			Heartbeat = 9,
+			Timeout = 10,
+		}
+
+		public long Sender;
+
+		public MessageStatus Status;
+
+		public Guid ConversationGuid { get; set; } = Guid.NewGuid();
+
+		public bool SyncRequest;
+
+		public bool SyncResponse;
+
+		public DateTime ExpirationUtc;
 
 	public override string ToString()
 	{

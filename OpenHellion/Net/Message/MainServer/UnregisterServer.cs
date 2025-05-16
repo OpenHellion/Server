@@ -1,4 +1,4 @@
-// ResponseResult.cs
+﻿// UnregisterServer.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -15,10 +15,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System;
+using Newtonsoft.Json;
+
 namespace OpenHellion.Net.Message.MainServer;
 
-public enum ResponseResult : byte {
-	Success = 0,
-	Error = 1,
-	ClientVersionError = 5
+[Serializable]
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+public class UnregisterServer : NakamaMessage
+{
+	public string ServerId;
+
+	public int GamePort;
+
+	public int StatusPort;
+
+	public override string GetDestination()
+	{
+		return "unregister_server";
+	}
 }

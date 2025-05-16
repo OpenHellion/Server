@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -8,7 +8,7 @@ namespace ZeroGravity.Objects;
 
 internal class HandDrill : Item
 {
-	private HandDrillStats _stats;
+	private HandDrillStats _stats = new();
 
 	private ItemSlot batterySlot;
 
@@ -56,53 +56,61 @@ internal class HandDrill : Item
 
 	public float DrillingStrength { get; private set; }
 
-	public bool CanDrill => Battery != null && Battery.CurrentPower > float.Epsilon && Canister.HasSpace && DrillBit != null && DrillBit.Health > float.Epsilon;
-
-	public HandDrill(DynamicObjectAuxData data)
+	public bool CanDrill => Battery is { CurrentPower: > float.Epsilon } && Canister.HasSpace && DrillBit is
 	{
-		_stats = new HandDrillStats();
-		if (data == null)
-		{
-			return;
-		}
-		HandDrillData hd = data as HandDrillData;
-		SetData(hd);
-		if (Slots != null)
-		{
-			batterySlot = Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillBattery)).Value;
-			canisterSlot = Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillCanister)).Value;
-			drillBitSlot = Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.GenericSubTypes.Contains(GenericItemSubType.DiamondCoreDrillBit)).Value;
-		}
+		Health: > float.Epsilon
+	};
+
+	private HandDrill()
+	{
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+		public static async Task<HandDrill> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		HandDrill handDrill = new();
+		if (data != null)
+		{
+			await handDrill.SetData(data);
+		}
+
+		if (handDrill.Slots != null)
+		{
+			handDrill.batterySlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillBattery)).Value;
+			handDrill.canisterSlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillCanister)).Value;
+			handDrill.drillBitSlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.GenericSubTypes.Contains(GenericItemSubType.DiamondCoreDrillBit)).Value;
+		}
+
+		return handDrill;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		HandDrillData hd = data as HandDrillData;
 		BatteryUsage = hd.BatteryConsumption;
 		DrillingStrength = hd.DrillingStrength;
 	}
 
-	public override void SendAllStats()
+	public override async Task SendAllStats()
 	{
 		if (Battery != null && Battery.DynamicObj.StatsChanged)
 		{
-			Battery.DynamicObj.SendStatsToClient();
+			await Battery.DynamicObj.SendStatsToClient();
 		}
 		if (Canister != null && Canister.DynamicObj.StatsChanged)
 		{
-			Canister.DynamicObj.SendStatsToClient();
+			await Canister.DynamicObj.SendStatsToClient();
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		HandDrillStats hds = stats as HandDrillStats;
 		if (hds.InAsteroidGUID.HasValue)
 		{
 			InAsteroidGUID = hds.InAsteroidGUID.Value;
 		}
-		return true;
+		return Task.FromResult(true);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -116,23 +124,16 @@ internal class HandDrill : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataHandDrill data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataHandDrill data)
-			{
-				Debug.Warning("PersistenceObjectDataHandDrill data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.HandDrillData);
-			}
+			Debug.LogWarning("PersistenceObjectDataHandDrill data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.HandDrillData);
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -76,9 +77,9 @@ public class SubSystemRefinery : SubSystem, ICargo
 		};
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		if (Status != SystemStatus.OnLine)
 		{
 			return;
@@ -86,7 +87,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 		float units = (float)(unitsPerSec * duration);
 		bool shutDown = true;
 		CargoCompartmentData ccd = GetCompartment();
-		if (ccd.Resources != null && ccd.Resources.Count > 0)
+		if (ccd.Resources is { Count: > 0 })
 		{
 			List<CargoResourceData> rawResources = new List<CargoResourceData>(ccd.Resources);
 			foreach (CargoResourceData raw in rawResources)
@@ -109,10 +110,10 @@ public class SubSystemRefinery : SubSystem, ICargo
 				shutDown = false;
 				if (rawQty > float.Epsilon)
 				{
-					ChangeQuantityBy(ccd.ID, raw.ResourceType, 0f - rawQty);
+					await ChangeQuantityByAsync(ccd.ID, raw.ResourceType, 0f - rawQty);
 					foreach (CargoResourceData refined in rrd.RefinedResources)
 					{
-						ChangeQuantityBy(ccd.ID, refined.ResourceType, rawQty * refined.Quantity);
+						await ChangeQuantityByAsync(ccd.ID, refined.ResourceType, rawQty * refined.Quantity);
 					}
 				}
 				if (!(units <= float.Epsilon))
@@ -124,7 +125,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 		}
 		if (shutDown)
 		{
-			GoOffLine(autoRestart: false);
+			await GoOffLine(autoRestart: false);
 		}
 		else
 		{
@@ -141,7 +142,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 		return CargoCompartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoCompartmentData compartment = Compartments.Find((CargoCompartmentData m) => m.ID == compartmentID);
 		CargoResourceData res = compartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
@@ -149,7 +150,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 		{
 			if (wholeAmount)
 			{
-				return 0f;
+				return Task.FromResult(0f);
 			}
 			res = new CargoResourceData
 			{
@@ -163,7 +164,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 		float resourceAvailable = res.Quantity;
 		if (wholeAmount && resourceAvailable - quantity < float.Epsilon)
 		{
-			return 0f;
+			return Task.FromResult(0f);
 		}
 		if (quantity > 0f && quantity > freeSpace)
 		{
@@ -179,7 +180,7 @@ public class SubSystemRefinery : SubSystem, ICargo
 			compartment.Resources.Remove(res);
 		}
 		StatusChanged = true;
-		return qty;
+		return Task.FromResult(qty);
 	}
 
 	public override PersistenceData GetPersistenceAuxData()

@@ -1,6 +1,7 @@
-using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
@@ -15,7 +16,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 {
 	public int ColliderIndex = 1;
 
-	public Dictionary<int, AsteroidMiningPoint> MiningPoints = new Dictionary<int, AsteroidMiningPoint>();
+	public ConcurrentDictionary<int, AsteroidMiningPoint> MiningPoints = new();
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.Asteroid;
 
@@ -61,7 +62,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 				cb = cb.Orbit.Parent.CelestialBody;
 			}
 			List<ResourceMinMax> asteroidResources = cb.AsteroidResources;
-			if (asteroidResources != null && asteroidResources.Count > 0)
+			if (asteroidResources is { Count: > 0 })
 			{
 				List<KeyValuePair<ResourceType, float>> resources = (from m in cb.AsteroidResources
 					select new KeyValuePair<ResourceType, float>(m.Type, MathHelper.RandomRange(m.Min, m.Max) * (AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f)) into m
@@ -147,7 +148,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 
 	public void ReadInfoFromJson()
 	{
-		CelestialSceneData asd = StaticData.AsteroidDataList.Find((CelestialSceneData x) => x.ItemID == (short)base.SceneID);
+		CelestialSceneData asd = StaticData.AsteroidDataList.Find((CelestialSceneData x) => x.ItemID == (short)SceneID);
 		Radius = asd.Radius;
 		RadarSignature = asd.RadarSignature;
 		foreach (AsteroidMiningPointData ampd in asd.MiningPoints)
@@ -158,7 +159,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		{
 			return;
 		}
-		if (asd.Colliders.PrimitiveCollidersData != null && asd.Colliders.PrimitiveCollidersData.Count > 0)
+		if (asd.Colliders.PrimitiveCollidersData is { Count: > 0 })
 		{
 			foreach (PrimitiveColliderData data2 in asd.Colliders.PrimitiveCollidersData)
 			{
@@ -204,12 +205,12 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		}
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
 		Server.Instance.PhysicsController.RemoveRigidBody(this);
 		Server.Instance.Remove(this);
 		DisconectListener();
-		base.Destroy();
+		await base.Destroy();
 	}
 
 	private void DisconectListener()
@@ -221,7 +222,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		bool isDummy = (pl.Position - Position).SqrMagnitude > 100000000.0;
 		return new SpawnAsteroidResponseData
 		{
-			GUID = GUID,
+			GUID = Guid,
 			Data = VesselData,
 			Radius = Radius,
 			IsDummy = isDummy,
@@ -232,7 +233,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 	public override InitializeSpaceObjectMessage GetInitializeMessage()
 	{
 		InitializeSpaceObjectMessage msg = new InitializeSpaceObjectMessage();
-		msg.GUID = GUID;
+		msg.GUID = Guid;
 		msg.DynamicObjects = new List<DynamicObjectDetails>();
 		foreach (DynamicObject dobj in DynamicObjects.Values)
 		{
@@ -254,13 +255,13 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 	public PersistenceObjectData GetPersistenceData()
 	{
 		PersistenceObjectDataAsteroid data = new PersistenceObjectDataAsteroid();
-		data.GUID = GUID;
+		data.GUID = Guid;
 		data.OrbitData = new OrbitData();
 		Orbit.FillOrbitData(ref data.OrbitData);
 		data.Name = VesselData.VesselRegistration;
 		data.Tag = VesselData.Tag;
-		data.SceneID = base.SceneID;
-		data.IsAlwaysVisible = base.IsAlwaysVisible;
+		data.SceneID = SceneID;
+		data.IsAlwaysVisible = IsAlwaysVisible;
 		data.Forward = Forward.ToArray();
 		data.Up = Up.ToArray();
 		data.Rotation = Rotation.ToArray();
@@ -268,27 +269,26 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		return data;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		PersistenceObjectDataAsteroid data = persistenceData as PersistenceObjectDataAsteroid;
+		VesselData = new VesselData();
+		VesselData.CollidersCenterOffset = Vector3D.Zero.ToFloatArray();
+		VesselData.VesselRegistration = data.Name;
+		VesselData.Tag = data.Tag;
+		VesselData.SceneID = data.SceneID;
+		IsAlwaysVisible = data.IsAlwaysVisible;
+		ReadInfoFromJson();
+		VesselData.RadarSignature = RadarSignature;
+		Server.Instance.PhysicsController.CreateAndAddRigidBody(this);
+		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Forward.ToVector3D(), data.Up.ToVector3D());
+		if (data.OrbitData != null)
 		{
-			PersistenceObjectDataAsteroid data = persistenceData as PersistenceObjectDataAsteroid;
-			VesselData = new VesselData();
-			VesselData.CollidersCenterOffset = Vector3D.Zero.ToFloatArray();
-			VesselData.VesselRegistration = data.Name;
-			VesselData.Tag = data.Tag;
-			VesselData.SceneID = data.SceneID;
-			base.IsAlwaysVisible = data.IsAlwaysVisible;
-			ReadInfoFromJson();
-			VesselData.RadarSignature = RadarSignature;
-			Server.Instance.PhysicsController.CreateAndAddRigidBody(this);
-			InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Forward.ToVector3D(), data.Up.ToVector3D());
-			if (data.OrbitData != null)
-			{
-				Orbit.ParseNetworkData(data.OrbitData, resetOrbit: true);
-			}
-			Rotation = data.Rotation.ToVector3D();
-			foreach (AsteroidMiningPointDetails det in data.MiningPoints)
+			Orbit.ParseNetworkData(data.OrbitData, resetOrbit: true);
+		}
+		Rotation = data.Rotation.ToVector3D();
+		await Task.Run(() => {
+			foreach (var det in data.MiningPoints)
 			{
 				if (MiningPoints.TryGetValue(det.InSceneID, out var mp))
 				{
@@ -297,23 +297,18 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 					mp.MaxQuantity = det.MaxQuantity;
 				}
 			}
-			Server.Instance.Add(this);
-			SetPhysicsParameters();
-		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		});
+		Server.Instance.Add(this);
+		SetPhysicsParameters();
 	}
 
-	public override void UpdateVesselSystems()
+	public override async Task UpdateVesselSystems()
 	{
-		base.UpdateVesselSystems();
 		foreach (AsteroidMiningPoint amp in MiningPoints.Values)
 		{
 			if (amp.CheckGasBurst())
 			{
-				NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				await NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					GasBurst = true
@@ -322,7 +317,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 			}
 			if (amp.StatusChanged)
 			{
-				NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
+				await NetworkController.SendToClientsSubscribedTo(new MiningPointStatsMessage
 				{
 					ID = amp.ID,
 					Quantity = amp.Quantity

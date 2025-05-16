@@ -120,6 +120,7 @@ public static class StaticData
 		}
 	}
 
+	// TODO: Load from nakama.
 	public static void LoadData()
 	{
 		string dir = !Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data") ? Server.ConfigDir : "";
@@ -150,12 +151,14 @@ public static class StaticData
 		}
 		foreach (CelestialSceneData a in _AsteroidDataList)
 		{
-			if (a != null && a.Collision != null && !_CollisionDataList.ContainsKey(a.Collision))
+			if (a is { Collision: not null } && !_CollisionDataList.ContainsKey(a.Collision))
 			{
 				a.Colliders = JsonSerialiser.Load<ServerCollisionData>(dir + "Data/Collision/" + a.Collision + ".json");
 				_CollisionDataList.Add(a.Collision, a.Colliders);
 			}
 		}
+
+		Debug.Log("Loaded static data.");
 	}
 
 	public static float GetVesselExposureDamage(double distance)

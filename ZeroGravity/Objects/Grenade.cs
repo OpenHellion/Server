@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Timers;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -7,7 +8,7 @@ namespace ZeroGravity.Objects;
 
 public class Grenade : Item
 {
-	private GrenadeStats gs;
+	private GrenadeStats gs = new GrenadeStats();
 
 	private bool isActive;
 
@@ -23,21 +24,27 @@ public class Grenade : Item
 
 	public override DynamicObjectStats StatsNew => gs;
 
-	public Grenade(DynamicObjectAuxData data)
+	private Grenade()
 	{
-		gs = new GrenadeStats();
-		if (data != null)
-		{
-			SetData(data as GrenadeData);
-		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public static async Task<Grenade> CreateAsync(DynamicObjectAuxData data)
+	{
+		Grenade grenade = new();
+		if (data != null)
+		{
+			await grenade.SetData(data);
+		}
+
+		return grenade;
+	}
+
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		GrenadeStats gstats = stats as GrenadeStats;
 		if (gstats.IsActive.HasValue && gstats.IsActive.Value != isActive)
 		{
-			PlayerGUID = base.DynamicObj.Parent.GUID;
+			PlayerGUID = DynamicObj.Parent.Guid;
 			if (isActive && gstats.IsActive == false)
 			{
 				isCanceled = true;
@@ -52,12 +59,12 @@ public class Grenade : Item
 				CallBlastAfterTime();
 			}
 		}
-		return false;
+		return Task.FromResult(false);
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		GrenadeData i = data as GrenadeData;
 		gs.IsActive = i.IsActive;
 		detonationTime = i.DetonationTime;
@@ -70,18 +77,18 @@ public class Grenade : Item
 	public void CallBlastAfterTime(double? time = null)
 	{
 		destroyTimer = new Timer(TimeSpan.FromSeconds(detonationTime).TotalMilliseconds);
-		destroyTimer.Elapsed += delegate
+		destroyTimer.Elapsed += async delegate
 		{
-			Blast();
+			await Blast();
 		};
 		destroyTimer.Enabled = true;
 	}
 
-	private void Blast()
+	private async Task Blast()
 	{
-		if (base.DynamicObj.Parent != null)
+		if (DynamicObj.Parent != null)
 		{
-			if (!isActive || isCanceled || (base.Health > float.Epsilon && (activationTime == -1.0 || Server.Instance.SolarSystem.CurrentTime - activationTime < (double)(detonationTime * 0.9f))))
+			if (!isActive || isCanceled || (Health > float.Epsilon && (activationTime == -1.0 || Server.Instance.SolarSystem.CurrentTime - activationTime < detonationTime * 0.9f)))
 			{
 				isCanceled = false;
 				activationTime = -1.0;
@@ -89,7 +96,7 @@ public class Grenade : Item
 			else
 			{
 				gs.Blast = true;
-				base.DynamicObj.SendStatsToClient();
+				await DynamicObj.SendStatsToClient();
 			}
 		}
 	}
@@ -105,23 +112,16 @@ public class Grenade : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataGrenade data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataGrenade data)
-			{
-				Debug.Warning("PersistenceObjectDataHandheldGrenade data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.GrenadeData);
-			}
+			Debug.LogWarning("PersistenceObjectDataHandheldGrenade data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.GrenadeData);
 		}
 	}
 }

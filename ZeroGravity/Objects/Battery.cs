@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -7,7 +7,7 @@ namespace ZeroGravity.Objects;
 
 public class Battery : Item
 {
-	private BatteryStats _stats;
+	private readonly BatteryStats _stats = new();
 
 	private float _CurrentPower;
 
@@ -45,18 +45,24 @@ public class Battery : Item
 
 	public float ChargeAmount => 1f;
 
-	public Battery(DynamicObjectAuxData data)
+	private Battery()
 	{
-		_stats = new BatteryStats();
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Battery> CreateBatteryAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		Battery battery = new();
+		if (data != null)
+		{
+			await battery.SetData(data);
+		}
+
+		return battery;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		BatteryData bd = data as BatteryData;
 		MaxPower = bd.MaxPower;
 		CurrentPower = bd.CurrentPower;
@@ -67,29 +73,29 @@ public class Battery : Item
 	{
 		if (!TierMultiplierApplied)
 		{
-			MaxPower *= base.TierMultiplier;
-			CurrentPower *= base.TierMultiplier;
+			MaxPower *= TierMultiplier;
+			CurrentPower *= TierMultiplier;
 		}
 		base.ApplyTierMultiplier();
 	}
 
-	public void ChangeQuantity(float amount)
+	public async Task ChangeQuantity(float amount)
 	{
 		float prevPower = CurrentPower;
 		CurrentPower = MathHelper.Clamp(CurrentPower + amount, 0f, MaxPower);
 		if (CurrentPower == 0f || CurrentPower == MaxPower || (int)prevPower != (int)CurrentPower)
 		{
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 		else
 		{
-			base.DynamicObj.StatsChanged = true;
+			DynamicObj.StatsChanged = true;
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -103,23 +109,16 @@ public class Battery : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataBattery data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataBattery data)
-			{
-				Debug.Warning("PersistenceObjectDataBattery data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.BatteryData);
-			}
+			Debug.LogWarning("PersistenceObjectDataBattery data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.BatteryData);
 		}
 	}
 }

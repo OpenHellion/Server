@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -12,25 +12,32 @@ public class MachineryPart : Item, IPersistantObject
 
 	public override DynamicObjectStats StatsNew => new MachineryPartStats
 	{
-		Health = base.Health
+		Health = Health
 	};
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
-	public MachineryPart(DynamicObjectAuxData data)
+	private MachineryPart()
 	{
+	}
+
+	public static async Task<MachineryPart> CreateAsync(DynamicObjectAuxData data)
+	{
+		MachineryPart machineryPart = new();
 		if (data != null)
 		{
-			SetData(data);
+			await machineryPart.SetData(data);
 		}
+
+		return machineryPart;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		MachineryPartData mpd = data as MachineryPartData;
 		PartType = mpd.PartType;
 		ApplyTierMultiplier();
@@ -42,13 +49,13 @@ public class MachineryPart : Item, IPersistantObject
 		{
 			if (PartType == MachineryPartType.CarbonFilters)
 			{
-				base.MaxHealth *= base.AuxValue;
-				base.Health *= base.AuxValue;
+				MaxHealth *= AuxValue;
+				Health *= AuxValue;
 			}
 			else if (PartType is MachineryPartType.NaniteCore or MachineryPartType.MillitaryNaniteCore or MachineryPartType.WarpCell)
 			{
-				base.MaxHealth *= base.TierMultiplier;
-				base.Health *= base.TierMultiplier;
+				MaxHealth *= TierMultiplier;
+				Health *= TierMultiplier;
 			}
 		}
 		base.ApplyTierMultiplier();
@@ -62,23 +69,16 @@ public class MachineryPart : Item, IPersistantObject
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataMachineryPart data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataMachineryPart data)
-			{
-				Debug.Warning("PersistenceObjectDataMachineryPart data is null", base.GUID);
-			}
-			else
-			{
-				PartType = data.PartType;
-			}
+			Debug.LogWarning("PersistenceObjectDataMachineryPart data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			PartType = data.PartType;
 		}
 	}
 }

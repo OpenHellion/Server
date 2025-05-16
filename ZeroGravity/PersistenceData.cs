@@ -18,7 +18,7 @@ public abstract class PersistenceData
 		}
 		catch
 		{
-			Debug.Error("Could not deseralize data", objectType);
+			Debug.LogError("Could not deseralize data", objectType);
 		}
 		return null;
 	}

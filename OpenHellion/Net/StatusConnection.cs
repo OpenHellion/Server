@@ -1,6 +1,7 @@
 using System;
 using System.Net.Sockets;
 using System.Threading;
+using OpenHellion.IO;
 using ZeroGravity;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -20,11 +21,11 @@ public class StatusConnection
 
 	public void Start()
 	{
-		_listeningThread = new Thread(Listen);
-		_listeningThread.IsBackground = true;
+		_listeningThread = new Thread(Listen)
+		{
+			IsBackground = true
+		};
 		_listeningThread.Start();
-
-		Debug.Log("Started server status thread.");
 	}
 
 	public void Stop()
@@ -32,11 +33,11 @@ public class StatusConnection
 		_socket.Close();
 	}
 
-	private void Listen()
+	private async void Listen()
 	{
 		try
 		{
-			NetworkData data = Serializer.ReceiveData(_socket);
+			NetworkData data = await ProtoSerialiser.Unpack(new NetworkStream(_socket));
 			switch (data)
 			{
 				case null:
@@ -58,9 +59,9 @@ public class StatusConnection
 					if (dcr.ServerId == NetworkController.ServerId)
 					{
 						Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.PlayerId);
-						if (!NetworkController.ContainsClient(pl.GUID))
+						if (!NetworkController.IsPlayerConnected(pl.Guid))
 						{
-							pl.Destroy();
+							await pl.Destroy();
 						}
 					}
 
@@ -69,20 +70,21 @@ public class StatusConnection
 				case LatencyTestMessage:
 					try
 					{
-						_socket.Send(Serializer.Package(data));
+						_socket.Send(await ProtoSerialiser.Pack(data));
 					}
 					catch (ArgumentNullException)
 					{
-						Debug.Error("Serialized data buffer is null", data.GetType().ToString(), data);
+						Debug.LogError("Serialized data buffer is null", data.GetType().ToString(), data);
 						throw;
 					}
 
 					break;
 			}
 		}
-		catch (Exception ex)
+		catch (SocketException)
 		{
-			Debug.Exception(ex);
+			Stop();
+			Debug.LogError("Error when trying to listen to status connection, socket failed.");
 		}
 	}
 }

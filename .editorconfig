@@ -12,3 +12,8 @@ tab_width = 4
 dotnet_diagnostic.IDE0090.severity = none
 dotnet_diagnostic.IDE0018.severity = none
 dotnet_diagnostic.IDE0030.severity = none
+dotnet_diagnostic.IDE0350.severity = none
+
+[**.json]
+indent_style = space
+indent_size = 2

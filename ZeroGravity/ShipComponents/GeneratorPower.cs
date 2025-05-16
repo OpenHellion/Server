@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -15,9 +16,9 @@ public class GeneratorPower : Generator
 	{
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 	}
 
 	public override void SetAuxData(SystemAuxData auxData)

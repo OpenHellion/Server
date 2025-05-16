@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -20,11 +20,10 @@ internal class GlowStick : Item
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		GlowStickStats gss = stats as GlowStickStats;
 		isOn = true;
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 		return false;
 	}
 
@@ -38,23 +37,16 @@ internal class GlowStick : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataGlowStick data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataGlowStick data)
-			{
-				Debug.Warning("PersistenceObjectDataGlowStick data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.GlowStickData);
-			}
+			Debug.LogWarning("PersistenceObjectDataGlowStick data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.GlowStickData);
 		}
 	}
 }

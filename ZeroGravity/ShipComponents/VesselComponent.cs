@@ -1,10 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
+using static ZeroGravity.ShipComponents.DistributionManager;
 
 namespace ZeroGravity.ShipComponents;
 
@@ -92,28 +93,6 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		{
 			return _Defective;
 		}
-		set
-		{
-			if (_Defective != (_Defective = value))
-			{
-				if (value && Status is SystemStatus.OnLine or SystemStatus.PowerUp)
-				{
-					GoOffLine(autoRestart: true);
-				}
-				else if (value)
-				{
-					SecondaryStatus = SystemSecondaryStatus.Defective;
-				}
-				else if (Status is SystemStatus.OffLine or SystemStatus.CoolDown && shouldAutoReactivate)
-				{
-					GoOnLine();
-				}
-				else
-				{
-					SecondaryStatus = SystemSecondaryStatus.None;
-				}
-			}
-		}
 	}
 
 	public virtual float CoolDownTime => _CoolDownTime * cooldownFactor;
@@ -187,35 +166,6 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		get
 		{
 			return _Status;
-		}
-		protected set
-		{
-			if (_Status == value)
-			{
-				return;
-			}
-			_Status = value;
-			if (Status == SystemStatus.OnLine)
-			{
-				if (OperationRate > float.Epsilon)
-				{
-					_SecondaryStatus = SystemSecondaryStatus.None;
-				}
-				else
-				{
-					_SecondaryStatus = SystemSecondaryStatus.Idle;
-				}
-				ParentVessel.RepairPoints.FirstOrDefault((VesselRepairPoint m) => m.AffectedSystem == this)?.Update();
-				if (baseRadarSignature != 0f)
-				{
-					ParentVessel.MainVessel.UpdateVesselData();
-				}
-			}
-			else if (Status == SystemStatus.OffLine && baseRadarSignature != 0f)
-			{
-				ParentVessel.MainVessel.UpdateVesselData();
-			}
-			StatusChanged = true;
 		}
 	}
 
@@ -342,7 +292,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		MachineryPartSlots[slotKey].IsActive = state;
 	}
 
-	public virtual void GoOffLine(bool autoRestart, bool malfunction = false)
+	public virtual async Task GoOffLine(bool autoRestart, bool malfunction = false)
 	{
 		shouldAutoReactivate = autoRestart && AutoReactivate;
 		if (Status is SystemStatus.OnLine or SystemStatus.PowerUp)
@@ -350,11 +300,11 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 			if (CoolDownTime > 0f)
 			{
 				statusChangeCountdown = CoolDownTime;
-				Status = SystemStatus.CoolDown;
+				await SetStatusAsync(SystemStatus.CoolDown);
 			}
 			else
 			{
-				Status = SystemStatus.OffLine;
+				await SetStatusAsync(SystemStatus.OffLine);
 			}
 		}
 		if (Defective)
@@ -371,7 +321,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		DebugInfo = "";
 	}
 
-	public virtual void GoOnLine()
+	public virtual async Task GoOnLine()
 	{
 		if (Status != SystemStatus.OffLine)
 		{
@@ -385,11 +335,11 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 			if (PowerUpTime > 0f)
 			{
 				statusChangeCountdown = PowerUpTime;
-				Status = SystemStatus.PowerUp;
+				await SetStatusAsync(SystemStatus.PowerUp);
 			}
 			else
 			{
-				Status = SystemStatus.OnLine;
+				await SetStatusAsync(SystemStatus.OnLine);
 			}
 		}
 		else
@@ -415,7 +365,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		return CheckAvailableResources(operationRate, duration, standby, ref reservedCapacities, ref reservedQuantities, ref debugText);
 	}
 
-	public virtual void Update(double duration)
+	public virtual async Task Update(double duration)
 	{
 		statusChangeCountdown -= (float)duration;
 		if (statusChangeCountdown <= 0f)
@@ -423,11 +373,11 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 			statusChangeCountdown = 0f;
 			if (Status == SystemStatus.PowerUp)
 			{
-				Status = SystemStatus.OnLine;
+				await SetStatusAsync(SystemStatus.OnLine);
 			}
 			else if (Status == SystemStatus.CoolDown)
 			{
-				Status = SystemStatus.OffLine;
+				await SetStatusAsync(SystemStatus.OffLine);
 			}
 		}
 		if (Status == SystemStatus.OnLine)
@@ -437,20 +387,20 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 				float decay = kv.Value.PartDecay;
 				MachineryPart mp = null;
 				MachineryParts.TryGetValue(kv.Key, out mp);
-				if (kv.Value.IsActive && mp != null && mp.Health > 0f)
+				if (kv.Value.IsActive && mp is { Health: > 0f })
 				{
 					float prevHealth = mp.Health;
-					mp.Health = MathHelper.Clamp((float)((double)mp.Health - (double)(PartsWearFactor * mp.WearMultiplier * decay / 3600f) * duration * (double)OperationRate), 0f, mp.MaxHealth);
+					mp.Health = MathHelper.Clamp((float)(mp.Health - PartsWearFactor * mp.WearMultiplier * decay / 3600f * duration * OperationRate), 0f, mp.MaxHealth);
 					if ((int)prevHealth != (int)mp.Health || (prevHealth > 0f && mp.Health == 0f) || (mp.Health != prevHealth && Server.SolarSystemTime - mp.DynamicObj.LastStatsSendTime > 10.0))
 					{
-						mp.DynamicObj.SendStatsToClient();
+						await mp.DynamicObj.SendStatsToClient();
 					}
 				}
 			}
 		}
 		else if (Status == SystemStatus.OffLine && shouldAutoReactivate)
 		{
-			GoOnLine();
+			await GoOnLine();
 		}
 		InputFactor = GetScopeMultiplier(MachineryPartSlotScope.ResourcesConsumption);
 		PowerInputFactor = GetScopeMultiplier(MachineryPartSlotScope.PowerConsumption);
@@ -578,38 +528,134 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		return hasEnoughResourceCapacity;
 	}
 
-	public void CheckStatus(float operationRate, float duration, bool standby, ref Dictionary<IResourceProvider, float> reservedCapacities, ref Dictionary<ResourceContainer, float> reservedQuantities)
+	public async Task<ComsumerRoomReserved> CheckStatus(float operationRate, float duration, bool standby, Dictionary<IResourceProvider, float> reservedCapacities, Dictionary<ResourceContainer, float> reservedQuantities)
 	{
 		if (Status != SystemStatus.OnLine && (Status != SystemStatus.OffLine || !CanReactivate))
 		{
-			return;
+			return new ComsumerRoomReserved
+			{
+				Capacities = reservedCapacities,
+				Quantities = reservedQuantities
+			};
 		}
-		Dictionary<IResourceProvider, float> reservedCapacitiesBackup = new Dictionary<IResourceProvider, float>(reservedCapacities);
-		Dictionary<ResourceContainer, float> reservedQuantitiesBackup = new Dictionary<ResourceContainer, float>(reservedQuantities);
+		Dictionary<IResourceProvider, float> reservedCapacitiesBackup = new(reservedCapacities);
+		Dictionary<ResourceContainer, float> reservedQuantitiesBackup = new(reservedQuantities);
 		string debugText = null;
 		bool canWork = CheckAvailableResources(operationRate, duration, standby, ref reservedCapacities, ref reservedQuantities, ref debugText);
-		debugText = "Vessel " + ParentVessel.GUID + "\n" + debugText;
+		debugText = "Vessel " + ParentVessel.Guid + "\n" + debugText;
 		if (canWork && Status == SystemStatus.OffLine && CanReactivate)
 		{
-			GoOnLine();
+			await GoOnLine();
 		}
 		else if (!canWork)
 		{
 			if (Status == SystemStatus.OnLine)
 			{
 				DebugInfo = debugText;
-				GoOffLine(autoRestart: true, malfunction: true);
+				await GoOffLine(autoRestart: true, malfunction: true);
 			}
 			reservedCapacities = reservedCapacitiesBackup;
 			reservedQuantities = reservedQuantitiesBackup;
 		}
+
+		return new ComsumerRoomReserved
+		{
+			Capacities = reservedCapacities,
+			Quantities = reservedQuantities
+		};
+	}
+
+	public virtual async Task SetDefectiveAsync(bool value)
+	{
+		if (_Defective != (_Defective = value))
+		{
+			if (value && Status is SystemStatus.OnLine or SystemStatus.PowerUp)
+			{
+				await GoOffLine(autoRestart: true);
+			}
+			else if (value)
+			{
+				SecondaryStatus = SystemSecondaryStatus.Defective;
+			}
+			else if (Status is SystemStatus.OffLine or SystemStatus.CoolDown && shouldAutoReactivate)
+			{
+				await GoOnLine();
+			}
+			else
+			{
+				SecondaryStatus = SystemSecondaryStatus.None;
+			}
+		}
+	}
+
+
+	protected virtual Task SetStatusAsync(SystemStatus status)
+	{
+		if (_Status == status)
+		{
+			return Task.CompletedTask;
+		}
+		_Status = status;
+		if (Status == SystemStatus.OnLine)
+		{
+			if (OperationRate > float.Epsilon)
+			{
+				_SecondaryStatus = SystemSecondaryStatus.None;
+			}
+			else
+			{
+				_SecondaryStatus = SystemSecondaryStatus.Idle;
+			}
+			ParentVessel.RepairPoints.FirstOrDefault((VesselRepairPoint m) => m.AffectedSystem == this)?.Update();
+			if (baseRadarSignature != 0f)
+			{
+				ParentVessel.MainVessel.UpdateVesselData();
+			}
+		}
+		else if (Status == SystemStatus.OffLine && baseRadarSignature != 0f)
+		{
+			ParentVessel.MainVessel.UpdateVesselData();
+		}
+		StatusChanged = true;
+
+		return Task.CompletedTask;
+	}
+
+	protected virtual void SetStatus(SystemStatus status)
+	{
+		if (_Status == status)
+		{
+			return;
+		}
+		_Status = status;
+		if (Status == SystemStatus.OnLine)
+		{
+			if (OperationRate > float.Epsilon)
+			{
+				_SecondaryStatus = SystemSecondaryStatus.None;
+			}
+			else
+			{
+				_SecondaryStatus = SystemSecondaryStatus.Idle;
+			}
+			ParentVessel.RepairPoints.FirstOrDefault((VesselRepairPoint m) => m.AffectedSystem == this)?.Update();
+			if (baseRadarSignature != 0f)
+			{
+				ParentVessel.MainVessel.UpdateVesselData();
+			}
+		}
+		else if (Status == SystemStatus.OffLine && baseRadarSignature != 0f)
+		{
+			ParentVessel.MainVessel.UpdateVesselData();
+		}
+		StatusChanged = true;
 	}
 
 	public PersistenceObjectData GetPersistenceData()
 	{
 		return new PersistenceObjectDataVesselComponent
 		{
-			GUID = ParentVessel.GUID,
+			GUID = ParentVessel.Guid,
 			InSceneID = ID.InSceneID,
 			Status = Status,
 			StatusChangeCountdown = statusChangeCountdown,
@@ -625,26 +671,19 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 		return null;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataVesselComponent data)
 		{
-			if (persistenceData is not PersistenceObjectDataVesselComponent data)
-			{
-				Debug.Warning("PersistenceObjectDataVesselComponent data is null");
-				return;
-			}
-			_AutoReactivate = data.AutoReactivate;
-			shouldAutoReactivate = data.ShouldAutoReactivate;
-			statusChangeCountdown = data.StatusChangeCountdown;
-			_Status = data.Status;
-			Defective = data.Defective;
-			SetPersistenceAuxData(data.AuxData);
+			Debug.LogWarning("PersistenceObjectDataVesselComponent data is null");
+			return;
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		_AutoReactivate = data.AutoReactivate;
+		shouldAutoReactivate = data.ShouldAutoReactivate;
+		statusChangeCountdown = data.StatusChangeCountdown;
+		_Status = data.Status;
+		await SetDefectiveAsync(data.Defective);
+		SetPersistenceAuxData(data.AuxData);
 	}
 
 	public virtual void SetPersistenceAuxData(PersistenceData auxData)

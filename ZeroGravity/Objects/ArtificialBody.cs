@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
@@ -9,19 +9,17 @@ namespace ZeroGravity.Objects;
 
 public class ArtificialBody : SpaceObject
 {
-	private double prevUpdatePositionTime = Server.SolarSystemTime;
+	private double _prevUpdatePositionTime = Server.SolarSystemTime;
 
 	public OrbitParameters Orbit = new OrbitParameters();
 
-	private ManeuverCourse _CurrentCourse;
+	private ManeuverCourse _currentCourse;
 
 	public double LastOrientationChangeTime;
 
-	public bool IsInDebrisField;
+	private Vector3D _forward = Vector3D.Forward;
 
-	public Vector3D _Forward = Vector3D.Forward;
-
-	public Vector3D _Up = Vector3D.Up;
+	private Vector3D _up = Vector3D.Up;
 
 	public double Radius;
 
@@ -29,52 +27,55 @@ public class ArtificialBody : SpaceObject
 
 	public Vector3D Rotation;
 
-	public Vector3D PhysicsVelocityDifference;
+	protected Vector3D PhysicsVelocityDifference;
 
-	public Vector3D PhysicsRotationDifference;
+	protected Vector3D PhysicsRotationDifference;
 
 	private bool _markForDestruction;
 
-	private float _RadarSignature;
+	private float _radarSignature;
 
-	private bool updateAngularVelocity = true;
+	private bool _updateAngularVelocity = true;
 
-	private static double stabilizeToTargetMaxVelocityDiff = 2.0;
+	private const double StabilizeToTargetMaxVelocityDiff = 2.0;
 
-	private static double stabilizeToTargetMaxPositionDiff = 100.0;
+	private const double StabilizeToTargetMaxPositionDiff = 100.0;
 
-	public List<SpaceObjectVessel> StabilizedToTargetChildren = new List<SpaceObjectVessel>();
+	public readonly List<SpaceObjectVessel> StabilizedToTargetChildren = new List<SpaceObjectVessel>();
 
-	private double? stabilizationDisabledTime;
+	private double? _stabilizationDisabledTime;
 
-	private bool? stabilizationDisableAfterUpdate;
+	private bool? _stabilizationDisableAfterUpdate;
 
-	private Vector3D? stabilizationDisableRelativePositionExtra;
+	private Vector3D? _stabilizationDisableRelativePositionExtra;
 
-	private Vector3D? stabilizationDisableRelativeVelocityExtra;
+	private Vector3D? _stabilizationDisableRelativeVelocityExtra;
 
 	public ManeuverCourse CurrentCourse
 	{
 		get
 		{
-			if (_CurrentCourse == null && this is Ship)
+			if (_currentCourse == null && this is Ship)
 			{
 				SpaceObjectVessel mainVessel = (this as SpaceObjectVessel).MainVessel;
-				if (mainVessel._CurrentCourse != null && mainVessel.MainVessel.FTL != null && mainVessel.FTL.Status == SystemStatus.OnLine)
+				if (mainVessel._currentCourse != null && mainVessel.MainVessel.FTL != null && mainVessel.FTL.Status == SystemStatus.OnLine)
 				{
-					return (this as SpaceObjectVessel).MainVessel._CurrentCourse;
+					return (this as SpaceObjectVessel).MainVessel._currentCourse;
 				}
-				SpaceObjectVessel courseVessel = (this as SpaceObjectVessel).MainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m._CurrentCourse != null && m.FTL != null && m.FTL.Status == SystemStatus.OnLine);
+				SpaceObjectVessel courseVessel = (this as SpaceObjectVessel).MainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m._currentCourse != null && m.FTL is
+				{
+					Status: SystemStatus.OnLine
+				});
 				if (courseVessel != null)
 				{
-					return courseVessel._CurrentCourse;
+					return courseVessel._currentCourse;
 				}
 			}
-			return _CurrentCourse;
+			return _currentCourse;
 		}
 		set
 		{
-			_CurrentCourse = value;
+			_currentCourse = value;
 		}
 	}
 
@@ -94,18 +95,18 @@ public class ArtificialBody : SpaceObject
 			{
 				return QuaternionD.LookRotation((this as SpaceObjectVessel).MainVessel.Forward, (this as SpaceObjectVessel).MainVessel.Up) * (this as SpaceObjectVessel).RelativeRotationFromMainParent * Vector3D.Forward;
 			}
-			return _Forward;
+			return _forward;
 		}
 		set
 		{
 			if (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10))
 			{
 			}
-			if (!_Forward.IsEpsilonEqual(value, 9.9999997473787516E-06))
+			if (!_forward.IsEpsilonEqual(value, 9.9999997473787516E-06))
 			{
 				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
-			_Forward = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Forward : value;
+			_forward = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _forward : value;
 		}
 	}
 
@@ -117,18 +118,18 @@ public class ArtificialBody : SpaceObject
 			{
 				return QuaternionD.LookRotation((this as SpaceObjectVessel).MainVessel.Forward, (this as SpaceObjectVessel).MainVessel.Up) * (this as SpaceObjectVessel).RelativeRotationFromMainParent * Vector3D.Up;
 			}
-			return _Up;
+			return _up;
 		}
 		set
 		{
 			if (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10))
 			{
 			}
-			if (!_Up.IsEpsilonEqual(value, 9.9999997473787516E-06))
+			if (!_up.IsEpsilonEqual(value, 9.9999997473787516E-06))
 			{
 				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
-			_Up = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _Up : value;
+			_up = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _up : value;
 		}
 	}
 
@@ -149,11 +150,11 @@ public class ArtificialBody : SpaceObject
 	{
 		get
 		{
-			return _RadarSignature;
+			return _radarSignature;
 		}
 		protected set
 		{
-			_RadarSignature = value;
+			_radarSignature = value;
 		}
 	}
 
@@ -185,13 +186,13 @@ public class ArtificialBody : SpaceObject
 		Server.Instance.SolarSystem.AddArtificialBody(this);
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
-		base.Destroy();
-		DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
+		await base.Destroy();
+		await DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
 		foreach (Player pl in Server.Instance.AllPlayers)
 		{
-			if (pl.IsSubscribedTo(GUID))
+			if (pl.IsSubscribedTo(Guid))
 			{
 				pl.UnsubscribeFrom(this);
 			}
@@ -238,10 +239,10 @@ public class ArtificialBody : SpaceObject
 		}
 	}
 
-	private void UpdatePosition()
+	private async Task UpdatePosition()
 	{
-		double deltaTime = Server.SolarSystemTime - prevUpdatePositionTime;
-		prevUpdatePositionTime = Server.SolarSystemTime;
+		double deltaTime = Server.SolarSystemTime - _prevUpdatePositionTime;
+		_prevUpdatePositionTime = Server.SolarSystemTime;
 		if (deltaTime <= double.Epsilon)
 		{
 			return;
@@ -249,19 +250,19 @@ public class ArtificialBody : SpaceObject
 		if (this is Ship && !(this as Ship).IsMainVessel)
 		{
 			((this as Ship).MainVessel as Ship).AddDockedVesselsThrust(this as Ship, deltaTime);
-			(this as Ship).CheckThrustStatsMessage();
+			await (this as Ship).CheckThrustStatsMessage();
 			return;
 		}
-		if (stabilizationDisabledTime.HasValue)
+		if (_stabilizationDisabledTime.HasValue)
 		{
-			if (stabilizationDisabledTime.Value.IsEpsilonEqualD(Server.Instance.SolarSystem.CurrentTime))
+			if (_stabilizationDisabledTime.Value.IsEpsilonEqualD(Server.Instance.SolarSystem.CurrentTime))
 			{
-				stabilizationDisabledTime = null;
+				_stabilizationDisabledTime = null;
 				return;
 			}
-			stabilizationDisabledTime = null;
+			_stabilizationDisabledTime = null;
 		}
-		if (CheckCurrentCourse())
+		if (await CheckCurrentCourse())
 		{
 			Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
 		}
@@ -269,11 +270,11 @@ public class ArtificialBody : SpaceObject
 		{
 			Orbit.UpdateOrbit();
 		}
-		if (CheckThrustAndRotation(deltaTime))
+		if (await CheckThrustAndRotation(deltaTime))
 		{
 			if (CurrentCourse != null)
 			{
-				CurrentCourse.Invalidate();
+				await CurrentCourse.Invalidate();
 			}
 			Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
 		}
@@ -285,7 +286,7 @@ public class ArtificialBody : SpaceObject
 		{
 			if (CurrentCourse != null)
 			{
-				CurrentCourse.OrbitParentChanged();
+				await CurrentCourse.OrbitParentChanged();
 			}
 			Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
 		}
@@ -295,7 +296,7 @@ public class ArtificialBody : SpaceObject
 		}
 	}
 
-	public void UpdateStabilization()
+	public async Task UpdateStabilization()
 	{
 		if (StabilizeToTargetObj == null || this is not Ship || (this as Ship).IsDocked)
 		{
@@ -303,19 +304,19 @@ public class ArtificialBody : SpaceObject
 		}
 		if (CurrentCourse != null)
 		{
-			CurrentCourse.Invalidate();
+			await CurrentCourse.Invalidate();
 		}
 		Orbit.CopyDataFrom(StabilizeToTargetObj.Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
 		Orbit.RelativePosition += StabilizeToTargetRelPosition;
-		if (stabilizationDisableRelativePositionExtra.HasValue)
+		if (_stabilizationDisableRelativePositionExtra.HasValue)
 		{
-			Orbit.RelativePosition += stabilizationDisableRelativePositionExtra.Value;
-			stabilizationDisableRelativePositionExtra = null;
+			Orbit.RelativePosition += _stabilizationDisableRelativePositionExtra.Value;
+			_stabilizationDisableRelativePositionExtra = null;
 		}
-		if (stabilizationDisableRelativeVelocityExtra.HasValue)
+		if (_stabilizationDisableRelativeVelocityExtra.HasValue)
 		{
-			Orbit.RelativeVelocity += stabilizationDisableRelativeVelocityExtra.Value;
-			stabilizationDisableRelativeVelocityExtra = null;
+			Orbit.RelativeVelocity += _stabilizationDisableRelativeVelocityExtra.Value;
+			_stabilizationDisableRelativeVelocityExtra = null;
 		}
 		Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
 		if (this is SpaceObjectVessel)
@@ -328,11 +329,11 @@ public class ArtificialBody : SpaceObject
 		}
 		foreach (SpaceObjectVessel ab in StabilizedToTargetChildren)
 		{
-			ab.UpdateStabilization();
+			await ab.UpdateStabilization();
 		}
 	}
 
-	private bool CheckCurrentCourse()
+	private async Task<bool> CheckCurrentCourse()
 	{
 		if (CurrentCourse is not { IsValid: true })
 		{
@@ -340,24 +341,24 @@ public class ArtificialBody : SpaceObject
 		}
 		if (CurrentCourse.IsActivated && !CurrentCourse.IsStartingSoonSent && CurrentCourse.StartSolarSystemTime > Server.Instance.SolarSystem.CurrentTime && Server.Instance.SolarSystem.CurrentTime >= CurrentCourse.StartSolarSystemTime - ManeuverCourse.StartingSoonTime)
 		{
-			CurrentCourse.SendCourseStartingSoonResponse();
+			await CurrentCourse.SendCourseStartingSoonResponse();
 		}
 		else if (CurrentCourse.StartSolarSystemTime <= Server.Instance.SolarSystem.CurrentTime)
 		{
 			if (!CurrentCourse.IsActivated)
 			{
-				CurrentCourse.Invalidate();
+				await CurrentCourse.Invalidate();
 				return false;
 			}
 			if (!CurrentCourse.IsInProgress)
 			{
-				if (!CurrentCourse.StartManeuver())
+				if (!await CurrentCourse.StartManeuver())
 				{
 					return false;
 				}
 				if (!CurrentCourse.IsStartingSoonSent)
 				{
-					CurrentCourse.SendCourseStartingSoonResponse();
+					await CurrentCourse.SendCourseStartingSoonResponse();
 				}
 			}
 			Vector3D relativePosition = Vector3D.Zero;
@@ -374,7 +375,7 @@ public class ArtificialBody : SpaceObject
 			if (CurrentCourse.EndSolarSystemTime <= Server.Instance.SolarSystem.CurrentTime)
 			{
 				CurrentCourse.SetFinalPosition();
-				CurrentCourse.ReadNextManeuverCourse();
+				await CurrentCourse.ReadNextManeuverCourse();
 			}
 			return true;
 		}
@@ -402,7 +403,7 @@ public class ArtificialBody : SpaceObject
 		thrust = Vector3D.Zero;
 	}
 
-	private bool CheckThrustAndRotation(double timeDelta)
+	private async Task<bool> CheckThrustAndRotation(double timeDelta)
 	{
 		Vector3D prevAngularVelocity = Rotation;
 		bool recalculateOrbit = false;
@@ -426,25 +427,25 @@ public class ArtificialBody : SpaceObject
 			}
 			if (sh.CalculateRotationThrust(timeDelta))
 			{
-				updateAngularVelocity = true;
+				_updateAngularVelocity = true;
 				Rotation += sh.RotationThrustVelocityDifference;
 				sh.RotationThrustVelocityDifference = Vector3D.Zero;
 			}
 			if (sh.CalculateRotationDampen(timeDelta))
 			{
-				updateAngularVelocity = true;
+				_updateAngularVelocity = true;
 			}
-			else if (sh.CalculateAutoStabilizeRotation(timeDelta))
+			else if (await sh.CalculateAutoStabilizeRotation(timeDelta))
 			{
-				updateAngularVelocity = true;
+				_updateAngularVelocity = true;
 			}
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
-				updateAngularVelocity = true;
+				_updateAngularVelocity = true;
 				Rotation += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
-			if (updateAngularVelocity)
+			if (_updateAngularVelocity)
 			{
 				QuaternionD oldRotation2 = QuaternionD.LookRotation(Forward, Up);
 				if (Rotation.IsNotEpsilonZero())
@@ -452,13 +453,13 @@ public class ArtificialBody : SpaceObject
 					ApplyRotation(timeDelta);
 				}
 				AngularVelocity = (QuaternionD.LookRotation(Forward, Up) * oldRotation2.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
-				updateAngularVelocity = false;
+				_updateAngularVelocity = false;
 			}
 			else if (Rotation.IsNotEpsilonZero())
 			{
 				ApplyRotation(timeDelta);
 			}
-			sh.CheckThrustStatsMessage();
+			await sh.CheckThrustStatsMessage();
 		}
 		else if (this is Asteroid)
 		{
@@ -469,11 +470,11 @@ public class ArtificialBody : SpaceObject
 			}
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
-				updateAngularVelocity = true;
+				_updateAngularVelocity = true;
 				Rotation += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
-			if (updateAngularVelocity)
+			if (_updateAngularVelocity)
 			{
 				QuaternionD oldRotation = QuaternionD.LookRotation(Forward, Up);
 				if (Rotation.IsNotEpsilonZero())
@@ -481,7 +482,7 @@ public class ArtificialBody : SpaceObject
 					ApplyRotation(timeDelta);
 				}
 				AngularVelocity = (QuaternionD.LookRotation(Forward, Up) * oldRotation.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
-				updateAngularVelocity = false;
+				_updateAngularVelocity = false;
 			}
 			else if (Rotation.IsNotEpsilonZero())
 			{
@@ -521,7 +522,7 @@ public class ArtificialBody : SpaceObject
 		return false;
 	}
 
-	public void Update()
+	public async Task Update()
 	{
 		if (this is Ship)
 		{
@@ -531,27 +532,27 @@ public class ArtificialBody : SpaceObject
 			}
 			(this as Ship).ExtraRcsThrustVelocityDifference = Vector3D.Zero;
 			(this as Ship).ExtraRotationThrustVelocityDifference = Vector3D.Zero;
-			foreach (Ship ship in (this as Ship).AllDockedVessels)
+			foreach (Ship ship in (this as Ship).AllDockedVessels.Cast<Ship>())
 			{
-				ship.UpdatePosition();
+				await ship.UpdatePosition();
 			}
-			UpdatePosition();
+			await UpdatePosition();
 		}
 		else
 		{
-			UpdatePosition();
+			await UpdatePosition();
 		}
 	}
 
-	public void AfterUpdate()
+	public async Task AfterUpdate()
 	{
-		if (stabilizationDisableAfterUpdate.HasValue && stabilizationDisableAfterUpdate.Value)
+		if (_stabilizationDisableAfterUpdate.HasValue && _stabilizationDisableAfterUpdate.Value)
 		{
-			DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+			await DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 		}
 		else if (StabilizeToTargetObj != null)
 		{
-			UpdateStabilization();
+			await UpdateStabilization();
 		}
 	}
 
@@ -573,14 +574,14 @@ public class ArtificialBody : SpaceObject
 		}
 		if (!forceStabilize)
 		{
-			if (targetMainVessel.GUID != vessel.MainVessel.GUID)
+			if (targetMainVessel.Guid != vessel.MainVessel.Guid)
 			{
-				if ((targetMainVessel.Velocity - mainVessel.Velocity).Magnitude > stabilizeToTargetMaxVelocityDiff || (vessel.MainVessel.Position - mainVessel.Position).Magnitude - vessel.MainVessel.Radius > stabilizeToTargetMaxPositionDiff)
+				if ((targetMainVessel.Velocity - mainVessel.Velocity).Magnitude > StabilizeToTargetMaxVelocityDiff || (vessel.MainVessel.Position - mainVessel.Position).Magnitude - vessel.MainVessel.Radius > StabilizeToTargetMaxPositionDiff)
 				{
 					return false;
 				}
 			}
-			else if ((targetMainVessel.Velocity - mainVessel.Velocity).Magnitude > stabilizeToTargetMaxVelocityDiff || (targetMainVessel.Position - mainVessel.Position).Magnitude - targetMainVessel.Radius > stabilizeToTargetMaxPositionDiff)
+			else if ((targetMainVessel.Velocity - mainVessel.Velocity).Magnitude > StabilizeToTargetMaxVelocityDiff || (targetMainVessel.Position - mainVessel.Position).Magnitude - targetMainVessel.Radius > StabilizeToTargetMaxPositionDiff)
 			{
 				return false;
 			}
@@ -602,22 +603,22 @@ public class ArtificialBody : SpaceObject
 		return target;
 	}
 
-	public void DisableStabilization(bool disableForChildren, bool updateBeforeDisable)
+	public async Task DisableStabilization(bool disableForChildren, bool updateBeforeDisable)
 	{
 		if (this is not SpaceObjectVessel)
 		{
 			return;
 		}
-		stabilizationDisableAfterUpdate = null;
+		_stabilizationDisableAfterUpdate = null;
 		if (StabilizeToTargetObj != null)
 		{
 			if (updateBeforeDisable)
 			{
-				UpdateStabilization();
+				await UpdateStabilization();
 			}
 			StabilizeToTargetObj.StabilizedToTargetChildren.Remove(this as SpaceObjectVessel);
 			StabilizeToTargetObj = null;
-			stabilizationDisabledTime = Server.Instance.SolarSystem.CurrentTime;
+			_stabilizationDisabledTime = Server.Instance.SolarSystem.CurrentTime;
 		}
 		if (!disableForChildren || StabilizedToTargetChildren.Count <= 0)
 		{
@@ -627,12 +628,12 @@ public class ArtificialBody : SpaceObject
 		int sanityCheck = 0;
 		while (StabilizedToTargetChildren.Count > 0 && sanityCheck < 1000)
 		{
-			StabilizedToTargetChildren[0].DisableStabilization(disableForChildren: false, updateBeforeDisable);
+			await StabilizedToTargetChildren[0].DisableStabilization(disableForChildren: false, updateBeforeDisable);
 			sanityCheck++;
 		}
 		if (sanityCheck >= 1000)
 		{
-			Debug.Error("When disabling stabilization for", GUID, "children, sanity check reached", sanityCheck);
+			Debug.LogError("When disabling stabilization for", Guid, "children, sanity check reached", sanityCheck);
 		}
 		if (reStabilizeChildren.Count <= 1)
 		{
@@ -656,9 +657,9 @@ public class ArtificialBody : SpaceObject
 	{
 		if (StabilizeToTargetObj != null)
 		{
-			stabilizationDisableAfterUpdate = true;
-			stabilizationDisableRelativePositionExtra = relativePositionExtra;
-			stabilizationDisableRelativeVelocityExtra = relativeVelocityExtra;
+			_stabilizationDisableAfterUpdate = true;
+			_stabilizationDisableRelativePositionExtra = relativePositionExtra;
+			_stabilizationDisableRelativeVelocityExtra = relativeVelocityExtra;
 		}
 	}
 

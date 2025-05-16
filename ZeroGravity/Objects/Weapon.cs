@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -9,7 +9,7 @@ namespace ZeroGravity.Objects;
 
 public class Weapon : Item
 {
-	private WeaponStats _stats;
+	private WeaponStats _stats = new();
 
 	private ItemSlot magazineSlot;
 
@@ -32,7 +32,7 @@ public class Weapon : Item
 		}
 	}
 
-	public bool HasAmmo => Magazine != null && Magazine.HasAmmo;
+	public bool HasAmmo => Magazine is { HasAmmo: true };
 
 	public Magazine Magazine => magazineSlot != null ? magazineSlot.Item as Magazine : null;
 
@@ -54,25 +54,32 @@ public class Weapon : Item
 
 	public float ChargeAmount => 1f;
 
-	public Weapon(DynamicObjectAuxData data)
+	private Weapon()
 	{
-		_stats = new WeaponStats();
-		if (data == null)
-		{
-			return;
-		}
-		WeaponData wd = data as WeaponData;
-		SetData(wd);
-		if (Slots == null)
-		{
-			return;
-		}
-		magazineSlot = Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => ItemTypeRange.IsAmmo(n)) != ItemType.None).Value;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Weapon> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		if (data == null)
+		{
+			return null;
+		}
+		Weapon weapon = new();
+		await weapon.SetData(data);
+
+		if (weapon.Slots == null)
+		{
+			return null;
+		}
+		weapon.magazineSlot = weapon.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => ItemTypeRange.IsAmmo(n)) != ItemType.None).Value;
+
+
+		return weapon;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		WeaponData wd = data as WeaponData;
 		weaponMods = wd.weaponMods;
 		foreach (WeaponModData wmod in weaponMods)
@@ -89,28 +96,28 @@ public class Weapon : Item
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		WeaponStats ws = stats as WeaponStats;
 		if (ws.CurrentMod.HasValue)
 		{
 			CurrentModIndex = MathHelper.Clamp(ws.CurrentMod.Value, 0, weaponMods.Count - 1);
-			return true;
+			return Task.FromResult(true);
 		}
-		return false;
+		return Task.FromResult(false);
 	}
 
 	public void ConsumePower(double amount)
 	{
 	}
 
-	public bool CanShoot()
+	public async Task<bool> CanShoot()
 	{
-		if (Magazine.BulletCount > 0 && Server.Instance.SolarSystem.CurrentTime - lastShotTime > (double)CurrentMod.RateOfFire)
+		if (Magazine.BulletCount > 0 && Server.Instance.SolarSystem.CurrentTime - lastShotTime > CurrentMod.RateOfFire)
 		{
-			Magazine.ChangeQuantity(-1);
+			await Magazine.ChangeQuantity(-1);
 			lastShotTime = Server.Instance.SolarSystem.CurrentTime;
-			base.DynamicObj.StatsChanged = true;
+			DynamicObj.StatsChanged = true;
 			return true;
 		}
 		return false;
@@ -127,23 +134,16 @@ public class Weapon : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataWeapon data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataWeapon data)
-			{
-				Debug.Warning("PersistenceObjectDataWeapon data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.WeaponData);
-			}
+			Debug.LogWarning("PersistenceObjectDataWeapon data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.WeaponData);
 		}
 	}
 }

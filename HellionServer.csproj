@@ -15,15 +15,15 @@
         <PublishRelease>true</PublishRelease>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor|AnyCPU' ">
-        <DefineConstants>build_for_unit_tests;DEBUG;SHOW_ALL_LOGS</DefineConstants>
+        <DefineConstants>build_for_unit_tests;DEBUG;SHOW_ALL_LOGS;TRACE</DefineConstants>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <DebugSymbols>true</DebugSymbols>
-        <DebugType>full</DebugType>
+        <DebugType>embedded</DebugType>
         <Optimize>false</Optimize>
         <DefineConstants>DEBUG;SHOW_ALL_LOGS;TRACE</DefineConstants>
         <ErrorReport>prompt</ErrorReport>
-        <WarningLevel>1</WarningLevel>
+        <WarningLevel>2</WarningLevel>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
         <DebugSymbols>false</DebugSymbols>
@@ -39,8 +39,5 @@
         <PackageReference Include="Newtonsoft.Json" Version="13.0.1"/>
         <PackageReference Include="protobuf-net" Version="3.1.26"/>
         <PackageReference Include="BulletSharp.x64" Version="0.12.0"/>
-        <Reference Include="Telepathy">
-            <HintPath>./Telepathy/Telepathy.dll</HintPath>
-        </Reference>
     </ItemGroup>
 </Project>

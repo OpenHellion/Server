@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Objects;
@@ -97,10 +98,10 @@ public class SpawnRule
 		return true;
 	}
 
-	public void Initialize(bool isPersistenceInitialize)
+	public async Task Initialize(bool isPersistenceInitialize)
 	{
 		totalScenes.Max = 0;
-		if (ScenePool != null && ScenePool.Count > 0)
+		if (ScenePool is { Count: > 0 })
 		{
 			foreach (SpawnRuleScene sc in ScenePool)
 			{
@@ -109,12 +110,12 @@ public class SpawnRule
 		}
 		if (totalScenes.Max > 0 && totalScenes.Max < NumberOfClusters.Max)
 		{
-			Debug.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" max number of clusters \"{NumberOfClusters.Max}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
+			Debug.LogWarning($"SPAWN MANAGER - Spawn rule \"{Name}\" max number of clusters \"{NumberOfClusters.Max}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
 			NumberOfClusters.Max = totalScenes.Max;
 		}
 		if (totalScenes.Max > 0 && totalScenes.Max < NumberOfClusters.Min)
 		{
-			Debug.Warning($"SPAWN MANAGER - Spawn rule \"{Name}\" min number of clusters \"{NumberOfClusters.Min}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
+			Debug.LogWarning($"SPAWN MANAGER - Spawn rule \"{Name}\" min number of clusters \"{NumberOfClusters.Min}\" are lower than number of total scenes \"{totalScenes.Max}\", clusters auto adjusted");
 			NumberOfClusters.Min = totalScenes.Max;
 		}
 		if (NumberOfClusters.Min > NumberOfClusters.Max)
@@ -139,13 +140,13 @@ public class SpawnRule
 			{
 				for (int i = 0; i < NumberOfClusters.Min; i++)
 				{
-					ExecuteRule();
+					await ExecuteRule();
 				}
 			}
 		}
 		else if (!IsOneTimeSpawnRule)
 		{
-			ExecuteRule();
+			await ExecuteRule();
 		}
 	}
 
@@ -157,11 +158,11 @@ public class SpawnRule
 		int distnceMultiplier = 1;
 		while (sanityCheck < 200)
 		{
-			Vector3D pos = first.Orbit.RelativePosition + MathHelper.RandomRotation() * (Vector3D.Forward * (ves.Radius + first.Radius + SpawnManager.Settings.RandomLocationClusterItemCheckDistance * (double)distnceMultiplier));
+			Vector3D pos = first.Orbit.RelativePosition + MathHelper.RandomRotation() * (Vector3D.Forward * (ves.Radius + first.Radius + SpawnManager.Settings.RandomLocationClusterItemCheckDistance * distnceMultiplier));
 			bool positionClear = true;
 			for (int i = 1; i < spawnedVessels.Count; i++)
 			{
-				if (spawnedVessels[i].Orbit.RelativePosition.DistanceSquared(pos) < System.Math.Pow(ves.Radius + (double)first.RadarSignature + SpawnManager.Settings.RandomLocationClusterItemCheckDistance, 2.0))
+				if (spawnedVessels[i].Orbit.RelativePosition.DistanceSquared(pos) < System.Math.Pow(ves.Radius + first.RadarSignature + SpawnManager.Settings.RandomLocationClusterItemCheckDistance, 2.0))
 				{
 					positionClear = false;
 					break;
@@ -182,7 +183,7 @@ public class SpawnRule
 		return Vector3D.Zero;
 	}
 
-	private SpaceObjectVessel ExecuteRandomRule()
+	private async Task<SpaceObjectVessel> ExecuteRandomRule()
 	{
 		if (LocationType != SpawnRuleLocationType.Random)
 		{
@@ -211,7 +212,6 @@ public class SpawnRule
 			SpaceObjectVessel firstVessel = null;
 			List<SpaceObjectVessel> clusterVessels = new List<SpaceObjectVessel>();
 			bool forceSpawn = false;
-			int scenesToSpawn = 0;
 			for (int j = 0; j < ScenePool.Count; j++)
 			{
 				if (scenesToSpawnTotal <= 0)
@@ -228,7 +228,7 @@ public class SpawnRule
 					continue;
 				}
 				SpawnRuleScene sc = ScenePool[j];
-				scenesToSpawn = !forceSpawn && scenesToSpawnTotal == 1 ? MathHelper.RandomRange(0, 2) : forceSpawn ? 1 : sc.CountMax < NumberOfClusters.Max ? MathHelper.RandomRange(0, 2) : MathHelper.RandomRange(1, sc.CountMax / NumberOfClusters.Max + 1);
+				int scenesToSpawn = !forceSpawn && scenesToSpawnTotal == 1 ? MathHelper.RandomRange(0, 2) : forceSpawn ? 1 : sc.CountMax < NumberOfClusters.Max ? MathHelper.RandomRange(0, 2) : MathHelper.RandomRange(1, sc.CountMax / NumberOfClusters.Max + 1);
 				if (scenesToSpawn > sc.Count)
 				{
 					scenesToSpawn = sc.Count;
@@ -243,20 +243,20 @@ public class SpawnRule
 					createdNewCluster = true;
 					if (firstVessel == null)
 					{
-						firstVessel = SpaceObjectVessel.CreateNew(sc.SceneID, "", -1L, null, null, null, null, MathHelper.RandomRotation(), LocationTag, checkPosition: true, spawnRuleOrbit: Orbit, artificialBodyDistanceCheck: SpawnManager.Settings.RandomLocationCheckDistance, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f);
+						firstVessel = await SpaceObjectVessel.CreateNew(sc.SceneID, "", -1L, null, null, null, null, MathHelper.RandomRotation(), LocationTag, checkPosition: true, spawnRuleOrbit: Orbit, artificialBodyDistanceCheck: SpawnManager.Settings.RandomLocationCheckDistance, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f);
 						if (firstVessel is Ship ship && IsVisibleOnRadar)
 						{
 							ship.IsAlwaysVisible = true;
 						}
 						SpawnRange<float>[] angularVelocity = AngularVelocity;
-						if (angularVelocity != null && angularVelocity.Length == 3)
+						if (angularVelocity is { Length: 3 })
 						{
 							firstVessel.Rotation = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						firstVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(firstVessel);
-						SpawnManager.SpawnedVessels.Add(firstVessel.GUID, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
-						firstVessel.Health = MathHelper.RandomRange(firstVessel.MaxHealth * sc.HealthMin, firstVessel.MaxHealth * sc.HealthMax);
+						SpawnManager.SpawnedVessels.Add(firstVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
+						await firstVessel.SetHealthAsync(MathHelper.RandomRange(firstVessel.MaxHealth * sc.HealthMin, firstVessel.MaxHealth * sc.HealthMax));
 						sc.Count--;
 						totalScenes.Min++;
 						scenesToSpawnTotal--;
@@ -264,25 +264,25 @@ public class SpawnRule
 					}
 					for (int k = startIndex; k < scenesToSpawn; k++)
 					{
-						SpaceObjectVessel currVessel = SpaceObjectVessel.CreateNew(sc.SceneID, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: LocationTag, nearArtificialBodyGUIDs: new List<long> { firstVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f);
+						SpaceObjectVessel currVessel = await SpaceObjectVessel.CreateNew(sc.SceneID, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: LocationTag, nearArtificialBodyGUIDs: new List<long> { firstVessel.Guid }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier.HasValue ? AsteroidResourcesMultiplier.Value : 1f);
 						Vector3D relativePos = FindEmptyRelativePosition(currVessel, ref clusterVessels);
 						if (relativePos.IsEpsilonZero())
 						{
-							Debug.Error("SPAWN MANAGER - Failed to find empty spawn position for rule", Name);
-							Server.Instance.DestroyArtificialBody(currVessel);
+							Debug.LogError("SPAWN MANAGER - Failed to find empty spawn position for rule", Name);
+							await Server.Instance.DestroyArtificialBody(currVessel);
 							continue;
 						}
 						currVessel.Orbit.RelativePosition = firstVessel.Orbit.RelativePosition + relativePos;
 						SpawnRange<float>[] angularVelocity2 = AngularVelocity;
-						if (angularVelocity2 != null && angularVelocity2.Length == 3)
+						if (angularVelocity2 is { Length: 3 })
 						{
 							currVessel.Rotation = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						currVessel.StabilizeToTarget(firstVessel, forceStabilize: true);
 						currVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(currVessel);
-						SpawnManager.SpawnedVessels.Add(currVessel.GUID, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
-						currVessel.Health = MathHelper.RandomRange(currVessel.MaxHealth * sc.HealthMin, currVessel.MaxHealth * sc.HealthMax);
+						SpawnManager.SpawnedVessels.Add(currVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
+						await currVessel.SetHealthAsync(MathHelper.RandomRange(currVessel.MaxHealth * sc.HealthMin, currVessel.MaxHealth * sc.HealthMax));
 						sc.Count--;
 						totalScenes.Min++;
 						scenesToSpawnTotal--;
@@ -302,22 +302,22 @@ public class SpawnRule
 			{
 				SpawnedVessels.AddRange(clusterVessels);
 				clusterVesselsCount.Add(nextClusterIndex, clusterVessels.Count);
-				DistributeLoot(clusterVessels);
+				await DistributeLoot(clusterVessels);
 			}
 			return firstVessel;
 		}
 		if (!createdNewCluster)
 		{
-			DistributeLoot(SpawnedVessels);
+			await DistributeLoot(SpawnedVessels);
 		}
 		return null;
 	}
 
-	public SpaceObjectVessel ExecuteQuestRule(QuestTrigger questTrigger)
+	public async Task<SpaceObjectVessel> ExecuteQuestRule(QuestTrigger questTrigger)
 	{
 		try
 		{
-			List<SpaceObjectVessel> mainVessels = ZeroGravity.Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, AsteroidResourcesMultiplier);
+			List<SpaceObjectVessel> mainVessels = await Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, AsteroidResourcesMultiplier);
 			if (mainVessels != null)
 			{
 				AuthorizedPerson ap = new AuthorizedPerson
@@ -336,20 +336,20 @@ public class SpawnRule
 					}
 					vessel.QuestTriggerID = qtid;
 				}
-				questTrigger.Quest.Player.SendAuthorizedVesselsResponse();
-				DistributeLoot(vessels);
+				await questTrigger.Quest.Player.SendAuthorizedVesselsResponse();
+				await DistributeLoot(vessels);
 			}
 			return mainVessels[0];
 		}
 		catch (Exception ex)
 		{
-			Debug.Exception(ex);
-			Debug.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
+			Debug.LogException(ex);
+			Debug.LogError($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
 		}
 		return null;
 	}
 
-	private SpaceObjectVessel ExecuteBlueprintRule(bool force = false)
+	private async Task<SpaceObjectVessel> ExecuteBlueprintRule(bool force = false)
 	{
 		if (!force && CheckPlayersDistance > 0.0)
 		{
@@ -367,18 +367,18 @@ public class SpawnRule
 		{
 			foreach (SpaceObjectVessel ves2 in new List<SpaceObjectVessel>(SpawnedVessels.Where((SpaceObjectVessel m) => m is Asteroid || (m.Health > 0f && m.IsMainVessel))))
 			{
-				Server.Instance.DestroyArtificialBody(ves2);
+				await Server.Instance.DestroyArtificialBody(ves2);
 			}
 			SpawnedVessels.Clear();
 		}
 		else if (SpawnedVessels.Count > 0)
 		{
-			DistributeLoot(SpawnedVessels);
+			await DistributeLoot(SpawnedVessels);
 			return null;
 		}
 		try
 		{
-			List<SpaceObjectVessel> mainVessels = ZeroGravity.Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, AsteroidResourcesMultiplier);
+			List<SpaceObjectVessel> mainVessels = await Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, AsteroidResourcesMultiplier);
 			int count = 0;
 			foreach (SpaceObjectVessel mainVessel in mainVessels)
 			{
@@ -387,46 +387,46 @@ public class SpawnRule
 				mainVessel.IsPartOfSpawnSystem = true;
 				mainVessel.VesselData.SpawnRuleID = (GetHashCode() << 10) + count++;
 				SpawnedVessels.Add(mainVessel);
-				SpawnManager.SpawnedVessels.Add(mainVessel.GUID, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
+				SpawnManager.SpawnedVessels.Add(mainVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
 				foreach (SpaceObjectVessel vessel in mainVessel.AllDockedVessels)
 				{
 					vessel.IsPrefabStationVessel = true;
 					vessel.IsAlwaysVisible = IsVisibleOnRadar;
 					vessel.IsPartOfSpawnSystem = true;
 					SpawnedVessels.Add(vessel);
-					SpawnManager.SpawnedVessels.Add(vessel.GUID, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
+					SpawnManager.SpawnedVessels.Add(vessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
 				}
 			}
-			DistributeLoot(SpawnedVessels);
+			await DistributeLoot(SpawnedVessels);
 			vesselsRemoved = false;
 			return mainVessels[0];
 		}
 		catch (Exception ex)
 		{
-			Debug.Exception(ex);
-			Debug.Error($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
+			Debug.LogException(ex);
+			Debug.LogError($"SPAWN MANAGER - Spawn rule \"{Name}\" location type \"{LocationType}\" is not valid");
 		}
 		return null;
 	}
 
-	private SpaceObjectVessel ExecuteStaringRule()
+	private async Task<SpaceObjectVessel> ExecuteStaringRule()
 	{
 		if (LocationType != SpawnRuleLocationType.StartingScene)
 		{
 			return null;
 		}
 		long startingSetId = GUIDFactory.NextLongRandom(1L, long.MaxValue);
-		List<SpaceObjectVessel> mainVessels = ZeroGravity.Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, 1f);
+		List<SpaceObjectVessel> mainVessels = await Data.StationBlueprint.AssembleStation(StationBlueprint, StationName, LocationTag, Orbit, null, 1f);
 		List<SpaceObjectVessel> vessels = mainVessels.SelectMany((SpaceObjectVessel m) => m.AllVessels).ToList();
 		foreach (SpaceObjectVessel mainVessel in vessels)
 		{
 			mainVessel.StartingSetId = startingSetId;
 		}
-		DistributeLoot(vessels);
+		await DistributeLoot(vessels);
 		return mainVessels[0];
 	}
 
-	public SpaceObjectVessel ExecuteRule(bool force = false)
+	public Task<SpaceObjectVessel> ExecuteRule(bool force = false)
 	{
 		return LocationType switch
 		{
@@ -437,7 +437,7 @@ public class SpawnRule
 		};
 	}
 
-	public void DistributeLoot(List<SpaceObjectVessel> vessels)
+	public async Task DistributeLoot(List<SpaceObjectVessel> vessels)
 	{
 		int lootToSpawn = 0;
 		List<SpawnRuleLoot> removeLoot = new List<SpawnRuleLoot>();
@@ -471,14 +471,14 @@ public class SpawnRule
 				}
 				try
 				{
-					if (SpawnManager.SpawnDynamicObject(this, loot, isl))
+					if (await SpawnManager.SpawnDynamicObject(this, loot, isl))
 					{
 						spawned++;
 					}
 				}
 				catch (Exception e)
 				{
-					Debug.Warning(e.Message);
+					Debug.LogWarning(e.Message);
 					removeLoot.Add(loot);
 					lootToSpawn--;
 				}
@@ -492,7 +492,7 @@ public class SpawnRule
 		{
 			LootPool.Remove(rem);
 		}
-		foreach (Asteroid ast in vessels.Where((SpaceObjectVessel m) => m is Asteroid))
+		foreach (Asteroid ast in vessels.Where((SpaceObjectVessel m) => m is Asteroid).Cast<Asteroid>())
 		{
 			double dist;
 			Player pl = ast.GetNearestPlayer(out dist);

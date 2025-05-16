@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -108,10 +109,10 @@ public class DebrisField
 		radiusSq = data.Radius_Km * data.Radius_Km * 1000000.0;
 		double vs = System.Math.PI * System.Math.Pow(data.Radius_Km * 1000.0, 3.0);
 		double vo = Orbit.Circumference * System.Math.PI * System.Math.Pow(data.Radius_Km * 1000.0, 2.0);
-		double i = vo / vs * (double)data.DamageVesselChance;
-		if (i > (double)maxSteps)
+		double i = vo / vs * data.DamageVesselChance;
+		if (i > maxSteps)
 		{
-			Debug.Warning("Debris field DamageVesselChance can't be achieved", data.Name, "Possible solutions: increase radius and/or scale down orbit.");
+			Debug.LogWarning("Debris field DamageVesselChance can't be achieved", data.Name, "Possible solutions: increase radius and/or scale down orbit.");
 		}
 		steps = (int)MathHelper.Clamp(System.Math.Ceiling(i), 1.0, maxSteps);
 	}
@@ -133,7 +134,7 @@ public class DebrisField
 		return details;
 	}
 
-	public void CheckVessels(double time)
+	public async Task CheckVessels(double time)
 	{
 		HashSet<SpaceObjectVessel> damageVessel = new HashSet<SpaceObjectVessel>();
 		ArtificialBody[] artificialBodies = Server.Instance.SolarSystem.GetArtificialBodies();
@@ -149,12 +150,11 @@ public class DebrisField
 			Vector3D posOnOrbit = proj.Normalized * Orbit.SemiMajorAxis;
 			if ((posOnOrbit - relPos).SqrMagnitude <= radiusSq)
 			{
-				ab.IsInDebrisField = true;
-				if ((double)Data.DamageVesselChance >= MathHelper.RandomNextDouble() && ab is SpaceObjectVessel vessel)
+				if (Data.DamageVesselChance >= MathHelper.RandomNextDouble() && ab is SpaceObjectVessel vessel)
 				{
 					damageVessel.Add(vessel);
 				}
-				if (!((double)Data.LargeFragmentsSpawnChance >= MathHelper.RandomNextDouble()))
+				if (!(Data.LargeFragmentsSpawnChance >= MathHelper.RandomNextDouble()))
 				{
 					continue;
 				}
@@ -165,9 +165,9 @@ public class DebrisField
 					if (pivot.Child is Player player)
 					{
 						offset += player.LocalPosition;
-						SpawnQueue.Enqueue((Action)delegate
+						SpawnQueue.Enqueue((Action) async delegate
 						{
-							SpawnFragment(ab, velocityDirection, offset);
+							await SpawnFragment(ab, velocityDirection, offset);
 						});
 					}
 				}
@@ -182,15 +182,11 @@ public class DebrisField
 					{
 						ves = ves.AllDockedVessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).First();
 					}
-					SpawnQueue.Enqueue((Action)delegate
+					SpawnQueue.Enqueue((Action) async delegate
 					{
-						SpawnFragment(ves, velocityDirection, offset);
+						await SpawnFragment(ves, velocityDirection, offset);
 					});
 				}
-			}
-			else
-			{
-				ab.IsInDebrisField = false;
 			}
 		}
 		foreach (SpaceObjectVessel v in damageVessel)
@@ -198,24 +194,24 @@ public class DebrisField
 			ShipCollisionMessage scm = new ShipCollisionMessage
 			{
 				CollisionVelocity = 0f,
-				ShipOne = v.GUID,
+				ShipOne = v.Guid,
 				ShipTwo = -1L
 			};
-			NetworkController.SendToClientsSubscribedTo(scm, -1L, v);
-			v.ChangeHealthBy(0f - MathHelper.RandomRange(Data.Damage.Min, Data.Damage.Max), null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.SmallDebrisHit, time);
+			await NetworkController.SendToClientsSubscribedTo(scm, -1L, v);
+			await v.ChangeHealthBy(0f - MathHelper.RandomRange(Data.Damage.Min, Data.Damage.Max), null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.SmallDebrisHit, time);
 		}
 	}
 
-	private void SpawnFragment(ArtificialBody ab, Vector3D velocityDirection, Vector3D offset)
+	private async Task SpawnFragment(ArtificialBody ab, Vector3D velocityDirection, Vector3D offset)
 	{
-		Ship ship = Ship.CreateNewShip(LargeFragmentsScenes.OrderBy((GameScenes.SceneId m) => MathHelper.RandomNextDouble()).FirstOrDefault(), "", -1L, new List<long> { ab.GUID }, null, offset, null, null, Data.LargeFragmentsTag, checkPosition: false, 0.03, 0.3, null, 1.5, 100.0, MathHelper.RandomRange(Data.LargeFragmentsHealth.Min, Data.LargeFragmentsHealth.Max), isDebrisFragment: true);
+		Ship ship = await Ship.CreateNewShip(LargeFragmentsScenes.OrderBy((GameScenes.SceneId m) => MathHelper.RandomNextDouble()).FirstOrDefault(), "", -1L, new List<long> { ab.Guid }, null, offset, null, null, Data.LargeFragmentsTag, checkPosition: false, 0.03, 0.3, null, 1.5, 100.0, MathHelper.RandomRange(Data.LargeFragmentsHealth.Min, Data.LargeFragmentsHealth.Max), isDebrisFragment: true);
 		float ttl = MathHelper.RandomRange(Data.LargeFragmentsTimeToLive.Min, Data.LargeFragmentsTimeToLive.Max);
-		ship.Health = ship.MaxHealth;
+		await ship.SetHealthAsync(ship.MaxHealth);
 		foreach (VesselRepairPoint vrp in ship.RepairPoints)
 		{
-			vrp.Health = vrp.MaxHealth;
+			await vrp.SetHealthAsync(vrp.MaxHealth);
 		}
-		ship.Health = (float)((double)(ttl * ship.ExposureDamage) * Server.VesselDecayRateMultiplier);
+		await ship.SetHealthAsync((float)(ttl * ship.ExposureDamage * Server.VesselDecayRateMultiplier));
 		Vector3D thrust = velocityDirection * Data.LargeFragmentsVelocity;
 		Vector3D offset2 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * Data.LargeFragmentsZoneRadius * 2.0;
 		ship.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -32,15 +33,6 @@ public abstract class Generator : VesselComponent, IResourceProvider
 		get
 		{
 			return base.Status;
-		}
-		protected set
-		{
-			base.Status = value;
-			if (Status != SystemStatus.OnLine)
-			{
-				_Output = -1f;
-				Output = 0f;
-			}
 		}
 	}
 
@@ -87,7 +79,7 @@ public abstract class Generator : VesselComponent, IResourceProvider
 			if (_Output != value)
 			{
 				_Output = value;
-				base.OperationRate = MaxOutput > 0f ? Output / MaxOutput : 0f;
+				OperationRate = MaxOutput > 0f ? Output / MaxOutput : 0f;
 				StatusChanged = true;
 			}
 		}
@@ -118,7 +110,7 @@ public abstract class Generator : VesselComponent, IResourceProvider
 		: base(vessel, id)
 	{
 		GeneratorData data = ObjectCopier.DeepCopy(genData);
-		base.OperationRate = data.OutputRate;
+		OperationRate = data.OutputRate;
 		_NominalOutput = data.NominalOutput;
 		ResourceRequirements = DistributionManager.ResourceRequirementsToDictionary(data.ResourceRequirements);
 		if (data.SpawnSettings != null)
@@ -141,7 +133,7 @@ public abstract class Generator : VesselComponent, IResourceProvider
 		}
 		_PowerUpTime = data.PowerUpTime;
 		_CoolDownTime = data.CoolDownTime;
-		Status = data.Status;
+		SetStatus(data.Status);
 		_AutoReactivate = data.AutoReactivate;
 		SetAuxData(data.AuxData);
 		MaxOutput = _NominalOutput;
@@ -149,22 +141,42 @@ public abstract class Generator : VesselComponent, IResourceProvider
 		baseRadarSignature = data.RadarSignature;
 	}
 
+	protected override async Task SetStatusAsync(SystemStatus status)
+	{
+		await base.SetStatusAsync(status);
+		if (Status != SystemStatus.OnLine)
+		{
+			_Output = -1f;
+			Output = 0f;
+		}
+	}
+
+	protected override void SetStatus(SystemStatus status)
+	{
+		base.SetStatus(status);
+		if (Status != SystemStatus.OnLine)
+		{
+			_Output = -1f;
+			Output = 0f;
+		}
+	}
+
 	public virtual IAuxDetails GetAuxDetails()
 	{
 		return null;
 	}
 
-	public virtual void SetDetails(GeneratorDetails details)
+	public virtual async Task SetDetails(GeneratorDetails details)
 	{
 		if (details.Status == SystemStatus.OnLine)
 		{
-			GoOnLine();
+			await GoOnLine();
 		}
 		else if (details.Status == SystemStatus.OffLine)
 		{
-			GoOffLine(autoRestart: false);
+			await GoOffLine(autoRestart: false);
 		}
-		base.OperationRate = details.OutputRate;
+		OperationRate = details.OutputRate;
 		SetAuxDetails(details.AuxDetails);
 	}
 
@@ -172,9 +184,9 @@ public abstract class Generator : VesselComponent, IResourceProvider
 	{
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		if (OutputType == DistributionSystemType.Power)
 		{
 			MaxOutput = NominalOutput * GetScopeMultiplier(MachineryPartSlotScope.PowerOutput) * secondaryPowerOutputFactor;

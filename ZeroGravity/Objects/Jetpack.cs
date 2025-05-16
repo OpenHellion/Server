@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
@@ -25,9 +25,9 @@ public class Jetpack : Item, ICargo
 
 	public override DynamicObjectStats StatsNew => new JetpackStats
 	{
-		Oxygen = OxygenCompartment.Resources != null && OxygenCompartment.Resources.Count > 0 ? OxygenCompartment.Resources[0] : null,
+		Oxygen = OxygenCompartment.Resources is { Count: > 0 } ? OxygenCompartment.Resources[0] : null,
 		OxygenCapacity = OxygenCompartment.Capacity,
-		Propellant = PropellantCompartment.Resources != null && PropellantCompartment.Resources.Count > 0 ? PropellantCompartment.Resources[0] : null,
+		Propellant = PropellantCompartment.Resources is { Count: > 0 } ? PropellantCompartment.Resources[0] : null,
 		PropellantCapacity = PropellantCompartment.Capacity
 	};
 
@@ -47,26 +47,33 @@ public class Jetpack : Item, ICargo
 
 	public float ChargeAmount => 1f;
 
-	public Jetpack(DynamicObjectAuxData data)
+	private Jetpack()
 	{
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public static async Task<Jetpack> CreateAsync(DynamicObjectAuxData data)
 	{
-		return false;
+		Jetpack jetpack = new();
+		if (data != null)
+		{
+			await jetpack.SetData(data);
+		}
+
+		return jetpack;
+	}
+
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	{
+		return Task.FromResult(false);
 	}
 
 	protected override void ChangeEquip(Inventory.EquipType equipType)
 	{
-		if (base.DynamicObj.Parent is not Player)
+		if (DynamicObj.Parent is not Player)
 		{
 			return;
 		}
-		Player pl = base.DynamicObj.Parent as Player;
+		Player pl = DynamicObj.Parent as Player;
 		if (equipType == Inventory.EquipType.EquipInventory)
 		{
 			pl.CurrentJetpack = this;
@@ -87,15 +94,15 @@ public class Jetpack : Item, ICargo
 		}
 	}
 
-	public void ConsumeResources(float? propellant = null, float? oxygen = null)
+	public async Task ConsumeResources(float? propellant = null, float? oxygen = null)
 	{
-		if (oxygen.HasValue && oxygen.Value > 0f && OxygenCompartment.Resources.Count > 0)
+		if (oxygen is > 0f && OxygenCompartment.Resources.Count > 0)
 		{
-			ChangeQuantityBy(OxygenCompartment.ID, OxygenCompartment.Resources[0].ResourceType, 0f - oxygen.Value);
+			await ChangeQuantityByAsync(OxygenCompartment.ID, OxygenCompartment.Resources[0].ResourceType, 0f - oxygen.Value);
 		}
-		if (propellant.HasValue && propellant.Value > 0f && PropellantCompartment.Resources.Count > 0)
+		if (propellant is > 0f && PropellantCompartment.Resources.Count > 0)
 		{
-			ChangeQuantityBy(PropellantCompartment.ID, PropellantCompartment.Resources[0].ResourceType, 0f - propellant.Value);
+			await ChangeQuantityByAsync(PropellantCompartment.ID, PropellantCompartment.Resources[0].ResourceType, 0f - propellant.Value);
 		}
 	}
 
@@ -113,7 +120,7 @@ public class Jetpack : Item, ICargo
 		return _Compartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public async Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoCompartmentData compartment = Compartments.Find((CargoCompartmentData m) => m.ID == compartmentID);
 		CargoResourceData res = compartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
@@ -148,7 +155,7 @@ public class Jetpack : Item, ICargo
 		}
 		if (System.Math.Abs(ResourceChangedCounter[compartmentID]) / compartment.Capacity >= 0.01f)
 		{
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 			ResourceChangedCounter[compartmentID] = 0f;
 		}
 		if (res.Quantity <= float.Epsilon && !compartment.AllowOnlyOneType)
@@ -166,29 +173,22 @@ public class Jetpack : Item, ICargo
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataJetpack data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataJetpack data)
-			{
-				Debug.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.JetpackData);
-			}
+			Debug.LogWarning("PersistenceObjectDataJetpack data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.JetpackData);
 		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		JetpackData jd = data as JetpackData;
 		PropellantCompartment = jd.PropellantCompartment;
 		OxygenCompartment = jd.OxygenCompartment;
@@ -196,16 +196,16 @@ public class Jetpack : Item, ICargo
 		_Compartments = new List<CargoCompartmentData> { OxygenCompartment, PropellantCompartment };
 		OxygenConsumption = jd.OxygenConsumption;
 		PropellantConsumption = jd.PropellantConsumption;
-		base.MaxHealth = jd.MaxHealth;
-		base.Health = jd.Health;
+		MaxHealth = jd.MaxHealth;
+		Health = jd.Health;
 	}
 
 	public override void ApplyTierMultiplier()
 	{
 		if (!TierMultiplierApplied)
 		{
-			PropellantCompartment.Capacity *= base.TierMultiplier;
-			OxygenCompartment.Capacity *= base.AuxValue;
+			PropellantCompartment.Capacity *= TierMultiplier;
+			OxygenCompartment.Capacity *= AuxValue;
 		}
 		base.ApplyTierMultiplier();
 	}

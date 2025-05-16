@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -37,19 +38,19 @@ public class SubSystemEngine : SubSystem
 	{
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		if (ThrustActive && RequiredThrust != 0f)
 		{
-			if (base.OperationRate != RequiredThrust)
+			if (OperationRate != RequiredThrust)
 			{
-				base.OperationRate = RequiredThrust;
+				OperationRate = RequiredThrust;
 			}
 		}
 		else
 		{
-			base.OperationRate = 0f;
+			OperationRate = 0f;
 		}
 		accelerationFactor = GetScopeMultiplier(MachineryPartSlotScope.Output);
 	}

@@ -36,7 +36,6 @@ public static class GameScenes
 		AltCorp_SolarPowerModule = 26,
 		AltCorp_Shuttle_CECA = 27,
 		AltCorp_FabricatorModule = 28,
-		FlatShipTest = 29,
 		AltCorp_PatchModule = 30,
 		SOE_Location002 = 31,
 		AltCorp_Secure_Module = 32,
@@ -234,10 +233,6 @@ public static class GameScenes
 		{
 			"Assets/Scene/Environment/Station/Module/AltCorp_V02/AltCorp_Corridor_Module/AlrCorp_Corridor_MKII.unity",
 			SceneId.AlrCorp_Corridor_MKII
-		},
-		{
-			"Assets/Test/FlatShipTest.unity",
-			SceneId.FlatShipTest
 		},
 		{
 			"Assets/Scene/Environment/SolarSystem/Asteroids/Asteroid01/Asteroid01.unity",

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Threading.Tasks;
 using BulletSharp;
 using BulletSharp.Math;
 using OpenHellion.Net;
@@ -40,10 +42,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		public static DockUndockPlayerData GetPlayerData(params SpaceObjectVessel[] vessels)
 		{
 			DockUndockPlayerData retVal = new DockUndockPlayerData();
-			SpaceObjectVessel ves = null;
 			foreach (SpaceObjectVessel vs in vessels)
 			{
-				ves = vs;
+				SpaceObjectVessel ves = vs;
 				if (ves.DockedToMainVessel != null)
 				{
 					ves = ves.DockedToMainVessel;
@@ -96,7 +97,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 					rotDiff = it.Player.LocalRotation.Inverse() * it.RotFromParent;
 				}
 				it.Player.ModifyLocalPositionAndRotation(posDiff, rotDiff);
-				if (NetworkController.ContainsClient(it.Player.GUID) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
+				if (NetworkController.IsPlayerConnected(it.Player.Guid) && it.Player.IsAlive && it.Player.EnvironmentReady && it.Player.PlayerReady)
 				{
 					it.Player.SetDockUndockCorrection(posDiff, rotDiff);
 				}
@@ -120,7 +121,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public QuaternionD RelativeRotationFromParent;
 
-	public SpaceObjectVessel DockedToMainVessel;
+	public SpaceObjectVessel DockedToMainVessel { get; private set; }
 
 	public SpaceObjectVessel DockedToVessel;
 
@@ -134,7 +135,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public List<Door> Doors = new List<Door>();
 
-	public List<VesselDockingPort> DockingPorts = new List<VesselDockingPort>();
+	public ImmutableArray<VesselDockingPort> DockingPorts;
 
 	public List<NameTagData> NameTags = new List<NameTagData>();
 
@@ -261,13 +262,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			return _Health;
 		}
-		set
-		{
-			ChangeHealthBy(value - Health, null, VesselRepairPoint.Priority.None, force: true);
-		}
 	}
 
-	public bool HasSpawnPoints => SpawnPoints != null && SpawnPoints.Count > 0;
+	public bool HasSpawnPoints => SpawnPoints is { Count: > 0 };
 
 	public bool HasSecuritySystem { get; protected set; }
 
@@ -327,7 +324,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (Engine != null)
 			{
-				return (float)((double)Engine.Acceleration * Mass / MainVessel.GetCompoundMass());
+				return (float)(Engine.Acceleration * Mass / MainVessel.GetCompoundMass());
 			}
 			return 0f;
 		}
@@ -339,7 +336,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (Engine != null)
 			{
-				return (float)((double)Engine.ReverseAcceleration * Mass / MainVessel.GetCompoundMass());
+				return (float)(Engine.ReverseAcceleration * Mass / MainVessel.GetCompoundMass());
 			}
 			return 0f;
 		}
@@ -352,7 +349,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			if (RCS != null)
 			{
 				double compoundMass = MainVessel.GetCompoundMass();
-				return (float)((double)RCS.Acceleration * Mass / compoundMass);
+				return (float)(RCS.Acceleration * Mass / compoundMass);
 			}
 			return 0f;
 		}
@@ -364,7 +361,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (RCS != null)
 			{
-				return (float)((double)RCS.RotationAcceleration * Mass / MainVessel.GetCompoundMass());
+				return (float)(RCS.RotationAcceleration * Mass / MainVessel.GetCompoundMass());
 			}
 			return 0f;
 		}
@@ -376,7 +373,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (RCS != null)
 			{
-				return (float)((double)RCS.RotationStabilization * Mass / MainVessel.GetCompoundMass());
+				return (float)(RCS.RotationStabilization * Mass / MainVessel.GetCompoundMass());
 			}
 			return 0f;
 		}
@@ -398,7 +395,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public bool IsWarping => (MainVessel.CurrentCourse != null && MainVessel.CurrentCourse.IsInProgress) || MainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m.CurrentCourse != null && m.CurrentCourse.IsInProgress) != null;
+	public bool IsWarping => MainVessel.CurrentCourse is { IsInProgress: true } || MainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m.CurrentCourse is { IsInProgress: true }) != null;
 
 	public float ExposureDamage => StaticData.GetVesselExposureDamage(MainVessel.Orbit.Position.Magnitude);
 
@@ -412,7 +409,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public bool HasSpawnPointsInHierarchy()
 	{
-		if (SpawnPoints != null && SpawnPoints.Count > 0)
+		if (SpawnPoints is { Count: > 0 })
 		{
 			return true;
 		}
@@ -420,7 +417,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			foreach (SpaceObjectVessel itemA in DockedToMainVessel.AllDockedVessels)
 			{
-				if (itemA.SpawnPoints != null && itemA.SpawnPoints.Count > 0)
+				if (itemA.SpawnPoints is { Count: > 0 })
 				{
 					return true;
 				}
@@ -430,7 +427,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			foreach (SpaceObjectVessel itemB in AllDockedVessels)
 			{
-				if (itemB.SpawnPoints != null && itemB.SpawnPoints.Count > 0)
+				if (itemB.SpawnPoints is { Count: > 0 })
 				{
 					return true;
 				}
@@ -468,7 +465,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		ObjectTransform objTrans = new ObjectTransform
 		{
-			GUID = GUID,
+			GUID = Guid,
 			Type = SpaceObjectType.Ship,
 			Forward = Forward.ToFloatArray(),
 			Up = Up.ToFloatArray()
@@ -490,9 +487,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				Velocity = Velocity.ToArray()
 			};
 		}
-		if (base.CurrentCourse != null)
+		if (CurrentCourse != null)
 		{
-			objTrans.Maneuver = base.CurrentCourse.CurrentData();
+			objTrans.Maneuver = CurrentCourse.CurrentData();
 			objTrans.Forward = Forward.ToFloatArray();
 			objTrans.Up = Up.ToFloatArray();
 		}
@@ -508,19 +505,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public void SetMainVesselForChldren(SpaceObjectVessel newMainVessel)
-	{
-		foreach (SpaceObjectVessel ves in DockedVessels)
-		{
-			if (!newMainVessel.AllDockedVessels.Contains(ves))
-			{
-				ves.DockedToMainVessel = newMainVessel;
-				newMainVessel.AllDockedVessels.Add(ves);
-				ves.SetMainVesselForChldren(newMainVessel);
-			}
-		}
-	}
-
 	public void RecreateDockedVesselsTree()
 	{
 		DockedToMainVessel = null;
@@ -528,6 +512,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		RecreateDockedVesselsTree(this, null);
 	}
 
+	// Warning: Recursive function!
 	private void RecreateDockedVesselsTree(SpaceObjectVessel mainVessel, SpaceObjectVessel parentVessel)
 	{
 		AllDockedVessels.Clear();
@@ -594,15 +579,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			return;
 		}
-		try
-		{
-			PhysicsVelocityDifference = RigidBody.LinearVelocity.ToVector3D() - Velocity;
-			PhysicsRotationDifference = QuaternionD.LookRotation(Forward, Up).Inverse() * (RigidBody.AngularVelocity.ToVector3D() - AngularVelocity) * (180.0 / System.Math.PI);
-		}
-		catch (Exception ex)
-		{
-			Debug.Exception(ex);
-		}
+
+		PhysicsVelocityDifference = RigidBody.LinearVelocity.ToVector3D() - Velocity;
+		PhysicsRotationDifference = QuaternionD.LookRotation(Forward, Up).Inverse() * (RigidBody.AngularVelocity.ToVector3D() - AngularVelocity) * (180.0 / System.Math.PI);
 	}
 
 	public void RemoveMachineryPart(VesselObjectID slotID)
@@ -885,13 +864,13 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		};
 	}
 
-	public void SendSecurityResponse(bool includeVesselName, bool sendForAllChildren = true)
+	public async Task SendSecurityResponse(bool includeVesselName, bool sendForAllChildren = true)
 	{
 		if (HasSecuritySystem)
 		{
-			NetworkController.SendToClientsSubscribedTo(new VesselSecurityResponse
+			await NetworkController.SendToClientsSubscribedTo(new VesselSecurityResponse
 			{
-				VesselGUID = GUID,
+				VesselGUID = Guid,
 				Data = GetVesselSecurityData(includeVesselName)
 			}, -1L, this);
 		}
@@ -903,7 +882,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			foreach (SpaceObjectVessel ves2 in DockedToMainVessel.AllDockedVessels)
 			{
-				ves2.SendSecurityResponse(includeVesselName, sendForAllChildren: false);
+				await ves2.SendSecurityResponse(includeVesselName, sendForAllChildren: false);
 			}
 			return;
 		}
@@ -913,44 +892,50 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		foreach (SpaceObjectVessel ves in AllDockedVessels)
 		{
-			ves.SendSecurityResponse(includeVesselName, sendForAllChildren: false);
+			await ves.SendSecurityResponse(includeVesselName, sendForAllChildren: false);
 		}
 	}
 
-	public virtual void UpdateVesselSystems()
+	public virtual Task UpdateVesselSystems()
 	{
+		return Task.FromException(new NotImplementedException());
 	}
 
-	public override void UpdateTimers(double deltaTime)
+	public override async Task UpdateTimers(double deltaTime)
 	{
-		base.UpdateTimers(deltaTime);
+		await base.UpdateTimers(deltaTime);
 		if (IsMainVessel && ((Server.JunkItemsCleanupScope == 1 && IsPrefabStationVessel) || Server.JunkItemsCleanupScope == 2))
 		{
 			JunkItemsCleanupTimer -= deltaTime;
 			if (JunkItemsCleanupTimer <= 0.0)
 			{
 				JunkItemsCleanupTimer = Server.JunkItemsCleanupInterval;
-				JunkItemsCleanup();
+				await JunkItemsCleanup();
 			}
 		}
 	}
 
-	public virtual float ChangeHealthBy(float value, List<VesselRepairPoint> repairPoints = null, VesselRepairPoint.Priority damagePiority = VesselRepairPoint.Priority.None, bool force = false, VesselDamageType damageType = VesselDamageType.None, double time = 1.0)
+	public async Task SetHealthAsync(float newValue)
 	{
-		LastVesselDamageType = VesselDamageType.None;
-		return 0f;
+		await ChangeHealthBy(newValue - Health, null, VesselRepairPoint.Priority.None, force: true);
 	}
 
-	public void DamageVesselsInExplosionRadius()
+	public virtual Task<float> ChangeHealthBy(float value, List<VesselRepairPoint> repairPoints = null, VesselRepairPoint.Priority damagePiority = VesselRepairPoint.Priority.None, bool force = false, VesselDamageType damageType = VesselDamageType.None, double time = 1.0)
+	{
+		LastVesselDamageType = VesselDamageType.None;
+		return Task.FromResult(0f);
+	}
+
+	public async Task DamageVesselsInExplosionRadius()
 	{
 		SelfDestructTimer selfDestructTimer = SelfDestructTimer;
 		double radiusMultiplier;
 		double damageMultiplier;
-		if (selfDestructTimer != null && selfDestructTimer.Time == 0f)
+		if (selfDestructTimer is { Time: 0f })
 		{
 			radiusMultiplier = Server.SelfDestructExplosionRadiusMultiplier;
 			damageMultiplier = Server.SelfDestructExplosionDamageMultiplier;
-			if (DockedToVessel != null && DockedToVessel is Ship)
+			if (DockedToVessel is Ship)
 			{
 				DockedToVessel.SelfDestructTimer = new SelfDestructTimer(DockedToVessel, MathHelper.RandomRange(1f, 3f));
 			}
@@ -964,8 +949,11 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			radiusMultiplier = IsDebrisFragment ? Server.DebrisVesselExplosionRadiusMultiplier : Server.VesselExplosionRadiusMultiplier;
 			damageMultiplier = IsDebrisFragment ? Server.DebrisVesselExplosionDamageMultiplier : Server.VesselExplosionDamageMultiplier;
 		}
-		float radius = (float)((System.Math.Sqrt(Mass / 1000.0) + (double)(Engine != null && Engine.Status == SystemStatus.OnLine ? 10 : 0) + (double)(FTL != null && FTL.Status == SystemStatus.OnLine ? 20 : 0)) * radiusMultiplier);
-		float baseDamage = (float)((double)MaxHealth * damageMultiplier);
+		float radius = (float)((System.Math.Sqrt(Mass / 1000.0) + (Engine is { Status: SystemStatus.OnLine } ? 10 : 0) + (FTL is
+		{
+			Status: SystemStatus.OnLine
+		} ? 20 : 0)) * radiusMultiplier);
+		float baseDamage = (float)(MaxHealth * damageMultiplier);
 		ArtificialBody[] artificialBodieslsInRange = Server.Instance.SolarSystem.GetArtificialBodieslsInRange(this, radius);
 		foreach (ArtificialBody ab in artificialBodieslsInRange)
 		{
@@ -973,11 +961,11 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			{
 				float dist2 = (float)(Position - ves2.Position).Magnitude;
 				float ratio2 = MathHelper.Clamp((radius - dist2) / radius, 0f, 1f);
-				ves2.ChangeHealthBy((0f - ratio2) * baseDamage, null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.NearbyVesselExplosion);
+				await ves2.ChangeHealthBy((0f - ratio2) * baseDamage, null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.NearbyVesselExplosion);
 				Vector3D thrust2 = (ves2.Position - Position).Normalized * 5.0 * ratio2;
 				ves2.Rotation += new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 5.0 * ratio2;
 				ves2.Orbit.InitFromStateVectors(ves2.Orbit.Parent, ves2.Orbit.Position, ves2.Orbit.Velocity + thrust2, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
-				ves2.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
+				await ves2.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
 			}
 			else if (ab is Pivot pivot)
 			{
@@ -986,7 +974,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				float ratio = MathHelper.Clamp((radius - dist) / radius, 0f, 1f);
 				if (pivot.Child is Player player)
 				{
-					player.Stats.TakeDamage(HurtType.Explosion, ratio * baseDamage);
+					await player.Stats.TakeDamage(HurtType.Explosion, ratio * baseDamage);
 				}
 				Vector3D thrust = (pos - Position).Normalized * 10.0 * ratio;
 				pivot.Orbit.InitFromStateVectors(pivot.Orbit.Parent, pivot.Orbit.Position, pivot.Orbit.Velocity + thrust, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
@@ -1018,14 +1006,14 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		List<ShipStatsMessage> ssmList = new List<ShipStatsMessage>();
 		foreach (SpaceObjectVessel v in DockedVessels.Where((SpaceObjectVessel m) => m is Ship))
 		{
-			VesselDockingPort dp2 = v.DockingPorts.Find((VesselDockingPort m) => m.DockingStatus && m.DockedVessel == this);
+			VesselDockingPort dp2 = v.DockingPorts.First(m => m.DockingStatus && m.DockedVessel == this);
 			if (dp2 != null)
 			{
 				SceneDockingPortDetails dpd2 = dp2.GetDetails();
 				dpd2.DockingStatus = false;
 				ssmList.Add(new ShipStatsMessage
 				{
-					GUID = v.GUID,
+					GUID = v.Guid,
 					VesselObjects = new VesselObjects
 					{
 						DockingPorts = new List<SceneDockingPortDetails> { dpd2 }
@@ -1033,16 +1021,16 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				});
 			}
 		}
-		if (DockedToVessel != null && DockedToVessel is Ship)
+		if (DockedToVessel is Ship)
 		{
-			VesselDockingPort dp = DockingPorts.Find((VesselDockingPort m) => m.DockingStatus && m.DockedVessel == DockedToVessel);
+			VesselDockingPort dp = DockingPorts.First(m => m.DockingStatus && m.DockedVessel == DockedToVessel);
 			if (dp != null)
 			{
 				SceneDockingPortDetails dpd = dp.GetDetails();
 				dpd.DockingStatus = false;
 				ssmList.Add(new ShipStatsMessage
 				{
-					GUID = GUID,
+					GUID = Guid,
 					VesselObjects = new VesselObjects
 					{
 						DockingPorts = new List<SceneDockingPortDetails> { dpd }
@@ -1061,7 +1049,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	protected SubSystem createSubSystem(SubSystemData ssData)
 	{
-		VesselObjectID id = new VesselObjectID(GUID, ssData.InSceneID);
+		VesselObjectID id = new VesselObjectID(Guid, ssData.InSceneID);
 		if (ssData.Type == SubSystemType.Light)
 		{
 			return new SubSystemLights(this, id, ssData);
@@ -1101,9 +1089,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		return new SubSystemGeneric(this, id, ssData);
 	}
 
-	protected Generator createGenerator(GeneratorData genData)
+	protected async Task<Generator> CreateGeneratorAsync(GeneratorData genData)
 	{
-		VesselObjectID id = new VesselObjectID(GUID, genData.InSceneID);
+		VesselObjectID id = new VesselObjectID(Guid, genData.InSceneID);
 		if (genData.Type == GeneratorType.Power)
 		{
 			return new GeneratorPower(this, id, genData);
@@ -1118,7 +1106,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		if (genData.Type == GeneratorType.Capacitor)
 		{
-			return new GeneratorCapacitor(this, id, genData);
+			return await GeneratorCapacitor.CreateAsync(this, id, genData);
 		}
 		if (genData.Type == GeneratorType.Solar)
 		{
@@ -1137,52 +1125,52 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public void JunkItemsCleanup()
+	public async Task JunkItemsCleanup()
 	{
 		if (MainVessel.VesselCrew.Count != 0 || MainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m.VesselCrew.Count > 0) != null)
 		{
 			return;
 		}
-		RemoveAllLooseDynamicObjects(MainVessel);
+		await RemoveAllLooseDynamicObjects(MainVessel);
 		foreach (SpaceObjectVessel ves in MainVessel.AllDockedVessels)
 		{
-			RemoveAllLooseDynamicObjects(ves);
+			await RemoveAllLooseDynamicObjects(ves);
 		}
 	}
 
-	public static void RemoveAllLooseDynamicObjects(SpaceObjectVessel vessel)
+	public static async Task RemoveAllLooseDynamicObjects(SpaceObjectVessel vessel)
 	{
 		List<DynamicObject> forRemoval = new List<DynamicObject>();
 		foreach (DynamicObject dobj2 in vessel.DynamicObjects.Values)
 		{
-			if (dobj2.Item != null && dobj2.Item.Slot == null && dobj2.Item.AttachPointID == null && dobj2.Item.AttachmentChangeTime > 0.0 && Server.SolarSystemTime - dobj2.Item.AttachmentChangeTime > Server.JunkItemsTimeToLive)
+			if (dobj2.Item is { Slot: null, AttachPointID: null, AttachmentChangeTime: > 0.0 } && Server.SolarSystemTime - dobj2.Item.AttachmentChangeTime > Server.JunkItemsTimeToLive)
 			{
 				forRemoval.Add(dobj2);
 			}
 		}
 		foreach (DynamicObject rem in forRemoval)
 		{
-			rem.Destroy();
-			vessel.DynamicObjects.TryRemove(rem.GUID, out var _);
+			await rem.Destroy();
+			vessel.DynamicObjects.TryRemove(rem.Guid, out var _);
 		}
 	}
 
 	public void SetMainVessel()
 	{
-		Dictionary<VesselObjectID, SceneDockingPortDetails> details = new Dictionary<VesselObjectID, SceneDockingPortDetails>();
+		Dictionary<VesselObjectID, SceneDockingPortDetails> details = [];
 		foreach (VesselDockingPort dp in DockingPorts.Where((VesselDockingPort m) => m.DockedToID != null))
 		{
-			VesselDockingPort odp = dp.DockedVessel.DockingPorts.FirstOrDefault((VesselDockingPort m) => m.ID.Equals(dp.DockedToID));
+			VesselDockingPort odp = dp.DockedVessel.DockingPorts.First((VesselDockingPort m) => m.ID.Equals(dp.DockedToID));
 			details[odp.ID] = odp.GetDetails();
 		}
 		UndockAll();
-		List<ShipStatsMessage> ssmList = new List<ShipStatsMessage>();
+		List<ShipStatsMessage> ssmList = [];
 		foreach (KeyValuePair<VesselObjectID, SceneDockingPortDetails> kv in details)
 		{
 			SpaceObjectVessel ves = Server.Instance.GetVessel(kv.Key.VesselGUID);
 			ssmList.Add(new ShipStatsMessage
 			{
-				GUID = ves.GUID,
+				GUID = ves.Guid,
 				VesselObjects = new VesselObjects
 				{
 					DockingPorts = new List<SceneDockingPortDetails> { kv.Value }
@@ -1207,37 +1195,50 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		return base.CheckPlanetDeath();
 	}
 
-	public bool DockToVessel(VesselDockingPort port, VesselDockingPort dockToPort, SpaceObjectVessel dockToVessel, bool disableStabilization = true, bool useCurrentSolarSystemTime = true, bool buildingStation = false)
+	public async Task<bool> DockToVessel(VesselDockingPort port, VesselDockingPort dockToPort, SpaceObjectVessel dockToVessel, bool disableStabilization = true, bool useCurrentSolarSystemTime = true, bool buildingStation = false)
 	{
 		if (port.ParentVessel.MainVessel == dockToVessel.MainVessel)
 		{
-			Debug.Error("Circular docking");
+			Debug.LogError("Circular docking");
 			return false;
 		}
 		if (dockToPort == null || port == null || port.DockingStatus || dockToPort.DockingStatus)
 		{
-			Debug.Error("DockToShip returned at start, check if some port IDs changed", Environment.StackTrace);
+			Debug.LogError("DockToShip returned at start, check if some port IDs changed", Environment.StackTrace);
 			return false;
 		}
 		if (disableStabilization)
 		{
 			if (DockedToMainVessel != null && (DockedToMainVessel.StabilizeToTargetObj != null || DockedToMainVessel.StabilizedToTargetChildren.Count > 0))
 			{
-				DockedToMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+				await DockedToMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 			}
-			else if (DockedToMainVessel == null && (base.StabilizeToTargetObj != null || StabilizedToTargetChildren.Count > 0))
+			else if (DockedToMainVessel == null && (StabilizeToTargetObj != null || StabilizedToTargetChildren.Count > 0))
 			{
-				DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+				await DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 			}
 			if (dockToVessel.DockedToMainVessel != null && (dockToVessel.DockedToMainVessel.StabilizeToTargetObj != null || dockToVessel.DockedToMainVessel.StabilizedToTargetChildren.Count > 0))
 			{
-				dockToVessel.DockedToMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+				await dockToVessel.DockedToMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 			}
 			else if (dockToVessel.DockedToMainVessel == null && (dockToVessel.StabilizeToTargetObj != null || dockToVessel.StabilizedToTargetChildren.Count > 0))
 			{
-				dockToVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+				await dockToVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 			}
 		}
+
+		if (dockToVessel.DockedToMainVessel == this)
+		{
+			Debug.LogErrorFormat("Vessel {0} is docked to itself.", FullName);
+			return false;
+		}
+
+		if (dockToVessel.DockedToVessel == this)
+		{
+			Debug.LogErrorFormat("Vessel {0} is docked to itself.", FullName);
+			return false;
+		}
+
 		port.DockedToID = dockToPort.ID;
 		port.DockedVessel = dockToVessel;
 		port.DockingStatus = true;
@@ -1296,10 +1297,10 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		vesselWithSecuritySystem?.CopyAuthorizedPersonelListToChildren();
 		dupd.ModifyPlayersPositionAndRotation();
-		CheckMainPropulsionVessel();
+		await CheckMainPropulsionVessel();
 		if (RCS != null)
 		{
-			RCS.GoOffLine(autoRestart: false);
+			await RCS.GoOffLine(autoRestart: false);
 			if (this is Ship)
 			{
 				(this as Ship).ResetRotationAndThrust();
@@ -1307,7 +1308,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		if (dockToVessel.RCS != null)
 		{
-			dockToVessel.RCS.GoOffLine(autoRestart: false);
+			await dockToVessel.RCS.GoOffLine(autoRestart: false);
 			if (dockToVessel is Ship ship)
 			{
 				ship.ResetRotationAndThrust();
@@ -1330,24 +1331,24 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 	}
 
-	public bool UndockFromVessel(SpaceObjectVessel dockedToVessel, ref SceneDockingPortDetails details)
+	public async Task<bool> UndockFromVessel(SpaceObjectVessel dockedToVessel, SceneDockingPortDetails details)
 	{
 		if (DockedToVessel == dockedToVessel)
 		{
-			VesselDockingPort port = DockingPorts.Find((VesselDockingPort m) => m.DockedVessel == DockedToVessel);
+			VesselDockingPort port = DockingPorts.First((VesselDockingPort m) => m.DockedVessel == DockedToVessel);
 			if (port != null)
 			{
-				VesselDockingPort dockedToPort = DockedToVessel.DockingPorts.Find((VesselDockingPort m) => m.ID == port.DockedToID);
+				VesselDockingPort dockedToPort = DockedToVessel.DockingPorts.First((VesselDockingPort m) => m.ID == port.DockedToID);
 				if (dockedToPort != null)
 				{
-					return UndockFromVessel(port, dockedToVessel, dockedToPort, ref details);
+					return await UndockFromVessel(port, dockedToVessel, dockedToPort, details);
 				}
 			}
 		}
 		return false;
 	}
 
-	public bool UndockFromVessel(VesselDockingPort port, SpaceObjectVessel dockedToVessel, VesselDockingPort dockedToPort, ref SceneDockingPortDetails details)
+	public async Task<bool> UndockFromVessel(VesselDockingPort port, SpaceObjectVessel dockedToVessel, VesselDockingPort dockedToPort, SceneDockingPortDetails details)
 	{
 		if (!port.DockingStatus || port.DockedToID == null || port.DockedVessel is not Ship)
 		{
@@ -1359,7 +1360,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		if (dockedToPort == null)
 		{
-			dockedToPort = dockedToVessel.DockingPorts.Find((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
+			dockedToPort = dockedToVessel.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
 		}
 		if (dockedToPort == null)
 		{
@@ -1367,15 +1368,15 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		SpaceObjectVessel resultVesselMine = null;
 		SpaceObjectVessel resultVesselOther = null;
-		details.RelativePositionUpdate = new Dictionary<long, float[]>();
-		details.RelativeRotationUpdate = new Dictionary<long, float[]>();
+		details.RelativePositionUpdate = [];
+		details.RelativeRotationUpdate = [];
 		SpaceObjectVessel oldMainVessel = DockedToMainVessel != null ? DockedToMainVessel : dockedToVessel.DockedToMainVessel;
 		QuaternionD oldMainVesselRot = QuaternionD.LookRotation(oldMainVessel.Forward, oldMainVessel.Up);
 		Vector3D oldCenterOffset = oldMainVessel.VesselData.CollidersCenterOffset.ToVector3D();
 		Vector3D oldMainVessleRelPos = oldMainVessel.Orbit.RelativePosition;
 		if (oldMainVessel.StabilizeToTargetObj != null)
 		{
-			oldMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+			await oldMainVessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 		}
 		port.DockedToID = null;
 		port.DockedVessel = null;
@@ -1422,10 +1423,10 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		resultVesselOther.RecalculateRelativeTransforms(null);
 		resultVesselMine.RecalculateCenter();
 		resultVesselOther.RecalculateCenter();
-		details.RelativePositionUpdate.Add(resultVesselMine.GUID, resShipMineMPRelPos.ToFloatArray());
-		details.RelativeRotationUpdate.Add(resultVesselMine.GUID, QuaternionD.LookRotation(resultVesselMine.Forward, resultVesselMine.Up).ToFloatArray());
-		details.RelativePositionUpdate.Add(resultVesselOther.GUID, resShipOtherMPRelPos.ToFloatArray());
-		details.RelativeRotationUpdate.Add(resultVesselOther.GUID, QuaternionD.LookRotation(resultVesselOther.Forward, resultVesselOther.Up).ToFloatArray());
+		details.RelativePositionUpdate.Add(resultVesselMine.Guid, resShipMineMPRelPos.ToFloatArray());
+		details.RelativeRotationUpdate.Add(resultVesselMine.Guid, QuaternionD.LookRotation(resultVesselMine.Forward, resultVesselMine.Up).ToFloatArray());
+		details.RelativePositionUpdate.Add(resultVesselOther.Guid, resShipOtherMPRelPos.ToFloatArray());
+		details.RelativeRotationUpdate.Add(resultVesselOther.Guid, QuaternionD.LookRotation(resultVesselOther.Forward, resultVesselOther.Up).ToFloatArray());
 		resultVesselMine.Orbit.RelativePosition += oldMainVesselRot * (-oldCenterOffset + resShipMineMPRelPos + oldMainVesselRot.Inverse() * QuaternionD.LookRotation(resultVesselMine.Forward, resultVesselMine.Up) * resultVesselMine.VesselData.CollidersCenterOffset.ToVector3D());
 		resultVesselOther.Orbit.RelativePosition += oldMainVesselRot * (-oldCenterOffset + resShipOtherMPRelPos + oldMainVesselRot.Inverse() * QuaternionD.LookRotation(resultVesselOther.Forward, resultVesselOther.Up) * resultVesselOther.VesselData.CollidersCenterOffset.ToVector3D());
 		resultVesselMine.Orbit.RelativeVelocity += (resultVesselMine.Orbit.RelativePosition - resultVesselOther.Orbit.RelativePosition).Normalized * 0.15;
@@ -1472,13 +1473,13 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		details.CollidersCenterOffsetOther = resultVesselOther.VesselData.CollidersCenterOffset;
 		foreach (SpaceObjectVessel s2 in resultVesselMine.AllDockedVessels)
 		{
-			details.RelativePositionUpdate.Add(s2.GUID, s2.RelativePositionFromParent.ToFloatArray());
-			details.RelativeRotationUpdate.Add(s2.GUID, s2.RelativeRotationFromParent.ToFloatArray());
+			details.RelativePositionUpdate.Add(s2.Guid, s2.RelativePositionFromParent.ToFloatArray());
+			details.RelativeRotationUpdate.Add(s2.Guid, s2.RelativeRotationFromParent.ToFloatArray());
 		}
 		foreach (SpaceObjectVessel s in resultVesselOther.AllDockedVessels)
 		{
-			details.RelativePositionUpdate.Add(s.GUID, s.RelativePositionFromParent.ToFloatArray());
-			details.RelativeRotationUpdate.Add(s.GUID, s.RelativeRotationFromParent.ToFloatArray());
+			details.RelativePositionUpdate.Add(s.Guid, s.RelativePositionFromParent.ToFloatArray());
+			details.RelativeRotationUpdate.Add(s.Guid, s.RelativeRotationFromParent.ToFloatArray());
 		}
 		details.VesselOrbit = new OrbitData();
 		resultVesselMine.Orbit.FillOrbitData(ref details.VesselOrbit, resultVesselMine);
@@ -1511,22 +1512,22 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		return true;
 	}
 
-	public void CheckMainPropulsionVessel()
+	public async Task CheckMainPropulsionVessel()
 	{
-		if (!IsMainVessel && MainVessel.FTL != null && MainVessel.FTL.Status == SystemStatus.OnLine)
+		if (!IsMainVessel && MainVessel.FTL is { Status: SystemStatus.OnLine })
 		{
-			MainVessel.FTL.GoOffLine(autoRestart: false);
+			await MainVessel.FTL.GoOffLine(autoRestart: false);
 		}
 		foreach (SpaceObjectVessel vessel in MainVessel.AllDockedVessels.Where((SpaceObjectVessel m) => m != this))
 		{
-			if (vessel.FTL != null && vessel.FTL.Status == SystemStatus.OnLine)
+			if (vessel.FTL is { Status: SystemStatus.OnLine })
 			{
-				vessel.FTL.GoOffLine(autoRestart: false);
+				await vessel.FTL.GoOffLine(autoRestart: false);
 			}
 		}
-		if (!Server.Instance.WorldInitialized && FTL != null && FTL.Status == SystemStatus.OnLine)
+		if (!Server.Instance.WorldInitialized && FTL is { Status: SystemStatus.OnLine })
 		{
-			FTL.GoOffLine(autoRestart: false);
+			await FTL.GoOffLine(autoRestart: false);
 		}
 	}
 
@@ -1544,7 +1545,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			if (port.DockingStatus && port.DockedVessel != parentVessel)
 			{
-				VesselDockingPort childPort = port.DockedVessel.DockingPorts.Find((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
+				VesselDockingPort childPort = port.DockedVessel.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
 				CalculateRelativeTransform(port, childPort, out var relativPos, out var relativRot);
 				port.DockedVessel.RelativePositionFromParent = relativPos;
 				port.DockedVessel.RelativeRotationFromParent = relativRot;
@@ -1569,8 +1570,9 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		{
 			return;
 		}
-		Vector3 maxValue = Vector3.Zero;
-		Vector3 minValue = Vector3.Zero;
+
+		Vector3 maxValue;
+		Vector3 minValue;
 		BulletPhysicsController.ComplexBoundCalculation(this, out minValue, out maxValue);
 		Vector3D CollidersCenterOffset = (minValue + maxValue).ToVector3D() / 2.0;
 		Vector3D centerOffsetDiff = CollidersCenterOffset - (VesselData.CollidersCenterOffset != null ? VesselData.CollidersCenterOffset.ToVector3D() : Vector3D.Zero);
@@ -1591,14 +1593,14 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		relativePosition = parentPort.Position - relativeRotation * childPort.Position;
 	}
 
-	public static SpaceObjectVessel CreateNew(GameScenes.SceneId sceneID, string registration = "", long GUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0)
+	public static async Task<SpaceObjectVessel> CreateNew(GameScenes.SceneId sceneID, string registration = "", long GUID = -1L, List<long> nearArtificialBodyGUIDs = null, List<long> celestialBodyGUIDs = null, Vector3D? positionOffset = null, Vector3D? velocityAtPosition = null, QuaternionD? localRotation = null, string vesselTag = "", bool checkPosition = true, float? AsteroidResourcesMultiplier = null, double distanceFromSurfacePercMin = 0.03, double distanceFromSurfacePercMax = 0.3, SpawnRuleOrbit spawnRuleOrbit = null, double celestialBodyDeathDistanceMultiplier = 1.5, double artificialBodyDistanceCheck = 100.0)
 	{
 		if (GameScenes.Ranges.IsAsteroid(sceneID))
 		{
 			float? asteroidResourcesMultiplier = AsteroidResourcesMultiplier;
 			return Asteroid.CreateNewAsteroid(sceneID, registration, GUID, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, vesselTag, checkPosition, asteroidResourcesMultiplier, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck);
 		}
-		return Ship.CreateNewShip(sceneID, registration, GUID, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, vesselTag, checkPosition, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck);
+		return await Ship.CreateNewShip(sceneID, registration, GUID, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, vesselTag, checkPosition, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck);
 	}
 
 	public double GetDistanceFromPlayer(Player pl)
@@ -1621,7 +1623,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		Player ret = null;
 		double dist = double.MaxValue;
 		distance = 0.0;
-		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in NetworkController.GetAllPlayers() select m)
+		foreach (Player pl in from m in Server.Instance.AllPlayers.Union(from m in NetworkController.GetAllConnectedPlayers() select m)
 			where m.IsAlive
 			select m)
 		{
@@ -1640,15 +1642,15 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		VesselObjects ss = new VesselObjects();
 		ss.MiscStatuses = new VesselMiscStatuses();
-		if (base.CurrentCourse != null && base.CurrentCourse.IsInProgress)
+		if (CurrentCourse != null && CurrentCourse.IsInProgress)
 		{
-			ss.MiscStatuses.CourseInProgress = ObjectCopier.DeepCopy(base.CurrentCourse.CurrentCourseItem);
+			ss.MiscStatuses.CourseInProgress = ObjectCopier.DeepCopy(CurrentCourse.CurrentCourseItem);
 		}
 		else
 		{
 			ss.MiscStatuses.CourseInProgress = null;
 		}
-		ss.MiscStatuses.IsMatchedToTarget = base.StabilizeToTargetObj != null;
+		ss.MiscStatuses.IsMatchedToTarget = StabilizeToTargetObj != null;
 		ss.SecurityData = GetVesselSecurityData();
 		ss.SubSystems = DistributionManager.GetSubSystemsDetails(changedOnly: false, -1L);
 		ss.Generators = DistributionManager.GetGeneratorsDetails(changedOnly: false, -1L);
@@ -1658,7 +1660,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		ss.NameTags = NameTags;
 		ss.Doors = DistributionManager.GetDoorsDetails(changedOnly: false, -1L);
 		ss.SceneTriggerExecutors = new List<SceneTriggerExecutorDetails>();
-		if (SceneTriggerExecutors != null && SceneTriggerExecutors.Count > 0)
+		if (SceneTriggerExecutors is { Count: > 0 })
 		{
 			foreach (SceneTriggerExecutor sc in SceneTriggerExecutors)
 			{
@@ -1672,7 +1674,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			}
 		}
 		ss.DockingPorts = new List<SceneDockingPortDetails>();
-		if (DockingPorts != null && DockingPorts.Count > 0)
+		if (DockingPorts is { Length: > 0 })
 		{
 			foreach (VesselDockingPort port in DockingPorts)
 			{
@@ -1727,7 +1729,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		VesselDataUpdate vdu = new VesselDataUpdate
 		{
-			GUID = GUID
+			GUID = Guid
 		};
 		bool update = false;
 		if (vesselName != null)
@@ -1743,7 +1745,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			update = true;
 		}
 		float newRadarSignature = GetCompoundRadarSignature();
-		if (VesselData.RadarSignature != (double)newRadarSignature)
+		if (VesselData.RadarSignature != newRadarSignature)
 		{
 			VesselData.RadarSignature = newRadarSignature;
 			vdu.RadarSignature = newRadarSignature;
@@ -1765,7 +1767,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		if (update)
 		{
-			Server.Instance.VesselsDataUpdate[GUID] = vdu;
+			Server.Instance.VesselsDataUpdate[Guid] = vdu;
 		}
 	}
 }

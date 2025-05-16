@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -49,14 +50,10 @@ public class AsteroidMiningPoint : IPersistantObject
 	public AsteroidMiningPoint(Asteroid parent, AsteroidMiningPointData data)
 	{
 		Parent = parent;
-		ID = new VesselObjectID
-		{
-			VesselGUID = parent.GUID,
-			InSceneID = data.InSceneID
-		};
+		ID = new VesselObjectID(parent.Guid, data.InSceneID);
 		LocalPosition = data.Position.ToVector3D();
 		Size = data.Size;
-		gasBurstSolarSystemTime = Server.SolarSystemTime + (double)MathHelper.RandomRange(0f, GasBurstTimeMax);
+		gasBurstSolarSystemTime = Server.SolarSystemTime + MathHelper.RandomRange(0f, GasBurstTimeMax);
 	}
 
 	public AsteroidMiningPointDetails GetDetails()
@@ -75,7 +72,7 @@ public class AsteroidMiningPoint : IPersistantObject
 		throw new NotImplementedException();
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		throw new NotImplementedException();
 	}
@@ -89,7 +86,7 @@ public class AsteroidMiningPoint : IPersistantObject
 			{
 				return false;
 			}
-			gasBurstSolarSystemTime = Server.SolarSystemTime + (double)MathHelper.RandomRange(GasBurstTimeMin, GasBurstTimeMax);
+			gasBurstSolarSystemTime = Server.SolarSystemTime + MathHelper.RandomRange(GasBurstTimeMin, GasBurstTimeMax);
 			return true;
 		}
 		return false;

@@ -15,10 +15,7 @@ public abstract class SpawnObjectResponseData
 
 	public virtual SpaceObjectType Type
 	{
-		get
-		{
-			return SpaceObjectType.None;
-		}
+		get => SpaceObjectType.None;
 		set
 		{
 		}

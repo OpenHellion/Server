@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -9,7 +9,7 @@ namespace ZeroGravity.Objects;
 
 public class Helmet : Item, IBatteryConsumer, IUpdateable
 {
-	private HelmetStats _stats;
+	private HelmetStats _stats = new();
 
 	public bool IsVisorToggleable;
 
@@ -61,24 +61,31 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		}
 	}
 
-	public Helmet(DynamicObjectAuxData data)
+	private Helmet()
 	{
-		_stats = new HelmetStats();
-		if (data == null)
-		{
-			return;
-		}
-		SetData(data);
-		if (Slots != null)
-		{
-			BatterySlot = Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => n == ItemType.AltairHandDrillBattery) != ItemType.None).Value;
-		}
-		IsVisorActive = true;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Helmet> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		if (data == null)
+		{
+			return null;
+		}
+		Helmet helmet = new();
+		await helmet.SetData(data);
+
+		if (helmet.Slots != null)
+		{
+			helmet.BatterySlot = helmet.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => n == ItemType.AltairHandDrillBattery) != ItemType.None).Value;
+		}
+		helmet.IsVisorActive = true;
+
+		return helmet;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		HelmetData hd = data as HelmetData;
 		IsLightActive = hd.IsLightActive;
 		IsVisorActive = hd.IsVisorActive;
@@ -89,7 +96,7 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		DamageResistance = hd.DamageResistance;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		HelmetStats hs = stats as HelmetStats;
 		bool retVal = false;
@@ -103,16 +110,16 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 			IsVisorActive = hs.isVisorActive.Value;
 			retVal = true;
 		}
-		return retVal;
+		return Task.FromResult(retVal);
 	}
 
 	protected override void ChangeEquip(Inventory.EquipType equipType)
 	{
-		if (base.DynamicObj.Parent is not Player)
+		if (DynamicObj.Parent is not Player)
 		{
 			return;
 		}
-		Player pl = base.DynamicObj.Parent as Player;
+		Player pl = DynamicObj.Parent as Player;
 		if (equipType == Inventory.EquipType.EquipInventory)
 		{
 			pl.CurrentHelmet = this;
@@ -149,27 +156,20 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataHelmet data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataHelmet data)
-			{
-				Debug.Warning("PersistenceObjectDataHelmet data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.HelmetData);
-			}
+			Debug.LogWarning("PersistenceObjectDataHelmet data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.HelmetData);
 		}
 	}
 
-	public void Update(double deltaTime)
+	public async Task Update(double deltaTime)
 	{
 		if (Battery != null)
 		{
@@ -184,13 +184,13 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 			}
 			if (cons != 0f)
 			{
-				Battery.ChangeQuantity(cons);
+				await Battery.ChangeQuantity(cons);
 			}
 		}
 		if (BatteryPower < float.Epsilon && IsLightActive)
 		{
 			IsLightActive = false;
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 	}
 }

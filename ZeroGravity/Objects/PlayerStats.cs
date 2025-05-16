@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Timers;
 using OpenHellion.Net;
 using ZeroGravity.Math;
@@ -62,9 +63,9 @@ public class PlayerStats
 	{
 		healTimer = new Timer(100.0);
 		healTimer.Enabled = false;
-		healTimer.Elapsed += delegate
+		healTimer.Elapsed += async delegate
 		{
-			HealOverTimeStep();
+			await HealOverTimeStep();
 		};
 	}
 
@@ -80,9 +81,9 @@ public class PlayerStats
 		});
 		Timer aTimer = new Timer(1000.0);
 		int tmpHitIdentifier = hitIdentyfy;
-		aTimer.Elapsed += delegate(object sender, ElapsedEventArgs args)
+		aTimer.Elapsed += async delegate(object sender, ElapsedEventArgs args)
 		{
-			WaitForHit(sender, tmpHitIdentifier);
+			await WaitForHit(sender, tmpHitIdentifier);
 		};
 		return hitIdentyfy;
 	}
@@ -95,56 +96,46 @@ public class PlayerStats
 		}
 	}
 
-	private static void WaitForHit(object source, int id)
+	private static async Task WaitForHit(object source, int id)
 	{
 		PlayerStats obj = source as PlayerStats;
 		if (obj.hitQueue.ContainsKey(id))
 		{
-			obj.TakeHitDamage(id);
+			await obj.TakeHitDamage(id);
 		}
 	}
 
-	public void SendAcumulatedMessage(double time)
+	public async Task TakeDamage(HurtType hurtType, float amount)
 	{
-		NetworkController.SendToGameClient(pl.GUID, psm);
-	}
-
-	public void TakeDamage(HurtType hurtType, float amount)
-	{
-		TakeDamage(1f, new PlayerDamage
+		await TakeDamage(1f, new PlayerDamage
 		{
 			HurtType = hurtType,
 			Amount = amount
 		});
 	}
 
-	public void TakeDamage(HurtType hurtType, float amount, float deltaTime)
+	public async Task TakeDamage(HurtType hurtType, float amount, float deltaTime)
 	{
-		TakeDamage(deltaTime, new PlayerDamage
+		await TakeDamage(deltaTime, new PlayerDamage
 		{
 			HurtType = hurtType,
 			Amount = amount
 		});
 	}
 
-	public void TakeDamage(params PlayerDamage[] damages)
+	public async Task TakeDamage(params PlayerDamage[] damages)
 	{
-		TakeDamage(null, 1f, damages);
+		await TakeDamage(null, 1f, damages);
 	}
 
-	public void TakeDamage(float deltaTime, params PlayerDamage[] damages)
+	public async Task TakeDamage(float deltaTime, params PlayerDamage[] damages)
 	{
-		TakeDamage(null, deltaTime, damages);
+		await TakeDamage(null, deltaTime, damages);
 	}
 
-	public void TakeDamage(Vector3D? shotDirection, params PlayerDamage[] damages)
+	public async Task TakeDamage(Vector3D? shotDirection, float deltaTime, params PlayerDamage[] damages)
 	{
-		TakeDamage(shotDirection, 1f, damages);
-	}
-
-	public void TakeDamage(Vector3D? shotDirection, float deltaTime, params PlayerDamage[] damages)
-	{
-		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executor != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
+		if (GodMode || pl.CurrentSpawnPoint is { Executor: not null, IsPlayerInSpawnPoint: true })
 		{
 			return;
 		}
@@ -159,7 +150,7 @@ public class PlayerStats
 		HealthPoints = MathHelper.Clamp(HealthPoints - amount, 0f, MaxHealthPoints);
 		if (HealthPoints <= float.Epsilon)
 		{
-			pl.KillYourself(causeOfDeath);
+			await pl.KillPlayer(causeOfDeath);
 			return;
 		}
 		acummulatedDamage += amount;
@@ -180,13 +171,13 @@ public class PlayerStats
 		{
 			psm.GUID = pl.FakeGuid;
 			psm.Health = (int)HealthPoints;
-			NetworkController.SendToGameClient(pl.GUID, psm);
+			await NetworkController.Send(pl.Guid, psm);
 			psm = new PlayerStatsMessage();
 			acummulatedDamage = 0f;
 		}
 	}
 
-	public void Heal(float amount)
+	public async Task Heal(float amount)
 	{
 		amount = amount > 0f ? amount : 0f;
 		if (!(amount <= float.Epsilon) && HealthPoints != MaxHealthPoints)
@@ -197,23 +188,23 @@ public class PlayerStats
 				GUID = pl.FakeGuid,
 				Health = (int)HealthPoints
 			};
-			NetworkController.SendToGameClient(pl.GUID, psm);
+			await NetworkController.Send(pl.Guid, psm);
 		}
 	}
 
-	private void HealOverTimeStep()
+	private async Task HealOverTimeStep()
 	{
 		amountToHeal -= amountToHealStep;
 		float healAmount = amountToHealStep;
 		if (amountToHeal <= 0f)
 		{
 			healAmount += amountToHeal;
-			Heal(amountToHealStep);
+			await Heal(amountToHealStep);
 			healTimer.Enabled = false;
 		}
 		else
 		{
-			Heal(amountToHealStep);
+			await Heal(amountToHealStep);
 		}
 	}
 
@@ -232,33 +223,33 @@ public class PlayerStats
 		}
 	}
 
-	public void DoCollisionDamage(float speed)
+	public async Task DoCollisionDamage(float speed)
 	{
 		double threshold = 6.5;
 		float hp = 0f;
-		if ((double)speed >= threshold)
+		if (speed >= threshold)
 		{
-			hp = (float)(((double)speed - threshold) * ((double)speed - threshold) / 10.0 + (double)speed) * (pl.PlayerInventory.CurrOutfit != null ? pl.PlayerInventory.CurrOutfit.CollisionResistance : 1f);
+			hp = (float)((speed - threshold) * (speed - threshold) / 10.0 + speed) * (pl.PlayerInventory.CurrOutfit != null ? pl.PlayerInventory.CurrOutfit.CollisionResistance : 1f);
 		}
-		TakeDamage(HurtType.Impact, hp);
+		await TakeDamage(HurtType.Impact, hp);
 	}
 
-	public float TakeHitDamage(int id)
+	public async Task<float> TakeHitDamage(int id)
 	{
-		if (GodMode || (pl.CurrentSpawnPoint != null && pl.CurrentSpawnPoint.Executor != null && pl.CurrentSpawnPoint.IsPlayerInSpawnPoint))
+		if (GodMode || pl.CurrentSpawnPoint is { Executor: not null, IsPlayerInSpawnPoint: true })
 		{
 			return 0f;
 		}
 		if (hitQueue.TryGetValue(id, out var hitInfo))
 		{
-			float damage = TakeHitDamage(hitInfo.damage, hitInfo.hitType, hitInfo.isMelee, hitInfo.direction);
+			float damage = await TakeHitDamage(hitInfo.damage, hitInfo.hitType, hitInfo.isMelee, hitInfo.direction);
 			UnqueueHit(id);
 			return damage;
 		}
 		return 0f;
 	}
 
-	public float TakeHitDamage(float damage, HitBoxType hitType, bool isMelee, Vector3D? direction = null, float duration = 1f)
+	public async Task<float> TakeHitDamage(float damage, HitBoxType hitType, bool isMelee, Vector3D? direction = null, float duration = 1f)
 	{
 		Outfit outfit = pl.PlayerInventory.CurrOutfit;
 		Helmet helmet = pl.CurrentHelmet;
@@ -269,7 +260,7 @@ public class PlayerStats
 		{
 		case HitBoxType.None:
 			resistanceMulti = 0f;
-			Debug.Error("UNKNOWN HITBOX TYPE", pl.GUID);
+			Debug.LogError("UNKNOWN HITBOX TYPE", pl.Guid);
 			break;
 		case HitBoxType.Head:
 			bodyDmgMulti = 10f;
@@ -309,7 +300,7 @@ public class PlayerStats
 			}
 			break;
 		default:
-			Debug.Error("UNKNOWN HITBOX TYPE DEFAULT", pl.GUID);
+			Debug.LogError("UNKNOWN HITBOX TYPE DEFAULT", pl.Guid);
 			break;
 		}
 		if (isMelee)
@@ -317,7 +308,7 @@ public class PlayerStats
 			bodyDmgMulti = 1f;
 		}
 		float amount = (damage - reductionValue * duration) * resistanceMulti * bodyDmgMulti;
-		TakeDamage(direction, duration, new PlayerDamage
+		await TakeDamage(direction, duration, new PlayerDamage
 		{
 			HurtType = HurtType.Shot,
 			Amount = amount

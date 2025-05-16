@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Timers;
 using OpenHellion.Net;
 using ZeroGravity.Math;
@@ -67,12 +68,12 @@ public class Corpse : SpaceObjectTransferable
 		{
 			if (_Parent != null)
 			{
-				Parent.Corpses.TryRemove(GUID, out var _);
+				Parent.Corpses.TryRemove(Guid, out var _);
 			}
 			_Parent = value;
 			if (_Parent != null && !_Parent.Corpses.Values.Contains(this))
 			{
-				Parent.Corpses[GUID] = this;
+				Parent.Corpses[Guid] = this;
 			}
 		}
 	}
@@ -85,7 +86,7 @@ public class Corpse : SpaceObjectTransferable
 			Pivot pivot = (Pivot)(Parent = new Pivot(this, parent));
 			foreach (Player pl in Server.Instance.AllPlayers)
 			{
-				if (pl.IsSubscribedTo(parent.GUID))
+				if (pl.IsSubscribedTo(parent.Guid))
 				{
 					pl.SubscribeTo(pivot);
 				}
@@ -127,92 +128,92 @@ public class Corpse : SpaceObjectTransferable
 		if (DestroyTime > -1.0)
 		{
 			destroyTimer = new Timer(DestroyTime);
-			destroyTimer.Elapsed += delegate
+			destroyTimer.Elapsed += async delegate
 			{
-				DestoyCorpseTimerElapsed(this);
+				await DestoyCorpseTimerElapsed(this);
 			};
 			destroyTimer.Enabled = true;
 		}
 		Gender = player.Gender;
 	}
 
-	private static void DestoyCorpseTimerElapsed(object sender)
+	private static async Task DestoyCorpseTimerElapsed(object sender)
 	{
 		if (sender is Corpse obj)
 		{
-			obj.Destroy();
+			await obj.Destroy();
 		}
 	}
 
 	public void ConnectToNetworkController()
 	{
-		EventSystem.AddListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
-		EventSystem.AddListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
+		EventSystem.AddListener<CorpseMovementMessage>(CorpseMovementMessageListener);
+		EventSystem.AddListener<CorpseStatsMessage>(CorpseStatsMessageListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
-		EventSystem.RemoveListener(typeof(CorpseMovementMessage), CorpseMovementMessageListener);
-		EventSystem.RemoveListener(typeof(CorpseStatsMessage), CorpseStatsMessageListener);
+		EventSystem.RemoveListener<CorpseMovementMessage>(CorpseMovementMessageListener);
+		EventSystem.RemoveListener<CorpseStatsMessage>(CorpseStatsMessageListener);
 	}
 
 	private void CorpseMovementMessageListener(NetworkData data)
 	{
-		CorpseMovementMessage mdom = data as CorpseMovementMessage;
-		if (mdom.GUID != GUID)
+		var message = data as CorpseMovementMessage;
+		if (message.GUID != Guid)
 		{
 			return;
 		}
-		if (ListenToSenderID != mdom.Sender)
+		if (ListenToSenderID != message.Sender)
 		{
 			if ((DateTime.UtcNow - takeoverTime).TotalSeconds < 0.8)
 			{
 				return;
 			}
 			takeoverTime = DateTime.UtcNow;
-			ListenToSenderID = mdom.Sender;
+			ListenToSenderID = message.Sender;
 		}
-		if (ListenToSenderID == 0L || mdom.Sender == ListenToSenderID || _listenToPlayer == null || (_listenToPlayer.Parent != Parent && _listenToSenderID != mdom.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
+		if (ListenToSenderID == 0L || message.Sender == ListenToSenderID || _listenToPlayer == null || (_listenToPlayer.Parent != Parent && _listenToSenderID != message.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
 		{
-			ListenToSenderID = mdom.Sender;
-			RagdollDataList = mdom.RagdollDataList;
-			LocalPosition = mdom.LocalPosition.ToVector3D();
-			LocalRotation = mdom.LocalRotation.ToQuaternionD();
-			velocity = mdom.Velocity.ToVector3D();
-			angularVelocity = mdom.AngularVelocity.ToVector3D();
-			IsInsideSpaceObject = mdom.IsInsideSpaceObject;
+			ListenToSenderID = message.Sender;
+			RagdollDataList = message.RagdollDataList;
+			LocalPosition = message.LocalPosition.ToVector3D();
+			LocalRotation = message.LocalRotation.ToQuaternionD();
+			velocity = message.Velocity.ToVector3D();
+			angularVelocity = message.AngularVelocity.ToVector3D();
+			IsInsideSpaceObject = message.IsInsideSpaceObject;
 		}
 	}
 
-	private void CorpseStatsMessageListener(NetworkData data)
+	private async void CorpseStatsMessageListener(NetworkData data)
 	{
-		CorpseStatsMessage dosm = data as CorpseStatsMessage;
-		if (dosm.GUID != GUID)
+		var message = data as CorpseStatsMessage;
+		if (message.GUID != Guid)
 		{
 			return;
 		}
 		SpaceObject oldParent = Parent;
-		if (Parent is SpaceObjectVessel && dosm.ParentType == SpaceObjectType.CorpsePivot)
+		if (Parent is SpaceObjectVessel && message.ParentType == SpaceObjectType.CorpsePivot)
 		{
 			SpaceObjectVessel parentVessel = Parent as SpaceObjectVessel;
 			Pivot pivot = (Pivot)(Parent = new Pivot(this, parentVessel.MainVessel));
 			foreach (Player pl2 in Server.Instance.AllPlayers)
 			{
-				if (pl2.IsSubscribedTo(parentVessel.GUID))
+				if (pl2.IsSubscribedTo(parentVessel.Guid))
 				{
 					pl2.SubscribeTo(pivot);
 				}
 			}
 		}
-		else if (Parent is Pivot && dosm.ParentType != SpaceObjectType.CorpsePivot)
+		else if (Parent is Pivot && message.ParentType != SpaceObjectType.CorpsePivot)
 		{
 			Pivot pivot2 = Parent as Pivot;
-			Parent = Server.Instance.GetObject(dosm.ParentGUID);
+			Parent = Server.Instance.GetObject(message.ParentGUID);
 			if (Parent != null)
 			{
 				foreach (Player pl in Server.Instance.AllPlayers)
 				{
-					if (pl.IsSubscribedTo(pivot2.GUID))
+					if (pl.IsSubscribedTo(pivot2.Guid))
 					{
 						pl.UnsubscribeFrom(pivot2);
 					}
@@ -220,19 +221,19 @@ public class Corpse : SpaceObjectTransferable
 				Server.Instance.SolarSystem.RemoveArtificialBody(pivot2);
 			}
 		}
-		else if (dosm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Station or SpaceObjectType.Asteroid)
+		else if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Station or SpaceObjectType.Asteroid)
 		{
-			Parent = Server.Instance.GetObject(dosm.ParentGUID);
+			Parent = Server.Instance.GetObject(message.ParentGUID);
 		}
 		else
 		{
-			Debug.Error("Dont know what happened to corpse parent", oldParent.GUID, oldParent.ObjectType, dosm.ParentGUID, dosm.ParentType);
+			Debug.LogError("Dont know what happened to corpse parent", oldParent.Guid, oldParent.ObjectType, message.ParentGUID, message.ParentType);
 		}
 		if (oldParent != Parent)
 		{
 		}
-		ListenToSenderID = dosm.Sender;
-		NetworkController.SendToClientsSubscribedTo(dosm, -1L, oldParent, Parent, oldParent?.Parent, Parent != null ? Parent.Parent : null);
+		ListenToSenderID = message.Sender;
+		await NetworkController.SendToClientsSubscribedTo(message, -1L, oldParent, Parent, oldParent?.Parent, Parent != null ? Parent.Parent : null);
 	}
 
 	internal void CheckInventoryDestroy()
@@ -244,9 +245,9 @@ public class Corpse : SpaceObjectTransferable
 				destroyTimer.Dispose();
 			}
 			destroyTimer = new Timer(TimeSpan.FromMinutes(5.0).TotalMilliseconds);
-			destroyTimer.Elapsed += delegate
+			destroyTimer.Elapsed += async delegate
 			{
-				DestoyCorpseTimerElapsed(this);
+				await DestoyCorpseTimerElapsed(this);
 			};
 			destroyTimer.Enabled = true;
 		}
@@ -256,7 +257,7 @@ public class Corpse : SpaceObjectTransferable
 	{
 		return new CorpseMovementMessage
 		{
-			GUID = GUID,
+			GUID = Guid,
 			RagdollDataList = RagdollDataList,
 			LocalPosition = LocalPosition.ToFloatArray(),
 			LocalRotation = LocalRotation.ToFloatArray(),
@@ -289,8 +290,8 @@ public class Corpse : SpaceObjectTransferable
 		}
 		return new CorpseDetails
 		{
-			GUID = GUID,
-			ParentGUID = Parent == null ? -1 : Parent.GUID,
+			GUID = Guid,
+			ParentGUID = Parent == null ? -1 : Parent.Guid,
 			ParentType = Parent != null ? Parent.ObjectType : SpaceObjectType.None,
 			LocalPosition = LocalPosition.ToFloatArray(),
 			LocalRotation = LocalRotation.ToFloatArray(),
@@ -305,14 +306,14 @@ public class Corpse : SpaceObjectTransferable
 	{
 		return new SpawnCorpseResponseData
 		{
-			GUID = GUID,
+			GUID = Guid,
 			Details = GetDetails()
 		};
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
 		DestroyCorpse();
-		base.Destroy();
+		await base.Destroy();
 	}
 }

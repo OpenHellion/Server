@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -68,10 +69,18 @@ public class GeneratorCapacitor : Generator
 
 	public override bool FixedConsumption => true;
 
-	public GeneratorCapacitor(SpaceObjectVessel vessel, VesselObjectID id, GeneratorData genData)
+	private GeneratorCapacitor(SpaceObjectVessel vessel, VesselObjectID id, GeneratorData genData)
 		: base(vessel, id, genData)
 	{
-		GoOnLine();
+	}
+
+	public static async Task<GeneratorCapacitor> CreateAsync(SpaceObjectVessel vessel, VesselObjectID id, GeneratorData genData)
+	{
+		GeneratorCapacitor capacitor = new(vessel, id, genData);
+
+		await capacitor.GoOnLine();
+
+		return capacitor;
 	}
 
 	public override IAuxDetails GetAuxDetails()
@@ -91,9 +100,9 @@ public class GeneratorCapacitor : Generator
 		Capacity = aux.Capacity;
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		MaxCapacity = NominalCapacity * GetScopeMultiplier(MachineryPartSlotScope.PowerCapacity);
 		if (Capacity > MaxCapacity)
 		{
@@ -117,8 +126,8 @@ public class GeneratorCapacitor : Generator
 		Capacity = aux.Capacity;
 	}
 
-	public override void GoOffLine(bool autoRestart, bool malfunction = false)
+	public override Task GoOffLine(bool autoRestart, bool malfunction = false)
 	{
-		base.GoOnLine();
+		return base.GoOnLine();
 	}
 }

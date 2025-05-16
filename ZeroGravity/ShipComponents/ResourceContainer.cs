@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -164,13 +164,13 @@ public class ResourceContainer : IResourceProvider, IResourceUser, ICargo, IPers
 		IsInUse = data.IsInUse;
 	}
 
-	public float ConsumeResource(float consumeQuantity)
+	public async Task<float> ConsumeResource(float consumeQuantity)
 	{
 		if (!IsInUse)
 		{
 			return 0f;
 		}
-		return ChangeQuantityBy(_Compartments[0].ID, _Compartments[0].Resources[0].ResourceType, 0f - consumeQuantity);
+		return await ChangeQuantityByAsync(_Compartments[0].ID, _Compartments[0].Resources[0].ResourceType, 0f - consumeQuantity);
 	}
 
 	public CargoCompartmentData GetCompartment(int? id = null)
@@ -182,7 +182,7 @@ public class ResourceContainer : IResourceProvider, IResourceUser, ICargo, IPers
 		return _Compartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoCompartmentData compartment = Compartments.Find((CargoCompartmentData m) => m.ID == compartmentID);
 		CargoResourceData res = compartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
@@ -207,12 +207,12 @@ public class ResourceContainer : IResourceProvider, IResourceUser, ICargo, IPers
 			qty = 0f - available;
 		}
 		res.Quantity = available + qty;
-		if ((double)res.Quantity <= 0.01 && compartment.AllowOnlyOneType && compartment.AllowedResources.Count > 1)
+		if (res.Quantity <= 0.01 && compartment.AllowOnlyOneType && compartment.AllowedResources.Count > 1)
 		{
 			compartment.Resources.Remove(res);
 		}
 		StatusChanged = true;
-		return qty;
+		return Task.FromResult(qty);
 	}
 
 	public virtual PersistenceObjectData GetPersistenceData()
@@ -224,23 +224,18 @@ public class ResourceContainer : IResourceProvider, IResourceUser, ICargo, IPers
 		};
 	}
 
-	public virtual void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public virtual Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		_Compartments = (persistenceData as PersistenceObjectDataCargo).CargoCompartments;
+		foreach (CargoCompartmentData ccd in _Compartments)
 		{
-			_Compartments = (persistenceData as PersistenceObjectDataCargo).CargoCompartments;
-			foreach (CargoCompartmentData ccd in _Compartments)
+			if (ccd.AllowOnlyOneType && ccd.AllowedResources.Count > 1)
 			{
-				if (ccd.AllowOnlyOneType && ccd.AllowedResources.Count > 1)
-				{
-					ccd.Resources.RemoveAll((CargoResourceData m) => (double)m.Quantity <= 0.01);
-				}
+				ccd.Resources.RemoveAll((CargoResourceData m) => m.Quantity <= 0.01);
 			}
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+
+		return Task.CompletedTask;
 	}
 
 	public virtual ResourceContainerDetails GetDetails()

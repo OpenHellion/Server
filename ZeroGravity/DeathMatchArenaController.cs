@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Objects;
@@ -39,9 +39,9 @@ public class DeathMatchArenaController : IPersistantObject
 		Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_min, SpawnShipCallback);
 	}
 
-	public static Ship SpawnSara(SpaceObjectVessel mainShip, Vector3D pos, long arenaAsteroidID)
+	public static async Task<Ship> SpawnSara(SpaceObjectVessel mainShip, Vector3D pos, long arenaAsteroidID)
 	{
-		Ship sara = Ship.CreateNewShip(GameScenes.SceneId.AltCorp_Shuttle_SARA, "", -1L, new List<long> { mainShip.GUID }, null, pos, null, MathHelper.RandomRotation());
+		Ship sara = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_Shuttle_SARA, "", -1L, new List<long> { mainShip.Guid }, null, pos, null, MathHelper.RandomRotation());
 		sara.StabilizeToTarget(Server.Instance.GetVessel(arenaAsteroidID), forceStabilize: true);
 		return sara;
 	}
@@ -54,13 +54,13 @@ public class DeathMatchArenaController : IPersistantObject
 		return r * new Vector3D(System.Math.Cos(a) * System.Math.Sin(b), System.Math.Sin(a) * System.Math.Sin(b), System.Math.Cos(b));
 	}
 
-	public void SpawnShipCallback(double dbl)
+	public async void SpawnShipCallback(double dbl)
 	{
 		timePassedSince += dbl;
 		if (timePassedSince > RespawnTimeForShip)
 		{
 			timePassedSince = 0.0;
-			CurrentSpawnedShip = SpawnSara(MainVessel, NewSaraPos(MainVessel), arenaAsteroidID);
+			CurrentSpawnedShip = await SpawnSara(MainVessel, NewSaraPos(MainVessel), arenaAsteroidID);
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, SpawnShipCallback);
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_min, DistanceCallback);
 			List<SpaceObjectVessel> allShips = new List<SpaceObjectVessel>(MainVessel.AllDockedVessels)
@@ -85,8 +85,8 @@ public class DeathMatchArenaController : IPersistantObject
 	{
 		PersistenceArenaControllerData data = new PersistenceArenaControllerData
 		{
-			MainShipGUID = MainVessel.GUID,
-			CurrentSpawnedShipGUID = CurrentSpawnedShip == null ? -1 : CurrentSpawnedShip.GUID,
+			MainShipGUID = MainVessel.Guid,
+			CurrentSpawnedShipGUID = CurrentSpawnedShip == null ? -1 : CurrentSpawnedShip.Guid,
 			RespawnTimeForShip = RespawnTimeForShip,
 			SquaredDistanceThreshold = SquaredDistanceThreshold,
 			timePassedSince = timePassedSince
@@ -94,7 +94,7 @@ public class DeathMatchArenaController : IPersistantObject
 		return data;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		if (persistenceData is PersistenceArenaControllerData data)
 		{
@@ -116,7 +116,9 @@ public class DeathMatchArenaController : IPersistantObject
 		}
 		else
 		{
-			Debug.Warning("PersistenceArenaControllerData wrong type");
+			Debug.LogWarning("PersistenceArenaControllerData wrong type");
 		}
+
+		return Task.CompletedTask;
 	}
 }

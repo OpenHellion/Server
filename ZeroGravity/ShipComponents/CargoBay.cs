@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -86,7 +86,7 @@ public class CargoBay : ICargo, IPersistantObject
 		return CargoCompartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public async Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoCompartmentData compartment = Compartments.Find((CargoCompartmentData m) => m.ID == compartmentID);
 		CargoResourceData res = compartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
@@ -123,9 +123,9 @@ public class CargoBay : ICargo, IPersistantObject
 		{
 			compartment.Resources.Remove(res);
 		}
-		NetworkController.SendToClientsSubscribedTo(new ShipStatsMessage
+		await NetworkController.SendToClientsSubscribedTo(new ShipStatsMessage
 		{
-			GUID = ParentVessel.GUID,
+			GUID = ParentVessel.Guid,
 			Temperature = ParentVessel.Temperature,
 			Health = ParentVessel.Health,
 			Armor = ParentVessel.Armor,
@@ -146,24 +146,20 @@ public class CargoBay : ICargo, IPersistantObject
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataCargo data)
 		{
-			if (persistenceData is not PersistenceObjectDataCargo data)
-			{
-				Debug.Warning("PersistenceObjectDataCargo data is null");
-				return;
-			}
-			CargoCompartments = data.CargoCompartments;
-			foreach (CargoCompartmentData ccd in CargoCompartments)
-			{
-				ccd.Resources.RemoveAll((CargoResourceData m) => m.Quantity <= float.Epsilon);
-			}
+			Debug.LogWarning("PersistenceObjectDataCargo data is null");
+			return Task.CompletedTask;
 		}
-		catch (Exception e)
+
+		CargoCompartments = data.CargoCompartments;
+		foreach (CargoCompartmentData ccd in CargoCompartments)
 		{
-			Debug.Exception(e);
+			ccd.Resources.RemoveAll((CargoResourceData m) => m.Quantity <= float.Epsilon);
 		}
+
+		return Task.CompletedTask;
 	}
 }

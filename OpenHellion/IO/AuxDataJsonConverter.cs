@@ -22,22 +22,15 @@ public class AuxDataJsonConverter : JsonConverter
 		{
 			return null;
 		}
-		try
+		if (objectType == typeof(DynamicObjectAuxData))
 		{
-			if (objectType == typeof(DynamicObjectAuxData))
-			{
-				JObject jo = JObject.Load(reader);
-				return DynamicObjectAuxData.GetJsonData(jo, serializer);
-			}
-			if (objectType == typeof(SystemAuxData))
-			{
-				JObject jo2 = JObject.Load(reader);
-				return SystemAuxData.GetJsonData(jo2, serializer);
-			}
+			JObject jo = JObject.Load(reader);
+			return DynamicObjectAuxData.GetJsonData(jo, serializer);
 		}
-		catch (Exception ex)
+		if (objectType == typeof(SystemAuxData))
 		{
-			Debug.Exception(ex);
+			JObject jo2 = JObject.Load(reader);
+			return SystemAuxData.GetJsonData(jo2, serializer);
 		}
 		return null;
 	}

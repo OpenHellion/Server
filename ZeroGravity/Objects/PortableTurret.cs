@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -14,30 +14,36 @@ internal class PortableTurret : Item
 
 	private Player targetPlayer;
 
-	private PortableTurretStats _stats;
+	private PortableTurretStats _stats = new();
 
 	public bool isStunned;
 
 	public override DynamicObjectStats StatsNew => _stats;
 
-	public PortableTurret(DynamicObjectAuxData data)
+	private PortableTurret()
 	{
-		_stats = new PortableTurretStats();
-		EventSystem.AddListener(typeof(PortableTurretShootingMessage), PortableTurretShootingMessageListener);
-		if (data != null)
-		{
-			SetData(data);
-		}
+		EventSystem.AddListener<PortableTurretShootingMessage>(PortableTurretShootingMessageListener);
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public static async Task<PortableTurret> CreateAsync(DynamicObjectAuxData data)
+	{
+		PortableTurret portableTurret = new();
+		if (data != null)
+		{
+			await portableTurret.SetData(data);
+		}
+
+		return portableTurret;
+	}
+
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		PortableTurretStats ts = stats as PortableTurretStats;
 		if (ts.IsActive.HasValue)
 		{
 			IsActive = ts.IsActive.Value;
 		}
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 		return false;
 	}
 
@@ -52,44 +58,37 @@ internal class PortableTurret : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataPortableTurret data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataPortableTurret data)
-			{
-				Debug.Warning("PersistenceObjectDataPortableTurret data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.PortableTurretData);
-				ApplyTierMultiplier();
-			}
+			Debug.LogWarning("PersistenceObjectDataPortableTurret data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.PortableTurretData);
+			ApplyTierMultiplier();
 		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		PortableTurretData ptd = data as PortableTurretData;
 		IsActive = ptd.IsActive;
 		Damage = ptd.Damage;
 		ApplyTierMultiplier();
 	}
 
-	private void PortableTurretShootingMessageListener(NetworkData data)
+	private async void PortableTurretShootingMessageListener(NetworkData data)
 	{
-		PortableTurretShootingMessage ptsm = data as PortableTurretShootingMessage;
-		if (ptsm.TurretGUID == base.GUID && !isStunned)
+		var message = data as PortableTurretShootingMessage;
+		if (message.TurretGUID == GUID && !isStunned)
 		{
-			targetPlayer = Server.Instance.GetPlayer(ptsm.Sender);
-			NetworkController.SendToClientsSubscribedTo(ptsm, -1L, targetPlayer.Parent);
-			if (ptsm.IsShooting)
+			targetPlayer = Server.Instance.GetPlayer(message.Sender);
+			await NetworkController.SendToClientsSubscribedTo(message, -1L, targetPlayer.Parent);
+			if (message.IsShooting)
 			{
 				Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, DamagePlayer);
 			}
@@ -100,36 +99,36 @@ internal class PortableTurret : Item
 		}
 	}
 
-	public void UnStun()
+	public async Task UnStun()
 	{
-		if (base.DynamicObj.Parent != null)
+		if (DynamicObj.Parent != null)
 		{
 			isStunned = false;
 			(StatsNew as PortableTurretStats).IsStunned = false;
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 	}
 
-	public override void TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false)
+	public override async Task TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false)
 	{
-		base.TakeDamage(damages, forceTakeDamage);
+		await base.TakeDamage(damages, forceTakeDamage);
 		if (damages.ContainsKey(TypeOfDamage.EMP))
 		{
 			isStunned = true;
-			Extensions.Invoke(delegate
+			Extensions.Invoke(async delegate
 			{
-				UnStun();
+				await UnStun();
 			}, 10.0);
 			(StatsNew as PortableTurretStats).IsStunned = isStunned;
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 	}
 
-	private void DamagePlayer(double deltaTime)
+	private async void DamagePlayer(double deltaTime)
 	{
-		if (targetPlayer != null && targetPlayer.IsAlive)
+		if (targetPlayer is { IsAlive: true })
 		{
-			targetPlayer.Stats.TakeHitDamage(Damage * base.TierMultiplier * (float)deltaTime, PlayerStats.HitBoxType.Torso, isMelee: false, null, (float)deltaTime);
+			await targetPlayer.Stats.TakeHitDamage(Damage * TierMultiplier * (float)deltaTime, PlayerStats.HitBoxType.Torso, isMelee: false, null, (float)deltaTime);
 		}
 		else
 		{
@@ -141,8 +140,13 @@ internal class PortableTurret : Item
 	{
 		if (!TierMultiplierApplied)
 		{
-			base.Armor = base.AuxValue;
+			Armor = AuxValue;
 		}
 		base.ApplyTierMultiplier();
+	}
+
+	~PortableTurret()
+	{
+		EventSystem.RemoveListener<PortableTurretShootingMessage>(PortableTurretShootingMessageListener);
 	}
 }

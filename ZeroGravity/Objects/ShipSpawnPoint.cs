@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -29,7 +30,7 @@ public class ShipSpawnPoint
 
 	public List<int> ExecutorOccupiedStateIDs;
 
-	public SpawnPointStats SetStats(SpawnPointStats stats, Player sender)
+	public async Task<SpawnPointStats> SetStats(SpawnPointStats stats, Player sender)
 	{
 		if (Type == SpawnPointType.SimpleSpawn)
 		{
@@ -43,7 +44,7 @@ public class ShipSpawnPoint
 			}
 			State = SpawnPointState.Locked;
 			Player = sender;
-			if (!Server.Instance.PlayerInviteChanged(this, stats.InvitedPlayerId, stats.InvitedPlayerName, sender))
+			if (!await Server.Instance.PlayerInviteChanged(this, stats.InvitedPlayerId, stats.InvitedPlayerName, sender))
 			{
 				return new SpawnPointStats
 				{
@@ -75,13 +76,13 @@ public class ShipSpawnPoint
 					PlayerGUID = -1L
 				};
 			}
-			Server.Instance.PlayerInviteChanged(this, "", "", sender);
+			await Server.Instance.PlayerInviteChanged(this, "", "", sender);
 		}
 		else if (stats.HackUnlock.HasValue && stats.HackUnlock.Value && stats.NewState == SpawnPointState.Unlocked && State == SpawnPointState.Locked && sender != Player && sender.ItemInHands != null && ItemTypeRange.IsHackingTool(sender.ItemInHands.Type))
 		{
 			State = SpawnPointState.Unlocked;
 			Player = null;
-			sender.ItemInHands.ChangeStats(new DisposableHackingToolStats
+			await sender.ItemInHands.ChangeStats(new DisposableHackingToolStats
 			{
 				Use = true
 			});
@@ -94,7 +95,7 @@ public class ShipSpawnPoint
 					PlayerGUID = -1L
 				};
 			}
-			Server.Instance.PlayerInviteChanged(this, "", "", sender);
+			await Server.Instance.PlayerInviteChanged(this, "", "", sender);
 		}
 		else
 		{
@@ -113,11 +114,11 @@ public class ShipSpawnPoint
 			}
 			if (stats.NewState == SpawnPointState.Authorized)
 			{
-				if (sender.AuthorizedSpawnPoint != null && sender.AuthorizedSpawnPoint.State == SpawnPointState.Authorized)
+				if (sender.AuthorizedSpawnPoint is { State: SpawnPointState.Authorized })
 				{
 					sender.AuthorizedSpawnPoint.State = SpawnPointState.Locked;
 					ShipStatsMessage retMsg = new ShipStatsMessage();
-					retMsg.GUID = sender.AuthorizedSpawnPoint.Ship.GUID;
+					retMsg.GUID = sender.AuthorizedSpawnPoint.Ship.Guid;
 					retMsg.Temperature = sender.AuthorizedSpawnPoint.Ship.Temperature;
 					retMsg.Health = sender.AuthorizedSpawnPoint.Ship.Health;
 					retMsg.Armor = sender.AuthorizedSpawnPoint.Ship.Armor;
@@ -132,7 +133,7 @@ public class ShipSpawnPoint
 						PlayerId = sender.PlayerId
 					});
 					retMsg.SelfDestructTime = sender.AuthorizedSpawnPoint.Ship.SelfDestructTimer?.Time;
-					NetworkController.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
+					await NetworkController.SendToClientsSubscribedTo(retMsg, -1L, sender.AuthorizedSpawnPoint.Ship);
 				}
 				State = SpawnPointState.Authorized;
 				Player = sender;
@@ -150,7 +151,7 @@ public class ShipSpawnPoint
 		return null;
 	}
 
-	public void SetInvitation(string id, string name, bool sendMessage)
+	public async Task SetInvitation(string id, string name, bool sendMessage)
 	{
 		if (!(id == InvitedPlayerId) && (!InvitedPlayerId.IsNullOrEmpty() || !id.IsNullOrEmpty()))
 		{
@@ -159,7 +160,7 @@ public class ShipSpawnPoint
 			if (sendMessage)
 			{
 				ShipStatsMessage retMsg = new ShipStatsMessage();
-				retMsg.GUID = Ship.GUID;
+				retMsg.GUID = Ship.Guid;
 				retMsg.Temperature = Ship.Temperature;
 				retMsg.Health = Ship.Health;
 				retMsg.Armor = Ship.Armor;
@@ -177,12 +178,12 @@ public class ShipSpawnPoint
 					InvitedPlayerId = InvitedPlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				await NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}
 
-	public void AuthorizePlayerToSpawnPoint(Player pl, bool sendMessage)
+	public async Task AuthorizePlayerToSpawnPoint(Player pl, bool sendMessage)
 	{
 		if (Type != 0 && (Player != pl || State != SpawnPointState.Authorized))
 		{
@@ -192,7 +193,7 @@ public class ShipSpawnPoint
 			if (sendMessage)
 			{
 				ShipStatsMessage retMsg = new ShipStatsMessage();
-				retMsg.GUID = Ship.GUID;
+				retMsg.GUID = Ship.Guid;
 				retMsg.Temperature = Ship.Temperature;
 				retMsg.Health = Ship.Health;
 				retMsg.Armor = Ship.Armor;
@@ -207,7 +208,7 @@ public class ShipSpawnPoint
 					PlayerId = Player.PlayerId
 				});
 				retMsg.SelfDestructTime = Ship.SelfDestructTimer?.Time;
-				NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
+				await NetworkController.SendToClientsSubscribedTo(retMsg, -1L, Ship);
 			}
 		}
 	}

@@ -3,7 +3,7 @@ using ProtoBuf;
 namespace ZeroGravity.Network;
 
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-public class DynamicObectMovementMessage : NetworkData
+public class DynamicObjectMovementMessage : NetworkData
 {
 	public long GUID;
 

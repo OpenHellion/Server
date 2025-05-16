@@ -19,9 +19,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public bool IsAlive;
 
-	private bool _EnvironmentReady;
+	private bool _environmentReady;
 
-	private bool _PlayerReady;
+	private bool _playerReady;
 
 	public string Name;
 
@@ -49,21 +49,21 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public int AnimationStatsMask;
 
-	private HashSet<long> subscribedToSpaceObjects = new HashSet<long>();
+	private readonly HashSet<long> _subscribedToSpaceObjects = [];
 
-	private float[] gravity;
+	private float[] _gravity;
 
 	public Vector3D LocalVelocity = Vector3D.Zero;
 
-	private float collisionImpactVelocity;
+	private float _collisionImpactVelocity;
 
-	private Helmet currentHelmet;
+	private Helmet _currentHelmet;
 
-	private Jetpack currentJetpack;
+	private Jetpack _currentJetpack;
 
 	public Dictionary<byte, RagdollItemData> RagdollData;
 
-	private sbyte[] jetpackDirection;
+	private sbyte[] _jetpackDirection;
 
 	public CharacterTransformData TransformData;
 
@@ -77,19 +77,19 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public const float timeToUpdateItems = 0.3f;
 
-	private Vector3D pivotPositionCorrection = Vector3D.Zero;
+	private Vector3D _pivotPositionCorrection = Vector3D.Zero;
 
-	private Vector3D pivotVelocityCorrection = Vector3D.Zero;
+	private Vector3D _pivotVelocityCorrection = Vector3D.Zero;
 
-	private Vector3D? dockUndockPositionCorrection;
+	private Vector3D? _dockUndockPositionCorrection;
 
-	private QuaternionD? dockUndockRotationCorrection;
+	private QuaternionD? _dockUndockRotationCorrection;
 
-	private bool dockUndockWaitForMsg;
+	private bool _dockUndockWaitForMsg;
 
 	public bool IsAdmin = false;
 
-	private SpaceObject _Parent;
+	private SpaceObject _parent;
 
 	public Room CurrentRoom;
 
@@ -99,11 +99,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public float CoreTemperature = 37f;
 
-	private bool outfitTempRegulationActive;
+	private double _lastPivotResetTime;
 
-	private double lastPivotResetTime;
-
-	private double lateDisconnectWait;
+	private double _lateDisconnectWait;
 
 	public bool IsInsideSpawnPoint;
 
@@ -125,16 +123,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public bool EnvironmentReady
 	{
-		get
+		get => _environmentReady;
+		private set
 		{
-			return _EnvironmentReady;
-		}
-		set
-		{
-			if (_EnvironmentReady = value)
+			if (_environmentReady != value)
 			{
-				_EnvironmentReady = value;
-				if (PlayerReady && EnvironmentReady)
+				_environmentReady = value;
+				if (PlayerReady && _environmentReady)
 				{
 					Initialize = false;
 				}
@@ -146,13 +141,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		get
 		{
-			return _PlayerReady;
+			return _playerReady;
 		}
 		set
 		{
-			if (_PlayerReady = value)
+			if (_playerReady = value)
 			{
-				_PlayerReady = value;
+				_playerReady = value;
 				if (PlayerReady && EnvironmentReady)
 				{
 					Initialize = false;
@@ -171,11 +166,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		get
 		{
-			return currentHelmet;
+			return _currentHelmet;
 		}
 		set
 		{
-			currentHelmet = value;
+			_currentHelmet = value;
 			if (value == null && CurrentJetpack != null)
 			{
 				CurrentJetpack.Helmet = null;
@@ -187,11 +182,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		get
 		{
-			return currentJetpack;
+			return _currentJetpack;
 		}
 		set
 		{
-			currentJetpack = value;
+			_currentJetpack = value;
 			if (value == null && CurrentHelmet != null)
 			{
 				CurrentHelmet.Jetpack = value;
@@ -217,16 +212,16 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		get
 		{
-			return _Parent;
+			return _parent;
 		}
 		set
 		{
-			if (_Parent != null && _Parent is SpaceObjectVessel vessel)
+			if (_parent is SpaceObjectVessel vessel)
 			{
 				vessel.RemovePlayerFromCrew(this);
 			}
-			_Parent = value;
-			if (_Parent != null && _Parent is SpaceObjectVessel objectVessel)
+			_parent = value;
+			if (_parent is SpaceObjectVessel objectVessel)
 			{
 				objectVessel.AddPlayerToCrew(this);
 			}
@@ -271,154 +266,163 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public bool AffectsQuantity => false;
 
-	public Player(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
+	public Player(long guid, Vector3D localPosition, QuaternionD localRotation)
 		: base(guid, localPosition, localRotation)
+	{}
+
+	public static async Task<Player> CreatePlayerAsync(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
 	{
-		FakeGuid = GUIDFactory.NextPlayerFakeGUID();
-		Name = name;
-		PlayerId = playerId;
-		Gender = gender;
-		HeadType = headType;
-		HairType = hairType;
-		Stats = new PlayerStats();
-		Stats.pl = this;
-		PlayerInventory = new Inventory(this);
-		Quests = StaticData.QuestsData.Select((QuestData m) => new Quest(m, this)).ToList();
+		var player = new Player(guid, localPosition, localRotation)
+		{
+			FakeGuid = GUIDFactory.NextPlayerFakeGUID(),
+			Name = name,
+			PlayerId = playerId,
+			Gender = gender,
+			HeadType = headType,
+			HairType = hairType,
+			Stats = new PlayerStats()
+		};
+		player.Stats.pl = player;
+		player.PlayerInventory = new Inventory(player);
+		player.Quests = await Quest.CreateQuestsAsync(StaticData.QuestsData, player);
 		if (addToServerList)
 		{
-			Server.Instance.Add(this);
+			Server.Instance.Add(player);
 		}
 		if (clone == null)
 		{
-			return;
+			return player;
 		}
 		if (clone.PlayerInventory.OutfitSlot.Item != null)
 		{
-			PlayerInventory.AddItemToInventory(clone.PlayerInventory.OutfitSlot.Item.GetCopy(), clone.PlayerInventory.OutfitSlot.SlotID);
+			await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.OutfitSlot.Item.GetCopy(), clone.PlayerInventory.OutfitSlot.SlotID);
 			foreach (InventorySlot sl in clone.PlayerInventory.CurrOutfit.InventorySlots.Values.Where((InventorySlot m) => m.Item != null))
 			{
-				PlayerInventory.AddItemToInventory(clone.PlayerInventory.CurrOutfit.InventorySlots[sl.SlotID].Item.GetCopy(), sl.SlotID);
+				await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.CurrOutfit.InventorySlots[sl.SlotID].Item.GetCopy(), sl.SlotID);
 			}
 		}
 		if (clone.PlayerInventory.HandsSlot.Item != null)
 		{
-			PlayerInventory.AddItemToInventory(clone.PlayerInventory.HandsSlot.Item.GetCopy(), clone.PlayerInventory.HandsSlot.SlotID);
+			await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.HandsSlot.Item.GetCopy(), clone.PlayerInventory.HandsSlot.SlotID);
 		}
+
+		return player;
 	}
 
 	public void ConnectToNetworkController()
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		EventSystem.AddListener(typeof(CharacterMovementMessage), UpdateMovementListener);
-		EventSystem.AddListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
-		EventSystem.AddListener(typeof(PlayerShootingMessage), PlayerShootingListener);
-		EventSystem.AddListener(typeof(PlayerHitMessage), PlayerHitListener);
-		EventSystem.AddListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
-		EventSystem.AddListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
-		EventSystem.AddListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
-		EventSystem.AddListener(typeof(SuicideRequest), SuicideListener);
-		EventSystem.AddListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
-		EventSystem.AddListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
-		EventSystem.AddListener(typeof(QuestTriggerMessage), QuestTriggerMessageListener);
-		EventSystem.AddListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
-		EventSystem.AddListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
+		EventSystem.AddListener<CharacterMovementMessage>(UpdateMovementListener);
+		EventSystem.AddListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
+		EventSystem.AddListener<PlayerShootingMessage>(PlayerShootingListener);
+		EventSystem.AddListener<PlayerHitMessage>(PlayerHitListener);
+		EventSystem.AddListener<PlayerStatsMessage>(PlayerStatsMessageListener);
+		EventSystem.AddListener<PlayerDrillingMessage>(PlayerDrillingListener);
+		EventSystem.AddListener<PlayerRoomMessage>(PlayerRoomMessageListener);
+		EventSystem.AddListener<SuicideRequest>(SuicideListener);
+		EventSystem.AddListener<AuthorizedVesselsRequest>(AuthorizedVesselsRequestListener);
+		EventSystem.AddListener<LockToTriggerMessage>(LockToTriggerMessageListener);
+		EventSystem.AddListener<QuestTriggerMessage>(QuestTriggerMessageListener);
+		EventSystem.AddListener<SkipQuestMessage>(SkipQuestMessageListener);
+		EventSystem.AddListener<NavigationMapDetailsMessage>(NavigationMapDetailsMessageListener);
 	}
 
-	public void DiconnectFromNetworkContoller()
+	public void DisconnectFromNetworkController()
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		EventSystem.RemoveListener(typeof(CharacterMovementMessage), UpdateMovementListener);
-		EventSystem.RemoveListener(typeof(EnvironmentReadyMessage), EnvironmentReadyListener);
-		EventSystem.RemoveListener(typeof(PlayerShootingMessage), PlayerShootingListener);
-		EventSystem.RemoveListener(typeof(PlayerHitMessage), PlayerHitListener);
-		EventSystem.RemoveListener(typeof(PlayerStatsMessage), PlayerStatsMessageListener);
-		EventSystem.RemoveListener(typeof(PlayerDrillingMessage), PlayerDrillingListener);
-		EventSystem.RemoveListener(typeof(PlayerRoomMessage), PlayerRoomMessageListener);
-		EventSystem.RemoveListener(typeof(SuicideRequest), SuicideListener);
-		EventSystem.RemoveListener(typeof(AuthorizedVesselsRequest), AuthorizedVesselsRequestListener);
-		EventSystem.RemoveListener(typeof(LockToTriggerMessage), LockToTriggerMessageListener);
-		EventSystem.RemoveListener(typeof(SkipQuestMessage), SkipQuestMessageListener);
-		EventSystem.RemoveListener(typeof(NavigationMapDetailsMessage), NavigationMapDetailsMessageListener);
+		EventSystem.RemoveListener<CharacterMovementMessage>(UpdateMovementListener);
+		EventSystem.RemoveListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
+		EventSystem.RemoveListener<PlayerShootingMessage>(PlayerShootingListener);
+		EventSystem.RemoveListener<PlayerHitMessage>(PlayerHitListener);
+		EventSystem.RemoveListener<PlayerStatsMessage>(PlayerStatsMessageListener);
+		EventSystem.RemoveListener<PlayerDrillingMessage>(PlayerDrillingListener);
+		EventSystem.RemoveListener<PlayerRoomMessage>(PlayerRoomMessageListener);
+		EventSystem.RemoveListener<SuicideRequest>(SuicideListener);
+		EventSystem.RemoveListener<AuthorizedVesselsRequest>(AuthorizedVesselsRequestListener);
+		EventSystem.RemoveListener<LockToTriggerMessage>(LockToTriggerMessageListener);
+		EventSystem.RemoveListener<QuestTriggerMessage>(QuestTriggerMessageListener);
+		EventSystem.RemoveListener<SkipQuestMessage>(SkipQuestMessageListener);
+		EventSystem.RemoveListener<NavigationMapDetailsMessage>(NavigationMapDetailsMessageListener);
 	}
 
-	public void RemovePlayerFromTrigger()
+	public async Task RemovePlayerFromTrigger()
 	{
 		if (lastPlayerStatsMessage != null)
 		{
 			lastPlayerStatsMessage.LockedToTriggerID = null;
-			NetworkController.SendToClientsSubscribedTo(lastPlayerStatsMessage, GUID, Parent);
+			await NetworkController.SendToClientsSubscribedTo(lastPlayerStatsMessage, Guid, Parent);
 		}
 	}
 
-	private void PlayerStatsMessageListener(NetworkData data)
+	private async void PlayerStatsMessageListener(NetworkData data)
 	{
-		PlayerStatsMessage psm = data as PlayerStatsMessage;
-		if (FakeGuid == psm.GUID)
+		var message = data as PlayerStatsMessage;
+		if (FakeGuid == message.GUID)
 		{
-			lastPlayerStatsMessage = psm;
-			if (psm.AnimationMaskChanged.HasValue && psm.AnimationMaskChanged.Value)
+			lastPlayerStatsMessage = message;
+			if (message.AnimationMaskChanged.HasValue && message.AnimationMaskChanged.Value)
 			{
-				AnimationStatsMask = psm.AnimationStatesMask;
+				AnimationStatsMask = message.AnimationStatesMask;
 			}
 			else
 			{
-				psm.AnimationStatesMask = AnimationStatsMask;
+				message.AnimationStatesMask = AnimationStatsMask;
 			}
-			LockedToTriggerID = psm.LockedToTriggerID;
-			IsPilotingVessel = psm.IsPilotingVessel;
-			NetworkController.SendToClientsSubscribedTo(psm, data.Sender, Parent);
+			LockedToTriggerID = message.LockedToTriggerID;
+			IsPilotingVessel = message.IsPilotingVessel;
+			await NetworkController.SendToClientsSubscribedTo(message, message.Sender, Parent);
 		}
 	}
 
-	protected void PlayerHitListener(NetworkData data)
+	protected async void PlayerHitListener(NetworkData data)
 	{
-		PlayerHitMessage phm = data as PlayerHitMessage;
-		if (phm.Sender != GUID)
+		var message = data as PlayerHitMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		if (phm.HitSuccessfull || MathHelper.RandomNextDouble() > 0.699999988079071)
+		if (message.HitSuccessfull || MathHelper.RandomNextDouble() > 0.699999988079071)
 		{
-			if (Stats.TakeHitDamage(phm.HitIndentifier) > 0f)
+			if (await Stats.TakeHitDamage(message.HitIndentifier) > 0f)
 			{
 				PlayerStatsMessage psm = new PlayerStatsMessage();
 				psm.Health = (int)Stats.HealthPoints;
 				psm.GUID = FakeGuid;
-				NetworkController.SendToGameClient(GUID, psm);
+				await NetworkController.Send(Guid, psm);
 			}
 		}
 		else
 		{
-			Stats.UnqueueHit(phm.HitIndentifier);
+			Stats.UnqueueHit(message.HitIndentifier);
 		}
 	}
 
-	private static void PassTroughtShootMessage(PlayerShootingMessage psm)
+	private static async Task PassTroughtShootMessage(PlayerShootingMessage psm)
 	{
 		PlayerShootingMessage sending = new PlayerShootingMessage();
 		sending.HitIndentifier = -1;
 		sending.ShotData = psm.ShotData;
 		sending.HitGUID = psm.HitGUID;
 		sending.GUID = psm.GUID;
-		NetworkController.SendToAllClients(sending, psm.Sender);
+		await NetworkController.SendToAll(sending, psm.Sender);
 	}
 
-	protected void PlayerShootingListener(NetworkData data)
+	protected async void PlayerShootingListener(NetworkData data)
 	{
-		if (data.Sender != GUID)
+		var message = data as PlayerShootingMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		PlayerShootingMessage psm = data as PlayerShootingMessage;
 		Weapon wep = PlayerInventory.GetHandsItemIfType<Weapon>() as Weapon;
-		if (wep == null && !psm.ShotData.IsMeleeAttack)
+		if (wep == null && !message.ShotData.IsMeleeAttack)
 		{
 			return;
 		}
 		bool rateValid = false;
-		if (psm.ShotData.IsMeleeAttack)
+		if (message.ShotData.IsMeleeAttack)
 		{
 			if (Server.Instance.SolarSystem.CurrentTime - Stats.lastMeleeTime > 1.0)
 			{
@@ -426,7 +430,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				Stats.lastMeleeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
 		}
-		else if (wep != null && wep.CanShoot())
+		else if (wep != null && await wep.CanShoot())
 		{
 			rateValid = true;
 		}
@@ -434,59 +438,58 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			return;
 		}
-		if (psm.HitGUID == -1)
+		if (message.HitGUID == -1)
 		{
-			psm.HitGUID = -2L;
-			PassTroughtShootMessage(psm);
+			message.HitGUID = -2L;
+			await PassTroughtShootMessage(message);
 			return;
 		}
-		SpaceObject sp = Server.Instance.GetObject(psm.HitGUID);
+		SpaceObject sp = Server.Instance.GetObject(message.HitGUID);
 		float damage = 0f;
-		damage = wep == null ? psm.ShotData.IsMeleeAttack ? 30f : 0f : psm.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage;
+		damage = wep == null ? message.ShotData.IsMeleeAttack ? 30f : 0f : message.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage;
 		if (sp is DynamicObject dynamicObject)
 		{
-			dynamicObject.Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
+			await dynamicObject.Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
 			{
 				TypeOfDamage.Hit,
 				damage
 			} });
 		}
-		if (Server.Instance.GetObject(psm.HitGUID) is Player hitPlayer)
+		if (Server.Instance.GetObject(message.HitGUID) is Player hitPlayer)
 		{
-			NetworkController.SendToClientsSubscribedTo(psm, GUID, Parent, hitPlayer.Parent);
-			float realDamage = hitPlayer.Stats.TakeHitDamage(hitPlayer.Stats.QueueHit((PlayerStats.HitBoxType)psm.ShotData.colliderType, damage, psm.ShotData.Orientation.ToVector3D(), psm.ShotData.IsMeleeAttack));
+			await NetworkController.SendToClientsSubscribedTo(message, Guid, Parent, hitPlayer.Parent);
+			float realDamage = await hitPlayer.Stats.TakeHitDamage(hitPlayer.Stats.QueueHit((PlayerStats.HitBoxType)message.ShotData.colliderType, damage, message.ShotData.Orientation.ToVector3D(), message.ShotData.IsMeleeAttack));
 		}
 	}
 
-	protected void PlayerDrillingListener(NetworkData data)
+	protected async void PlayerDrillingListener(NetworkData data)
 	{
-		PlayerDrillingMessage pdm = data as PlayerDrillingMessage;
+		var message = data as PlayerDrillingMessage;
 		HandDrill drill = ItemInHands as HandDrill;
-		if (data.Sender == GUID && drill != null)
+		if (message.Sender == Guid && drill != null)
 		{
 			PlayerDrillingMessage pdmForOtherChar = new PlayerDrillingMessage();
 			pdmForOtherChar.DrillersGUID = FakeGuid;
-			pdmForOtherChar.dontPlayEffect = pdm.dontPlayEffect;
-			pdmForOtherChar.isDrilling = pdm.isDrilling;
-			NetworkController.SendToClientsSubscribedTo(pdmForOtherChar, GUID, Parent);
-			if (drill.CanDrill && pdm.MiningPointID != null && Server.Instance.GetVessel(pdm.MiningPointID.VesselGUID) is Asteroid asteroid && asteroid.MiningPoints.TryGetValue(pdm.MiningPointID.InSceneID, out var miningPoint))
+			pdmForOtherChar.dontPlayEffect = message.dontPlayEffect;
+			pdmForOtherChar.isDrilling = message.isDrilling;
+			await NetworkController.SendToClientsSubscribedTo(pdmForOtherChar, Guid, Parent);
+			if (drill.CanDrill && message.MiningPointID != null && Server.Instance.GetVessel(message.MiningPointID.VesselGUID) is Asteroid asteroid && asteroid.MiningPoints.TryGetValue(message.MiningPointID.InSceneID, out var miningPoint))
 			{
-				drill.Battery.ChangeQuantity((0f - drill.BatteryUsage) * pdm.MiningTime * drill.TierMultiplier);
-				drill.Canister.ChangeQuantityBy(0, miningPoint.ResourceType, drill.DrillingStrength * drill.TierMultiplier * pdm.MiningTime);
-				miningPoint.Quantity = MathHelper.Clamp(miningPoint.Quantity - drill.DrillingStrength * drill.TierMultiplier * pdm.MiningTime, 0f, miningPoint.MaxQuantity);
-				drill.DrillBit.TakeDamage(TypeOfDamage.Degradation, drill.DrillBit.UsageWear * pdm.MiningTime * drill.DrillBit.TierMultiplier, forceTakeDamage: true);
+				await drill.Battery.ChangeQuantity((0f - drill.BatteryUsage) * message.MiningTime * drill.TierMultiplier);
+				await drill.Canister.ChangeQuantityByAsync(0, miningPoint.ResourceType, drill.DrillingStrength * drill.TierMultiplier * message.MiningTime);
+				miningPoint.Quantity = MathHelper.Clamp(miningPoint.Quantity - drill.DrillingStrength * drill.TierMultiplier * message.MiningTime, 0f, miningPoint.MaxQuantity);
+				await drill.DrillBit.TakeDamage(TypeOfDamage.Degradation, drill.DrillBit.UsageWear * message.MiningTime * drill.DrillBit.TierMultiplier, forceTakeDamage: true);
 			}
 		}
 	}
 
-	protected void EnvironmentReadyListener(NetworkData data)
+	protected async void EnvironmentReadyListener(NetworkData data)
 	{
-		EnvironmentReadyMessage erd = data as EnvironmentReadyMessage;
-		if (erd.Sender != GUID)
+		var message = data as EnvironmentReadyMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		EnvironmentReady = true;
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		NetworkController.AddCharacterSpawnsToResponse(this, ref res);
 		if (Parent is SpaceObjectVessel)
@@ -519,12 +522,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				}
 			}
 		}
-		NetworkController.SendToGameClient(GUID, res);
-		NetworkController.SendCharacterSpawnToOtherPlayers(this);
+		await NetworkController.Send(Guid, res);
+		await NetworkController.SendCharacterSpawnToOtherPlayers(this);
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
-		foreach (SpaceObjectVessel ves in from m in subscribedToSpaceObjects
+		foreach (SpaceObjectVessel ves in from m in _subscribedToSpaceObjects
 			select Server.Instance.GetObject(m) into m
-			where m != null && m is SpaceObjectVessel
+			where m is SpaceObjectVessel
 			select m as SpaceObjectVessel)
 		{
 			VesselObjects vesselObjects = ves.GetVesselObjects();
@@ -535,61 +538,62 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					sted.IsImmediate = true;
 				}
 			}
-			NetworkController.SendToGameClient(GUID, new ShipStatsMessage
+			await NetworkController.Send(Guid, new ShipStatsMessage
 			{
-				GUID = ves.GUID,
+				GUID = ves.Guid,
 				VesselObjects = vesselObjects
 			});
 		}
 		IsAlive = true;
+		EnvironmentReady = true;
 	}
 
-	private void SuicideListener(NetworkData data)
+	private async void SuicideListener(NetworkData data)
 	{
-		if (data.Sender == GUID)
+		if (data.Sender == Guid)
 		{
-			KillYourself(HurtType.Suicide);
+			await KillPlayer(HurtType.Suicide);
 		}
 	}
 
-	private void AuthorizedVesselsRequestListener(NetworkData data)
+	private async void AuthorizedVesselsRequestListener(NetworkData data)
 	{
-		if (data.Sender == GUID)
+		if (data.Sender == Guid)
 		{
-			SendAuthorizedVesselsResponse();
+			await SendAuthorizedVesselsResponse();
 		}
 	}
 
-	public void SendAuthorizedVesselsResponse()
+	public async Task SendAuthorizedVesselsResponse()
 	{
 		AuthorizedVesselsResponse avr = new AuthorizedVesselsResponse
 		{
 			GUIDs = (from m in Server.Instance.AllVessels
 				where m.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson n) => n.PlayerId == PlayerId) != null
-				select m.GUID).ToArray()
+				select m.Guid).ToArray()
 		};
-		NetworkController.SendToGameClient(GUID, avr);
+		await NetworkController.Send(Guid, avr);
 	}
 
-	private void QuestTriggerMessageListener(NetworkData data)
+	private async void QuestTriggerMessageListener(NetworkData data)
 	{
-		QuestTriggerMessage qtm = data as QuestTriggerMessage;
-		if (qtm.Sender != GUID)
+		var message = data as QuestTriggerMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == qtm.QuestID);
+		Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == message.QuestID);
 		if (quest == null || (quest.DependencyQuests != null && Quests.FirstOrDefault((Quest m) => quest.DependencyQuests.Contains(m.ID) && m.Status != QuestStatus.Completed) != null))
 		{
 			return;
 		}
-		QuestTrigger qt = quest.QuestTriggers.FirstOrDefault((QuestTrigger m) => m.ID == qtm.TriggerID);
+		QuestTrigger qt = quest.QuestTriggers.FirstOrDefault((QuestTrigger m) => m.ID == message.TriggerID);
 		if (qt is not { Status: QuestStatus.Active })
 		{
 			return;
 		}
-		qt.Status = QuestStatus.Completed;
-		qt.UpdateDependentTriggers(quest);
+		await qt.SetQuestStatusAsync(QuestStatus.Completed);
+		await qt.UpdateDependentTriggers(quest);
 		List<Task> tasks = new List<Task>();
 		if (qt.Type == QuestTriggerType.Activate && quest.Status == QuestStatus.Inactive)
 		{
@@ -598,7 +602,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				foreach (QuestTrigger aqt in quest.QuestTriggers.Where((QuestTrigger m) => m.Type == QuestTriggerType.Activate))
 				{
-					aqt.Status = QuestStatus.Completed;
+					await aqt.SetQuestStatusAsync(QuestStatus.Completed);
 				}
 			}
 		}
@@ -615,38 +619,37 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 						aaq.Status = QuestStatus.Active;
 						foreach (QuestTrigger aaqt in aaq.QuestTriggers.Where((QuestTrigger m) => m.Type == QuestTriggerType.Activate && m.Status != QuestStatus.Completed))
 						{
-							aaqt.Status = QuestStatus.Completed;
-							aaqt.UpdateDependentTriggers(aaq);
+							await aaqt.SetQuestStatusAsync(QuestStatus.Completed);
+							await aaqt.UpdateDependentTriggers(aaq);
 						}
 					}
-					tasks.Add(new Task(delegate
-					{
-						NetworkController.SendToGameClient(qtm.Sender, new QuestStatsMessage
+					tasks.Add(
+						NetworkController.Send(message.Sender, new QuestStatsMessage
 						{
 							QuestDetails = aaq.GetDetails()
-						});
-					}));
+						}
+					));
 				}
 			}
 		}
-		NetworkController.SendToGameClient(qtm.Sender, new QuestStatsMessage
+		await NetworkController.Send(message.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
 		foreach (Task t in tasks)
 		{
-			t.RunSynchronously();
+			await t;
 		}
 	}
 
-	private void SkipQuestMessageListener(NetworkData data)
+	private async void SkipQuestMessageListener(NetworkData data)
 	{
-		SkipQuestMessage sqm = data as SkipQuestMessage;
-		if (sqm.Sender != GUID)
+		var message = data as SkipQuestMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == sqm.QuestID);
+		Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == message.QuestID);
 		if (quest == null)
 		{
 			return;
@@ -654,7 +657,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		quest.Status = QuestStatus.Completed;
 		foreach (QuestTrigger qt in quest.QuestTriggers)
 		{
-			qt.Status = QuestStatus.Completed;
+			await qt.SetQuestStatusAsync(QuestStatus.Completed);
 		}
 		List<Task> tasks = new List<Task>();
 		foreach (Quest aaq in Quests.Where((Quest m) => m.AutoActivate && m.DependencyQuests.Contains(quest.ID) && m.Status == QuestStatus.Inactive))
@@ -665,52 +668,49 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				aaq.Status = QuestStatus.Active;
 				foreach (QuestTrigger aaqt in aaq.QuestTriggers.Where((QuestTrigger m) => m.Type == QuestTriggerType.Activate && m.Status != QuestStatus.Completed))
 				{
-					aaqt.Status = QuestStatus.Completed;
-					aaqt.UpdateDependentTriggers(aaq);
+					await aaqt.SetQuestStatusAsync(QuestStatus.Completed);
+					await aaqt.UpdateDependentTriggers(aaq);
 				}
 			}
-			tasks.Add(new Task(delegate
-			{
-				NetworkController.SendToGameClient(sqm.Sender, new QuestStatsMessage
+			tasks.Add(NetworkController.Send(message.Sender, new QuestStatsMessage
 				{
 					QuestDetails = aaq.GetDetails()
-				});
-			}));
+				}));
 		}
-		NetworkController.SendToGameClient(sqm.Sender, new QuestStatsMessage
+		await NetworkController.Send(message.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
 		foreach (Task t in tasks)
 		{
-			t.RunSynchronously();
+			await t;
 		}
 	}
 
-	private void LockToTriggerMessageListener(NetworkData data)
+	private async void LockToTriggerMessageListener(NetworkData data)
 	{
-		LockToTriggerMessage ltm = data as LockToTriggerMessage;
-		if (ltm.Sender == GUID)
+		var message = data as LockToTriggerMessage;
+		if (message.Sender == Guid)
 		{
-			if (ltm.TriggerID == null)
+			if (message.TriggerID == null)
 			{
 				LockedToTriggerID = null;
-				IsPilotingVessel = ltm.IsPilotingVessel;
+				IsPilotingVessel = message.IsPilotingVessel;
 			}
-			else if (Server.Instance.AllPlayers.FirstOrDefault((Player m) => m.GUID != GUID && m.LockedToTriggerID != null && m.LockedToTriggerID.Equals(ltm.TriggerID)) == null)
+			else if (Server.Instance.AllPlayers.FirstOrDefault((Player m) => m.Guid != Guid && m.LockedToTriggerID != null && m.LockedToTriggerID.Equals(message.TriggerID)) == null)
 			{
-				LockedToTriggerID = ltm.TriggerID;
-				IsPilotingVessel = ltm.IsPilotingVessel;
-				NetworkController.SendToGameClient(data.Sender, ltm);
+				LockedToTriggerID = message.TriggerID;
+				IsPilotingVessel = message.IsPilotingVessel;
+				await NetworkController.Send(message.Sender, message);
 			}
 		}
 	}
 
 	public void SetDockUndockCorrection(Vector3D? posCorrection, QuaternionD? rotCorrection)
 	{
-		dockUndockPositionCorrection = posCorrection;
-		dockUndockRotationCorrection = rotCorrection;
-		dockUndockWaitForMsg = posCorrection.HasValue && rotCorrection.HasValue;
+		_dockUndockPositionCorrection = posCorrection;
+		_dockUndockRotationCorrection = rotCorrection;
+		_dockUndockWaitForMsg = posCorrection.HasValue && rotCorrection.HasValue;
 	}
 
 	public void ModifyLocalPositionAndRotation(Vector3D locPos, QuaternionD locRot)
@@ -724,101 +724,101 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	private void UpdateMovementListener(NetworkData data)
+	private async void UpdateMovementListener(NetworkData data)
 	{
-		CharacterMovementMessage mm = data as CharacterMovementMessage;
-		if (mm.Sender != GUID || !IsAlive || (Parent is Pivot && mm.ParentType == SpaceObjectType.None))
+		var message = data as CharacterMovementMessage;
+		if (message.Sender != Guid || !IsAlive || (Parent is Pivot && message.ParentType == SpaceObjectType.None))
 		{
 			return;
 		}
-		MouseLook = mm.TransformData.MouseLook;
-		FreeLookX = mm.TransformData.FreeLookX;
-		FreeLookY = mm.TransformData.FreeLookY;
+		MouseLook = message.TransformData.MouseLook;
+		FreeLookX = message.TransformData.FreeLookX;
+		FreeLookY = message.TransformData.FreeLookY;
 		CharacterAnimationData tmp = new CharacterAnimationData();
-		tmp.VelocityForward = mm.AnimationData.VelocityForward;
-		tmp.VelocityRight = mm.AnimationData.VelocityRight;
-		tmp.ZeroGForward = mm.AnimationData.ZeroGForward;
-		tmp.ZeroGRight = mm.AnimationData.ZeroGRight;
-		tmp.PlayerStance = mm.AnimationData.PlayerStance;
-		tmp.InteractType = mm.AnimationData.InteractType;
-		tmp.TurningDirection = mm.AnimationData.TurningDirection;
-		tmp.EquipOrDeEquip = mm.AnimationData.EquipOrDeEquip;
-		tmp.EquipItemId = mm.AnimationData.EquipItemId;
-		tmp.EmoteType = mm.AnimationData.EmoteType;
-		tmp.ReloadItemType = mm.AnimationData.ReloadItemType;
-		tmp.MeleeAttackType = mm.AnimationData.MeleeAttackType;
-		tmp.LadderDirection = mm.AnimationData.LadderDirection;
-		tmp.PlayerStanceFloat = mm.AnimationData.PlayerStanceFloat;
-		tmp.GetUpType = mm.AnimationData.GetUpType;
-		tmp.FireMode = mm.AnimationData.FireMode;
-		tmp.AirTime = mm.AnimationData.AirTime;
+		tmp.VelocityForward = message.AnimationData.VelocityForward;
+		tmp.VelocityRight = message.AnimationData.VelocityRight;
+		tmp.ZeroGForward = message.AnimationData.ZeroGForward;
+		tmp.ZeroGRight = message.AnimationData.ZeroGRight;
+		tmp.PlayerStance = message.AnimationData.PlayerStance;
+		tmp.InteractType = message.AnimationData.InteractType;
+		tmp.TurningDirection = message.AnimationData.TurningDirection;
+		tmp.EquipOrDeEquip = message.AnimationData.EquipOrDeEquip;
+		tmp.EquipItemId = message.AnimationData.EquipItemId;
+		tmp.EmoteType = message.AnimationData.EmoteType;
+		tmp.ReloadItemType = message.AnimationData.ReloadItemType;
+		tmp.MeleeAttackType = message.AnimationData.MeleeAttackType;
+		tmp.LadderDirection = message.AnimationData.LadderDirection;
+		tmp.PlayerStanceFloat = message.AnimationData.PlayerStanceFloat;
+		tmp.GetUpType = message.AnimationData.GetUpType;
+		tmp.FireMode = message.AnimationData.FireMode;
+		tmp.AirTime = message.AnimationData.AirTime;
 		AnimationData = tmp;
-		if (pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && mm.ParentType == SpaceObjectType.PlayerPivot && !mm.PivotReset)
+		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && message.ParentType == SpaceObjectType.PlayerPivot && !message.PivotReset)
 		{
 			return;
 		}
-		if (pivotPositionCorrection.IsNotEpsilonZero() && mm.ParentType == SpaceObjectType.PlayerPivot && mm.PivotReset)
+		if (_pivotPositionCorrection.IsNotEpsilonZero() && message.ParentType == SpaceObjectType.PlayerPivot && message.PivotReset)
 		{
-			pivotPositionCorrection = Vector3D.Zero;
+			_pivotPositionCorrection = Vector3D.Zero;
 			return;
 		}
-		TransformData = mm.TransformData;
-		LocalPosition = mm.TransformData.LocalPosition.ToVector3D();
-		if (pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && !mm.PivotReset)
+		TransformData = message.TransformData;
+		LocalPosition = message.TransformData.LocalPosition.ToVector3D();
+		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && !message.PivotReset)
 		{
-			LocalPosition -= pivotPositionCorrection;
+			LocalPosition -= _pivotPositionCorrection;
 			TransformData.LocalPosition = LocalPosition.ToFloatArray();
 		}
-		LocalRotation = mm.TransformData.LocalRotation.ToQuaternionD();
-		if (mm.DockUndockMsg.HasValue && dockUndockWaitForMsg)
+		LocalRotation = message.TransformData.LocalRotation.ToQuaternionD();
+		if (message.DockUndockMsg.HasValue && _dockUndockWaitForMsg)
 		{
 			SetDockUndockCorrection(null, null);
 		}
-		if (dockUndockPositionCorrection.HasValue && dockUndockRotationCorrection.HasValue)
+		if (_dockUndockPositionCorrection.HasValue && _dockUndockRotationCorrection.HasValue)
 		{
-			LocalPosition += dockUndockPositionCorrection.Value;
-			LocalRotation *= dockUndockRotationCorrection.Value;
+			LocalPosition += _dockUndockPositionCorrection.Value;
+			LocalRotation *= _dockUndockRotationCorrection.Value;
 			TransformData.LocalPosition = LocalPosition.ToFloatArray();
 			TransformData.LocalRotation = LocalRotation.ToFloatArray();
 		}
-		LocalVelocity = mm.TransformData.LocalVelocity.ToVector3D();
-		gravity = mm.Gravity;
-		if (mm.ImpactVelocity.HasValue)
+		LocalVelocity = message.TransformData.LocalVelocity.ToVector3D();
+		_gravity = message.Gravity;
+		if (message.ImpactVelocity.HasValue)
 		{
-			Stats.DoCollisionDamage(mm.ImpactVelocity.Value);
-			collisionImpactVelocity = mm.ImpactVelocity.Value;
+			await Stats.DoCollisionDamage(message.ImpactVelocity.Value);
+			_collisionImpactVelocity = message.ImpactVelocity.Value;
 		}
 		else
 		{
-			collisionImpactVelocity = 0f;
+			_collisionImpactVelocity = 0f;
 		}
-		if (mm.RagdollData != null)
+		if (message.RagdollData != null)
 		{
-			RagdollData = new Dictionary<byte, RagdollItemData>(mm.RagdollData);
+			RagdollData = new Dictionary<byte, RagdollItemData>(message.RagdollData);
 		}
 		else if (RagdollData != null)
 		{
 			RagdollData.Clear();
 			RagdollData = null;
 		}
-		if (mm.JetpackDirection != null)
+		if (message.JetpackDirection != null)
 		{
-			jetpackDirection = new sbyte[4]
+			_jetpackDirection = new sbyte[4]
 			{
-				mm.JetpackDirection[0],
-				mm.JetpackDirection[1],
-				mm.JetpackDirection[2],
-				mm.JetpackDirection[3]
+				message.JetpackDirection[0],
+				message.JetpackDirection[1],
+				message.JetpackDirection[2],
+				message.JetpackDirection[3]
 			};
 		}
-		else if (jetpackDirection != null)
+		else if (_jetpackDirection != null)
 		{
-			jetpackDirection = null;
+			_jetpackDirection = null;
 		}
-		if (Parent is SpaceObjectVessel && mm.ParentType == SpaceObjectType.PlayerPivot)
+		if (Parent is SpaceObjectVessel && message.ParentType == SpaceObjectType.PlayerPivot)
 		{
-			pivotPositionCorrection = Vector3D.Zero;
-			pivotVelocityCorrection = Vector3D.Zero;
+			_pivotPositionCorrection = Vector3D.Zero;
+			_pivotVelocityCorrection = Vector3D.Zero;
 			LocalPosition = Vector3D.Zero;
 			SpaceObjectVessel refVessel2 = (Parent as SpaceObjectVessel).MainVessel;
 			Pivot pivot2 = new Pivot(this, refVessel2);
@@ -827,80 +827,80 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			SubscribeTo(Parent);
 			foreach (Player pl in Server.Instance.AllPlayers)
 			{
-				if (pl.IsSubscribedTo(Parent.GUID))
+				if (pl.IsSubscribedTo(Parent.Guid))
 				{
 					pl.SubscribeTo(pivot2);
 				}
 			}
 			Parent = pivot2;
 		}
-		else if (Parent is SpaceObjectVessel && Parent.GUID != mm.ParentGUID)
+		else if (Parent is SpaceObjectVessel && Parent.Guid != message.ParentGUID)
 		{
 			SpaceObjectVessel parVessel = Parent as SpaceObjectVessel;
-			if (mm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(mm.ParentGUID))
+			if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(message.ParentGUID))
 			{
-				Parent = Server.Instance.GetVessel(mm.ParentGUID);
+				Parent = Server.Instance.GetVessel(message.ParentGUID);
 			}
 			else
 			{
-				Debug.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
+				Debug.LogError("Unable to find new parent", Guid, Name, "new parent", message.ParentType, message.ParentGUID);
 			}
 		}
-		else if (Parent is Pivot && mm.ParentType != SpaceObjectType.PlayerPivot)
+		else if (Parent is Pivot && message.ParentType != SpaceObjectType.PlayerPivot)
 		{
 			Pivot pivot3 = Parent as Pivot;
-			if (mm.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(mm.ParentGUID))
+			if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(message.ParentGUID))
 			{
-				Parent = Server.Instance.GetVessel(mm.ParentGUID);
+				Parent = Server.Instance.GetVessel(message.ParentGUID);
 				SubscribeTo(Parent);
-				pivot3.Destroy();
+				await pivot3.Destroy();
 			}
 			else
 			{
-				Debug.Error("Unable to find new parent", GUID, Name, "new parent", mm.ParentType, mm.ParentGUID);
+				Debug.LogError("Unable to find new parent", Guid, Name, "new parent", message.ParentType, message.ParentGUID);
 			}
 		}
-		else if (Parent is Pivot && pivotPositionCorrection.IsEpsilonZero() && Server.Instance.RunTime.TotalSeconds - lastPivotResetTime > 1.0)
+		else if (Parent is Pivot && _pivotPositionCorrection.IsEpsilonZero() && Server.Instance.RunTime.TotalSeconds - _lastPivotResetTime > 1.0)
 		{
 			Pivot pivot = Parent as Pivot;
-			SpaceObjectVessel nearestVessel = mm.NearestVesselGUID > 0 ? Server.Instance.GetVessel(mm.NearestVesselGUID) : null;
+			SpaceObjectVessel nearestVessel = message.NearestVesselGUID > 0 ? Server.Instance.GetVessel(message.NearestVesselGUID) : null;
 			SpaceObjectVessel refVessel = nearestVessel.MainVessel;
 			if (refVessel.StabilizeToTargetObj != null)
 			{
 				refVessel = refVessel.StabilizeToTargetObj;
 			}
 			Vector3D playerGlobalPos = pivot.Position + LocalPosition;
-			if (nearestVessel != null && !nearestVessel.IsDebrisFragment && (pivot.Position - refVessel.Position).IsNotEpsilonZero() && (mm.StickToVessel || mm.NearestVesselDistance <= 50f))
+			if (nearestVessel is { IsDebrisFragment: false } && (pivot.Position - refVessel.Position).IsNotEpsilonZero() && (message.StickToVessel || message.NearestVesselDistance <= 50f))
 			{
 				Vector3D oldPivotPos = pivot.Position;
 				Vector3D oldPivotVel = pivot.Velocity;
 				pivot.Orbit.CopyDataFrom(refVessel.Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
 				pivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
-				pivotPositionCorrection += pivot.Position - oldPivotPos;
-				pivotVelocityCorrection = pivot.Velocity - oldPivotVel;
-				UpdateArtificialBodyMovement.Add(pivot.GUID);
-				UpdateArtificialBodyMovement.Add(refVessel.GUID);
+				_pivotPositionCorrection += pivot.Position - oldPivotPos;
+				_pivotVelocityCorrection = pivot.Velocity - oldPivotVel;
+				UpdateArtificialBodyMovement.Add(pivot.Guid);
+				UpdateArtificialBodyMovement.Add(refVessel.Guid);
 			}
-			else if ((nearestVessel == null || (mm.NearestVesselDistance > 50f && (nearestVessel.FTL is not
+			else if ((nearestVessel == null || (message.NearestVesselDistance > 50f && (nearestVessel.FTL is not
 			         {
 				         Status: SystemStatus.OnLine
-			         } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !mm.StickToVessel)
+			         } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !message.StickToVessel)
 			{
-				pivotPositionCorrection = LocalPosition;
-				pivot.AdjustPositionAndVelocity(pivotPositionCorrection, pivotVelocityCorrection);
-				UpdateArtificialBodyMovement.Add(pivot.GUID);
+				_pivotPositionCorrection = LocalPosition;
+				pivot.AdjustPositionAndVelocity(_pivotPositionCorrection, _pivotVelocityCorrection);
+				UpdateArtificialBodyMovement.Add(pivot.Guid);
 			}
-			if (pivotPositionCorrection.IsNotEpsilonZero())
+			if (_pivotPositionCorrection.IsNotEpsilonZero())
 			{
-				lastPivotResetTime = Server.Instance.RunTime.TotalSeconds;
-				LocalPosition -= pivotPositionCorrection;
-				TransformData.LocalPosition = (TransformData.LocalPosition.ToVector3D() - pivotPositionCorrection).ToFloatArray();
+				_lastPivotResetTime = Server.Instance.RunTime.TotalSeconds;
+				LocalPosition -= _pivotPositionCorrection;
+				TransformData.LocalPosition = (TransformData.LocalPosition.ToVector3D() - _pivotPositionCorrection).ToFloatArray();
 			}
 		}
 		PlayerReady = true;
 	}
 
-	public override void UpdateTimers(double deltaTime)
+	public override async Task UpdateTimers(double deltaTime)
 	{
 		if (!IsAlive)
 		{
@@ -917,9 +917,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			if (CurrentHelmet != null && (!CurrentHelmet.IsVisorToggleable || CurrentHelmet.IsVisorActive))
 			{
-				if (CurrentJetpack != null && CurrentJetpack.HasOxygen)
+				if (CurrentJetpack is { HasOxygen: true })
 				{
-					CurrentJetpack.ConsumeResources(null, CurrentJetpack.OxygenConsumption * (float)deltaTime);
+					await CurrentJetpack.ConsumeResources(null, CurrentJetpack.OxygenConsumption * (float)deltaTime);
 				}
 				else
 				{
@@ -930,7 +930,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				suffocateDamage = 1f * (float)deltaTime;
 			}
-			else if (CurrentRoom != null && CurrentRoom.Breathability < 1f)
+			else if (CurrentRoom is { Breathability: < 1f })
 			{
 				suffocateDamage = 1f * (1f - CurrentRoom.Breathability) * (float)deltaTime;
 			}
@@ -941,7 +941,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (!Initialize && (suffocateDamage > float.Epsilon || pressureDamage > float.Epsilon || exposureDamage > float.Epsilon))
 		{
-			Stats.TakeDamage((float)deltaTime, new PlayerDamage
+			await Stats.TakeDamage((float)deltaTime, new PlayerDamage
 			{
 				HurtType = HurtType.Suffocate,
 				Amount = suffocateDamage
@@ -955,9 +955,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				Amount = exposureDamage
 			});
 		}
-		if (CurrentJetpack != null && jetpackDirection != null && (jetpackDirection[0] != 0 || jetpackDirection[1] != 0 || jetpackDirection[2] != 0 || jetpackDirection[3] != 0))
+		if (CurrentJetpack != null && _jetpackDirection != null && (_jetpackDirection[0] != 0 || _jetpackDirection[1] != 0 || _jetpackDirection[2] != 0 || _jetpackDirection[3] != 0))
 		{
-			CurrentJetpack.ConsumeResources(CurrentJetpack.PropellantConsumption * (float)deltaTime);
+			await CurrentJetpack.ConsumeResources(CurrentJetpack.PropellantConsumption * (float)deltaTime);
 		}
 		if (CurrentHelmet == null && CurrentJetpack == null && ItemInHands == null)
 		{
@@ -990,7 +990,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (ItemInHands != null)
 		{
-			ItemInHands.SendAllStats();
+			await ItemInHands.SendAllStats();
 		}
 		if (ItemInHands is not HandDrill && ItemInHands is Weapon)
 		{
@@ -1016,79 +1016,94 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (doim.Infos.Count > 0)
 		{
-			NetworkController.SendToClientsSubscribedTo(doim, -1L, Parent);
+			await NetworkController.SendToClientsSubscribedTo(doim, -1L, Parent);
 		}
 		updateItemTimer = 0.0;
 	}
 
 	public void SubscribeTo(SpaceObject spaceObject)
 	{
-		subscribedToSpaceObjects.Add(spaceObject.GUID);
-		if (spaceObject is not SpaceObjectVessel ves)
+		lock (_subscribedToSpaceObjects)
 		{
-			return;
-		}
-
-		if (ves.IsDocked)
-		{
-			subscribedToSpaceObjects.Add(ves.DockedToMainVessel.GUID);
+			_subscribedToSpaceObjects.Add(spaceObject.Guid);
+			if (spaceObject is not SpaceObjectVessel ves)
 			{
-				foreach (SpaceObjectVessel obj2 in ves.DockedToMainVessel.AllDockedVessels)
-				{
-					subscribedToSpaceObjects.Add(obj2.GUID);
-				}
 				return;
 			}
-		}
-		if (ves.AllDockedVessels is not { Count: > 0 })
-		{
-			return;
-		}
-		foreach (SpaceObjectVessel obj in ves.AllDockedVessels)
-		{
-			subscribedToSpaceObjects.Add(obj.GUID);
+
+			if (ves.IsDocked)
+			{
+				_subscribedToSpaceObjects.Add(ves.DockedToMainVessel.Guid);
+				{
+					foreach (SpaceObjectVessel obj2 in ves.DockedToMainVessel.AllDockedVessels)
+					{
+						_subscribedToSpaceObjects.Add(obj2.Guid);
+					}
+					return;
+				}
+			}
+			if (ves.AllDockedVessels is not { Count: > 0 })
+			{
+				return;
+			}
+			foreach (SpaceObjectVessel obj in ves.AllDockedVessels)
+			{
+				_subscribedToSpaceObjects.Add(obj.Guid);
+			}
 		}
 	}
 
 	public void UnsubscribeFrom(SpaceObject spaceObject)
 	{
-		subscribedToSpaceObjects.Remove(spaceObject.GUID);
+		lock (_subscribedToSpaceObjects)
+		{
+			_subscribedToSpaceObjects.Remove(spaceObject.Guid);
+		}
 	}
 
 	public void UnsubscribeFromAll()
 	{
-		subscribedToSpaceObjects.Clear();
+		lock (_subscribedToSpaceObjects)
+		{
+			_subscribedToSpaceObjects.Clear();
+		}
 	}
 
 	public bool IsSubscribedTo(SpaceObject spaceObject, bool checkParent)
 	{
-		if (!checkParent)
+		lock (_subscribedToSpaceObjects)
 		{
-			return subscribedToSpaceObjects.Contains(spaceObject.GUID);
+			if (!checkParent)
+			{
+				return _subscribedToSpaceObjects.Contains(spaceObject.Guid);
+			}
+			return _subscribedToSpaceObjects.Contains(spaceObject.Guid) || (spaceObject.Parent != null && _subscribedToSpaceObjects.Contains(spaceObject.Parent.Guid));
 		}
-		return subscribedToSpaceObjects.Contains(spaceObject.GUID) || (spaceObject.Parent != null && subscribedToSpaceObjects.Contains(spaceObject.Parent.GUID));
 	}
 
 	public bool IsSubscribedTo(long guid)
 	{
-		return subscribedToSpaceObjects.Contains(guid);
+		lock (_subscribedToSpaceObjects)
+		{
+			return _subscribedToSpaceObjects.Contains(guid);
+		}
 	}
 
 	public void PlayerRoomMessageListener(NetworkData data)
 	{
-		if (data.Sender != GUID)
+		var message = data as PlayerRoomMessage;
+		if (message.Sender != Guid)
 		{
 			return;
 		}
-		PlayerRoomMessage prm = (PlayerRoomMessage)data;
-		isOutsideRoom = prm.IsOutsideRoom.HasValue && prm.IsOutsideRoom.Value;
+		isOutsideRoom = message.IsOutsideRoom.HasValue && message.IsOutsideRoom.Value;
 		Room newRoom = null;
-		if (prm.ID != null)
+		if (message.ID != null)
 		{
-			SpaceObjectVessel newRoomVessel = Server.Instance.GetVessel(prm.ID.VesselGUID);
+			SpaceObjectVessel newRoomVessel = Server.Instance.GetVessel(message.ID.VesselGUID);
 			if (newRoomVessel != null)
 			{
-				newRoom = newRoomVessel.Rooms.FirstOrDefault((Room m) => m.ID.Equals(prm.ID));
+				newRoom = newRoomVessel.Rooms.FirstOrDefault((Room m) => m.ID.Equals(message.ID));
 			}
 		}
 		if (CurrentRoom != null)
@@ -1109,7 +1124,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		mm.GUID = FakeGuid;
 		if (Parent != null)
 		{
-			mm.ParentGUID = Parent.GUID;
+			mm.ParentGUID = Parent.Guid;
 			mm.ParentType = Parent.ObjectType;
 		}
 		else
@@ -1118,7 +1133,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			mm.ParentType = SpaceObjectType.None;
 		}
 		mm.TransformData = TransformData;
-		mm.Gravity = gravity;
+		mm.Gravity = _gravity;
 		mm.AnimationData = new CharacterAnimationData();
 		mm.AnimationData.VelocityForward = AnimationData.VelocityForward;
 		mm.AnimationData.VelocityRight = AnimationData.VelocityRight;
@@ -1137,26 +1152,26 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		mm.AnimationData.GetUpType = AnimationData.GetUpType;
 		mm.AnimationData.FireMode = AnimationData.FireMode;
 		mm.AnimationData.AirTime = AnimationData.AirTime;
-		if (RagdollData != null && RagdollData.Count > 0)
+		if (RagdollData is { Count: > 0 })
 		{
 			mm.RagdollData = new Dictionary<byte, RagdollItemData>(RagdollData);
 		}
-		if (jetpackDirection != null)
+		if (_jetpackDirection != null)
 		{
 			mm.JetpackDirection = new sbyte[4]
 			{
-				jetpackDirection[0],
-				jetpackDirection[1],
-				jetpackDirection[2],
-				jetpackDirection[3]
+				_jetpackDirection[0],
+				_jetpackDirection[1],
+				_jetpackDirection[2],
+				_jetpackDirection[3]
 			};
 		}
-		mm.PivotReset = pivotPositionCorrection.IsNotEpsilonZero();
-		mm.PivotPositionCorrection = pivotPositionCorrection.ToFloatArray();
-		mm.PivotVelocityCorrection = pivotVelocityCorrection.ToFloatArray();
-		if (collisionImpactVelocity > 0f)
+		mm.PivotReset = _pivotPositionCorrection.IsNotEpsilonZero();
+		mm.PivotPositionCorrection = _pivotPositionCorrection.ToFloatArray();
+		mm.PivotVelocityCorrection = _pivotVelocityCorrection.ToFloatArray();
+		if (_collisionImpactVelocity > 0f)
 		{
-			mm.ImpactVelocity = collisionImpactVelocity;
+			mm.ImpactVelocity = _collisionImpactVelocity;
 		}
 		return mm;
 	}
@@ -1165,7 +1180,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		return new SpawnCharacterResponseData
 		{
-			GUID = GUID,
+			GUID = Guid,
 			Details = GetDetails(checkAlive: true)
 		};
 	}
@@ -1185,7 +1200,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			HeadType = HeadType,
 			HairType = HairType,
 			PlayerId = PlayerId,
-			ParentID = Parent != null ? Parent.GUID : -1,
+			ParentID = Parent != null ? Parent.Guid : -1,
 			ParentType = Parent != null ? Parent.ObjectType : SpaceObjectType.None,
 			DynamicObjects = dods,
 			AnimationStatsMask = AnimationStatsMask,
@@ -1209,22 +1224,22 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		return details;
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
-		DiconnectFromNetworkContoller();
+		DisconnectFromNetworkController();
 		while (DynamicObjects.Count > 0)
 		{
-			DynamicObjects.First().Value.DestroyDynamicObject();
+			await DynamicObjects.First().Value.DestroyDynamicObject();
 		}
 		foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 		{
 			if (ves is Ship ship)
 			{
-				ship.ResetSpawnPointsForPlayer(this, sendStatsMessage: true);
+				await ship.ResetSpawnPointsForPlayer(this, sendStatsMessage: true);
 			}
 		}
 		Server.Instance.Remove(this);
-		base.Destroy();
+		await base.Destroy();
 	}
 
 	private void updateTemperature(double deltaTime)
@@ -1232,7 +1247,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		updateOutfitTemperature(deltaTime);
 		if (AmbientTemperature.HasValue)
 		{
-			CoreTemperature += (float)((double?)(AmbientTemperature - CoreTemperature) * 0.01 * deltaTime).Value;
+			CoreTemperature += (float)((AmbientTemperature - CoreTemperature) * 0.01 * deltaTime).Value;
 		}
 		else
 		{
@@ -1251,21 +1266,20 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			else if (Parent is SpaceObjectVessel)
 			{
-				outfit.ExternalTemperature += (float)((double)((Parent as SpaceObjectVessel).Temperature - outfit.ExternalTemperature) * 0.001 * deltaTime);
+				outfit.ExternalTemperature += (float)(((Parent as SpaceObjectVessel).Temperature - outfit.ExternalTemperature) * 0.001 * deltaTime);
 			}
 			float outfitInsulationFactor = 0.1f;
-			outfit.InternalTemperature += (float)((double)(outfit.ExternalTemperature - outfit.InternalTemperature) * 0.1 * deltaTime * (double)outfitInsulationFactor);
-			if (CurrentHelmet != null && CurrentHelmet.IsVisorActive && CurrentJetpack != null)
+			outfit.InternalTemperature += (float)((outfit.ExternalTemperature - outfit.InternalTemperature) * 0.1 * deltaTime * outfitInsulationFactor);
+			if (CurrentHelmet is { IsVisorActive: true } && CurrentJetpack != null)
 			{
 				float outfitTempRegulation = 5f;
-				float tempCorr = (float)MathHelper.Clamp(37f - outfit.InternalTemperature, (double)(0f - outfitTempRegulation) * deltaTime, (double)outfitTempRegulation * deltaTime);
+				float tempCorr = (float)MathHelper.Clamp(37f - outfit.InternalTemperature, (0f - outfitTempRegulation) * deltaTime, outfitTempRegulation * deltaTime);
 				outfit.InternalTemperature += tempCorr;
-				outfitTempRegulationActive = System.Math.Abs((double)tempCorr / deltaTime) > 0.5;
 			}
 		}
 	}
 
-	public void KillYourself(HurtType causeOfdeath, bool createCorpse = true)
+	public async Task KillPlayer(HurtType causeOfDeath, bool createCorpse = true)
 	{
 		IsAlive = false;
 		Corpse corpse = null;
@@ -1277,18 +1291,18 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			while (DynamicObjects.Count > 0)
 			{
-				DynamicObjects.First().Value.DestroyDynamicObject();
+				await DynamicObjects.First().Value.DestroyDynamicObject();
 			}
 		}
 		PlayerInventory = new Inventory(this);
 		CurrentJetpack = null;
 		CurrentHelmet = null;
-		if (DynamicObjects.Count > 0)
+		if (!DynamicObjects.IsEmpty)
 		{
 			string error = "Player had some dynamic objects that are not moved to corpse:";
 			foreach (DynamicObject dobj in DynamicObjects.Values)
 			{
-				error = error + " " + dobj.GUID + ",";
+				error = error + " " + dobj.Guid + ",";
 			}
 			DynamicObjects.Clear();
 		}
@@ -1307,9 +1321,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		else if (Parent is Pivot)
 		{
-			(Parent as Pivot).Destroy();
+			await (Parent as Pivot).Destroy();
 		}
-		if (CurrentSpawnPoint != null && CurrentSpawnPoint.Type == SpawnPointType.SimpleSpawn)
+		if (CurrentSpawnPoint is { Type: SpawnPointType.SimpleSpawn })
 		{
 			CurrentSpawnPoint.Player = null;
 			CurrentSpawnPoint.IsPlayerInSpawnPoint = false;
@@ -1320,71 +1334,64 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			RagdollData.Clear();
 			RagdollData = null;
 		}
-		NetworkController.SendToClientsSubscribedToParents(new KillPlayerMessage
+		await NetworkController.SendToClientsSubscribedToParents(new KillPlayerMessage
 		{
 			GUID = FakeGuid,
-			CauseOfDeath = causeOfdeath,
+			CauseOfDeath = causeOfDeath,
 			VesselDamageType = vesselDamageType,
 			CorpseDetails = corpse?.GetDetails()
-		}, this, GUID);
+		}, this, Guid);
 		Parent = null;
 		CurrentRoom = null;
 		isOutsideRoom = false;
-		if (NetworkController.ContainsClient(GUID))
+		if (NetworkController.IsPlayerConnected(Guid))
 		{
-			NetworkController.LogOutPlayer(GUID);
-			NetworkController.SendToGameClient(GUID, new KillPlayerMessage
+			await NetworkController.Send(Guid, new KillPlayerMessage
 			{
 				GUID = FakeGuid,
-				CauseOfDeath = causeOfdeath,
+				CauseOfDeath = causeOfDeath,
 				VesselDamageType = vesselDamageType
 			});
-			lateDisconnectWait = 0.0;
+			_lateDisconnectWait = 0.0;
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, LateDisconnect);
+			NetworkController.DisconnectClient(Guid);
 		}
-		foreach (Quest q in Quests)
+		foreach (var q in Quests.Where(q => q.Status == QuestStatus.Active))
 		{
-			if (q.Status != QuestStatus.Active)
-			{
-				continue;
-			}
 			q.Status = QuestStatus.Inactive;
 			foreach (QuestTrigger qt in q.QuestTriggers)
 			{
 				if (qt.Type == QuestTriggerType.Activate)
 				{
-					qt.Status = QuestStatus.Active;
+					await qt.SetQuestStatusAsync(QuestStatus.Active);
 					continue;
 				}
-				qt.Status = QuestStatus.Inactive;
+				await qt.SetQuestStatusAsync(QuestStatus.Inactive);
 				if (qt.SpawnRuleName is null or "")
 				{
 					continue;
 				}
 				QuestTrigger.QuestTriggerID qtid = qt.GetQuestTriggerID();
-				foreach (SpaceObjectVessel vessel in Server.Instance.AllVessels)
+				foreach (var vessel in Server.Instance.AllVessels.Where(vessel => vessel.QuestTriggerID == qtid))
 				{
-					if (vessel.QuestTriggerID == qtid)
+					vessel.SelfDestructTimer = new SelfDestructTimer(vessel, 1f)
 					{
-						vessel.SelfDestructTimer = new SelfDestructTimer(vessel, 1f)
-						{
-							CheckPlayersDistance = 1000.0
-						};
-						vessel.AuthorizedPersonel.RemoveAll((AuthorizedPerson m) => m.PlayerId == PlayerId);
-					}
+						CheckPlayersDistance = 1000.0
+					};
+					vessel.AuthorizedPersonel.RemoveAll((AuthorizedPerson m) => m.PlayerId == PlayerId);
 				}
 			}
 		}
 	}
 
-	public void LateDisconnect(double dbl)
+	private void LateDisconnect(double dbl)
 	{
-		lateDisconnectWait += dbl;
-		if (lateDisconnectWait > 1.0)
+		_lateDisconnectWait += dbl;
+		if (_lateDisconnectWait > 1.0)
 		{
-			NetworkController.DisconnectClient(GUID);
+			NetworkController.DisconnectClient(Guid);
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, LateDisconnect);
-			lateDisconnectWait = 0.0;
+			_lateDisconnectWait = 0.0;
 		}
 	}
 
@@ -1401,7 +1408,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		try
 		{
-			if (Parent != null && Parent is Ship && isOutsideRoom)
+			if (Parent is Ship && isOutsideRoom)
 			{
 				Pivot pivot = new Pivot(this, Parent as SpaceObjectVessel);
 				pivot.Orbit.CopyDataFrom((Parent as Ship).Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
@@ -1420,11 +1427,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public PersistenceObjectData GetPersistenceData()
 	{
 		PersistenceObjectDataPlayer data = new PersistenceObjectDataPlayer();
-		data.GUID = GUID;
+		data.GUID = Guid;
 		data.FakeGUID = FakeGuid;
 		if (Parent != null)
 		{
-			data.ParentGUID = Parent.GUID;
+			data.ParentGUID = Parent.Guid;
 			data.ParentType = Parent.ObjectType;
 			if (Parent.ObjectType == SpaceObjectType.PlayerPivot)
 			{
@@ -1449,7 +1456,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		data.MaxHealthPoints = Stats.MaxHealthPoints;
 		data.AnimationData = ObjectCopier.DeepCopy(AnimationData);
 		data.AnimationStatsMask = AnimationStatsMask;
-		data.Gravity = gravity;
+		data.Gravity = _gravity;
 		data.Velocity = LocalVelocity.ToArray();
 		if (CurrentRoom != null)
 		{
@@ -1457,7 +1464,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		data.CoreTemperature = CoreTemperature;
 		data.ChildObjects = new List<PersistenceObjectData>();
-		DynamicObject outfitItem = DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item != null && m.Item.Slot != null && m.Item.Slot.SlotID == -2);
+		DynamicObject outfitItem = DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item is { Slot.SlotID: -2 });
 		if (outfitItem != null)
 		{
 			data.ChildObjects.Add(outfitItem.Item != null ? outfitItem.Item.GetPersistenceData() : outfitItem.GetPersistenceData());
@@ -1475,103 +1482,96 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		return data;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataPlayer data)
 		{
-			if (persistenceData is not PersistenceObjectDataPlayer data)
+			Debug.LogError("PersistenceObjectDataPlayer data is null", Guid);
+			return;
+		}
+
+		Guid = data.GUID;
+		FakeGuid = data.FakeGUID;
+		LocalPosition = data.LocalPosition.ToVector3D();
+		LocalRotation = data.LocalRotation.ToQuaternionD();
+		IsAlive = data.IsAlive;
+		Name = data.Name;
+		PlayerId = data.PlayerId;
+		Gender = data.Gender;
+		HeadType = data.HeadType;
+		HairType = data.HairType;
+		Stats.MaxHealthPoints = data.MaxHealthPoints;
+		Stats.HealthPoints = data.HealthPoints;
+		AnimationData = ObjectCopier.DeepCopy(data.AnimationData);
+		AnimationStatsMask = data.AnimationStatsMask;
+		_gravity = data.Gravity;
+		LocalVelocity = data.Velocity.ToVector3D();
+		CoreTemperature = data.CoreTemperature;
+		SpaceObject parent = null;
+		if (data.ParentType == SpaceObjectType.PlayerPivot)
+		{
+			parent = new Pivot(this, data.ParentPosition.ToVector3D(), data.ParentVelocity.ToVector3D());
+		}
+		else if (data.ParentGUID != -1)
+		{
+			parent = Server.Instance.GetObject(data.ParentGUID);
+		}
+		if (parent != null)
+		{
+			Parent = parent;
+			if (data.CurrentRoomID.HasValue && Parent is SpaceObjectVessel)
 			{
-				Debug.Warning("PersistenceObjectDataPlayer data is null", GUID);
+				CurrentRoom = (Parent as SpaceObjectVessel).Rooms.FirstOrDefault((Room m) => m.ID.InSceneID == data.CurrentRoomID.Value);
+			}
+		}
+		else
+		{
+			if (data.ParentGUID != -1 && parent == null)
+			{
+				Debug.LogError("Player parent object not found, SAVE MIGHT BE CORRUPTED", Guid, data.ParentGUID, data.ParentType);
 				return;
 			}
-
-			GUID = data.GUID;
-			FakeGuid = data.FakeGUID;
-			LocalPosition = data.LocalPosition.ToVector3D();
-			LocalRotation = data.LocalRotation.ToQuaternionD();
-			IsAlive = data.IsAlive;
-			Name = data.Name;
-			PlayerId = data.PlayerId;
-			Gender = data.Gender;
-			HeadType = data.HeadType;
-			HairType = data.HairType;
-			Stats.MaxHealthPoints = data.MaxHealthPoints;
-			Stats.HealthPoints = data.HealthPoints;
-			AnimationData = ObjectCopier.DeepCopy(data.AnimationData);
-			AnimationStatsMask = data.AnimationStatsMask;
-			gravity = data.Gravity;
-			LocalVelocity = data.Velocity.ToVector3D();
-			CoreTemperature = data.CoreTemperature;
-			SpaceObject parent = null;
-			if (data.ParentType == SpaceObjectType.PlayerPivot)
-			{
-				parent = new Pivot(this, data.ParentPosition.ToVector3D(), data.ParentVelocity.ToVector3D());
-			}
-			else if (data.ParentGUID != -1)
-			{
-				parent = Server.Instance.GetObject(data.ParentGUID);
-			}
-			if (parent != null)
-			{
-				Parent = parent;
-				if (data.CurrentRoomID.HasValue && Parent is SpaceObjectVessel)
-				{
-					CurrentRoom = (Parent as SpaceObjectVessel).Rooms.FirstOrDefault((Room m) => m.ID.InSceneID == data.CurrentRoomID.Value);
-				}
-			}
-			else
-			{
-				if (data.ParentGUID != -1 && parent == null)
-				{
-					Debug.Error("Player parent object not found, SAVE MIGHT BE CORRUPTED", GUID, data.ParentGUID, data.ParentType);
-					return;
-				}
-				Parent = null;
-				KillYourself(HurtType.None, createCorpse: false);
-			}
-			if (Parent != null)
-			{
-				foreach (PersistenceObjectDataDynamicObject dobjData in data.ChildObjects.Cast<PersistenceObjectDataDynamicObject>())
-				{
-					Persistence.CreateDynamicObject(dobjData, this);
-				}
-			}
-			if (data.Quests != null)
-			{
-				foreach (QuestDetails det in data.Quests)
-				{
-					Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == det.ID);
-					if (quest == null)
-					{
-						continue;
-					}
-					quest.Status = det.Status;
-					foreach (QuestTriggerDetails qtDet in det.QuestTriggers)
-					{
-						QuestTrigger questTrigger = quest.QuestTriggers.FirstOrDefault((QuestTrigger m) => m.ID == qtDet.ID);
-						if (questTrigger != null)
-						{
-							questTrigger.Status = qtDet.Status;
-						}
-					}
-				}
-			}
-			if (data.Blueprints != null)
-			{
-				Blueprints = data.Blueprints;
-			}
-			NavMapDetails = data.NavMapDetails;
-			Server.Instance.Add(this);
+			Parent = null;
+			await KillPlayer(HurtType.None, createCorpse: false);
 		}
-		catch (Exception e)
+		if (Parent != null)
 		{
-			Debug.Exception(e);
+			foreach (PersistenceObjectDataDynamicObject dobjData in data.ChildObjects.Cast<PersistenceObjectDataDynamicObject>())
+			{
+				await Persistence.CreateDynamicObject(dobjData, this);
+			}
 		}
+		if (data.Quests != null)
+		{
+			foreach (QuestDetails det in data.Quests)
+			{
+				Quest quest = Quests.FirstOrDefault((Quest m) => m.ID == det.ID);
+				if (quest == null)
+				{
+					continue;
+				}
+				quest.Status = det.Status;
+				foreach (QuestTriggerDetails qtDet in det.QuestTriggers)
+				{
+					QuestTrigger questTrigger = quest.QuestTriggers.FirstOrDefault((QuestTrigger m) => m.ID == qtDet.ID);
+					if (questTrigger != null)
+					{
+						await questTrigger.SetQuestStatusAsync(qtDet.Status);
+					}
+				}
+			}
+		}
+		if (data.Blueprints != null)
+		{
+			Blueprints = data.Blueprints;
+		}
+		NavMapDetails = data.NavMapDetails;
+		Server.Instance.Add(this);
 	}
 
 	public void SetSpawnPoint(ShipSpawnPoint spawnPoint)
 	{
-		if (spawnPoint != null && spawnPoint.Type == SpawnPointType.WithAuthorization)
+		if (spawnPoint is { Type: SpawnPointType.WithAuthorization })
 		{
 			AuthorizedSpawnPoint = spawnPoint;
 		}
@@ -1596,10 +1596,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	private void NavigationMapDetailsMessageListener(NetworkData data)
 	{
-		if (data.Sender == GUID)
+		var message = data as NavigationMapDetailsMessage;
+		if (message.Sender == Guid)
 		{
-			NavigationMapDetailsMessage nmdl = data as NavigationMapDetailsMessage;
-			NavMapDetails = nmdl.NavMapDetails;
+			NavMapDetails = message.NavMapDetails;
 		}
 	}
 }

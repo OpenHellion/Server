@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -9,33 +10,31 @@ namespace ZeroGravity.Objects;
 
 public abstract class SpaceObject
 {
-	public long GUID;
+	public long Guid;
 
-	private double _ScanningRange = -1.0;
+	private double _scanningRange = -1.0;
 
-	public ConcurrentDictionary<long, DynamicObject> DynamicObjects = new ConcurrentDictionary<long, DynamicObject>();
+	public readonly ConcurrentDictionary<long, DynamicObject> DynamicObjects = new ConcurrentDictionary<long, DynamicObject>();
 
-	public ConcurrentDictionary<long, Corpse> Corpses = new ConcurrentDictionary<long, Corpse>();
+	public readonly ConcurrentDictionary<long, Corpse> Corpses = new ConcurrentDictionary<long, Corpse>();
 
-	protected double baseSunHeatTransferPerSec = 9.4E+21;
+	private const double BaseSunHeatTransferPerSec = 9.4E+21;
 
 	public bool IsExposedToSunlight;
 
-	public double SqrDistanceFromSun;
+	private double _sqrDistanceFromSun;
 
 	public bool IsPartOfSpawnSystem;
-
-	public bool IsDestroyed;
 
 	public double ScanningRange
 	{
 		get
 		{
-			return _ScanningRange;
+			return _scanningRange;
 		}
 		set
 		{
-			_ScanningRange = value < 10000.0 ? 10000.0 : value;
+			_scanningRange = value < 10000.0 ? 10000.0 : value;
 		}
 	}
 
@@ -49,7 +48,7 @@ public abstract class SpaceObject
 
 	public SpaceObject(long guid)
 	{
-		GUID = guid;
+		Guid = guid;
 	}
 
 	public virtual InitializeSpaceObjectMessage GetInitializeMessage()
@@ -62,30 +61,35 @@ public abstract class SpaceObject
 		return null;
 	}
 
-	public virtual void UpdateTimers(double deltaTime)
+	public virtual Task UpdateTimers(double deltaTime)
 	{
-		IsExposedToSunlight = isExposedToSunlight(out SqrDistanceFromSun);
+		IsExposedToSunlight = CalculateSunlightExposure(out _sqrDistanceFromSun);
+
+		return Task.CompletedTask;
 	}
 
-	public virtual void Destroy()
+	public virtual async Task Destroy()
 	{
-		foreach (DynamicObject dobj in new List<DynamicObject>(DynamicObjects.Values))
+		foreach (DynamicObject dynamicObject in new List<DynamicObject>(DynamicObjects.Values))
 		{
-			dobj.Destroy();
+			await dynamicObject.Destroy();
 		}
-		DestroyObjectMessage dom = new DestroyObjectMessage
+
+		DestroyObjectMessage message = new DestroyObjectMessage
 		{
-			ID = GUID,
+			ID = Guid,
 			ObjectType = ObjectType
 		};
+
 		if (this is SpaceObjectVessel)
 		{
-			NetworkController.SendToAllClients(dom, -1L);
+			await NetworkController.SendToAll(message);
 		}
 		else
 		{
-			NetworkController.SendToClientsSubscribedToParents(dom, this, -1L);
+			await NetworkController.SendToClientsSubscribedToParents(message, this, -1L);
 		}
+
 		if (this is Player)
 		{
 			Server.Instance.Remove(this as Player);
@@ -102,19 +106,25 @@ public abstract class SpaceObject
 		{
 			Server.Instance.Remove(this as Corpse);
 		}
+
 		if (Parent is Pivot)
 		{
 			Server.Instance.SolarSystem.RemoveArtificialBody(Parent as Pivot);
 		}
+
 		Parent = null;
 		if (IsPartOfSpawnSystem)
 		{
 			SpawnManager.RemoveSpawnSystemObject(this, checkChildren: false);
 		}
-		IsDestroyed = true;
 	}
 
-	private bool isExposedToSunlight(out double sqrDistFromSun)
+	/// <summary>
+	/// 	Calculates if this vessel is exposed to sunlight.
+	/// </summary>
+	/// <param name="sqrDistFromSun">Square magnitude of our relative position to the sun.</param>
+	/// <returns>If the vessel is exposed to sunlight.</returns>
+	private bool CalculateSunlightExposure(out double sqrDistFromSun)
 	{
 		sqrDistFromSun = 0.0;
 		CelestialBody sun = Server.Instance.SolarSystem.GetCelestialBodies()[0];
@@ -162,10 +172,10 @@ public abstract class SpaceObject
 		double hDis = 0.0;
 		if (IsExposedToSunlight)
 		{
-			hCol = baseSunHeatTransferPerSec * (double)heatCollectionFactor / (double)mass / SqrDistanceFromSun;
+			hCol = BaseSunHeatTransferPerSec * heatCollectionFactor / mass / _sqrDistanceFromSun;
 		}
-		hDis = (double)(heatDissipationFactor / mass) * ((double)currentTemperature + 273.15);
-		return (float)((double)currentTemperature + (hCol - hDis) * deltaTime);
+		hDis = heatDissipationFactor / mass * (currentTemperature + 273.15);
+		return (float)(currentTemperature + (hCol - hDis) * deltaTime);
 	}
 
 	public List<SpaceObject> GetParents(bool includeMe, int depth = 10)

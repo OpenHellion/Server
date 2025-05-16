@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -10,17 +10,24 @@ public class HandheldAsteroidScanner : Item
 
 	public override DynamicObjectStats StatsNew => null;
 
-	public HandheldAsteroidScanner(DynamicObjectAuxData data)
+	private HandheldAsteroidScanner()
 	{
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<HandheldAsteroidScanner> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		HandheldAsteroidScanner asteroidScanner = new();
+		if (data != null)
+		{
+			await asteroidScanner.SetData(data);
+		}
+
+		return asteroidScanner;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		HandheldAsteroidScannerData hasd = data as HandheldAsteroidScannerData;
 		penetrationLevel = hasd.penetrationLevel;
 	}
@@ -39,28 +46,21 @@ public class HandheldAsteroidScanner : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataHandheldAsteroidScanner data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataHandheldAsteroidScanner data)
-			{
-				Debug.Warning("PersistenceObjectDataHandheldAsteroidScanner data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.ScannerData);
-			}
+			Debug.LogWarning("PersistenceObjectDataHandheldAsteroidScanner data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.ScannerData);
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return true;
+		return Task.FromResult(true);
 	}
 }

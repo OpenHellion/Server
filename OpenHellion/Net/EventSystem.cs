@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading;
-using OpenHellion.Net.Message.MainServer;
+using System.Threading.Tasks;
 using ZeroGravity;
 using ZeroGravity.Network;
 
@@ -10,184 +9,116 @@ namespace OpenHellion.Net;
 
 public class EventSystem
 {
-	public class InternalEventData
-	{
-		public InternalEventType Type;
 
-		public object[] Objects;
+	private static readonly List<Type> _invokeImmediatelyDataTypes = new List<Type>();
 
-		public InternalEventData(InternalEventType type, params object[] objects)
-		{
-			Type = type;
-			Objects = objects;
-		}
-	}
+	private static readonly ConcurrentDictionary<Type, Action<NetworkData>> _networkDataListeners = new ConcurrentDictionary<Type, Action<NetworkData>>();
+	private static readonly ConcurrentDictionary<Type, Func<NetworkData, Task<NetworkData>>> _syncRequestListeners = new();
 
-	public delegate void NetworkDataDelegate(NetworkData data);
-
-	public delegate void InternalEventsDelegate(InternalEventData data);
-
-	public enum InternalEventType
-	{
-		GetPlayer
-	}
-
-	private List<Type> _invokeImmediatelyDataTypes = new List<Type>();
-
-	private ConcurrentDictionary<Type, NetworkDataDelegate> _networkDataGroups = new ConcurrentDictionary<Type, NetworkDataDelegate>();
-
-	private ConcurrentQueue<NetworkData> _networkBuffer = new ConcurrentQueue<NetworkData>();
-
-	private ConcurrentDictionary<InternalEventType, InternalEventsDelegate> _internalDataGroups = new ConcurrentDictionary<InternalEventType, InternalEventsDelegate>();
-
-	private ConcurrentQueue<InternalEventData> _internalBuffer = new ConcurrentQueue<InternalEventData>();
+	private static readonly ConcurrentQueue<NetworkData> _networkBuffer = new ConcurrentQueue<NetworkData>();
 
 	public EventSystem()
 	{
 		_invokeImmediatelyDataTypes.Add(typeof(PlayerHitMessage));
 	}
 
-	private static EventSystem s_instance;
-	internal static EventSystem Instance
+	/// <summary>
+	/// 	Add listener for custom events.
+	/// </summary>
+	public static void AddListener<T>(Action<NetworkData> function)
 	{
-		get
+		if (_networkDataListeners.ContainsKey(typeof(T)))
 		{
-			if (s_instance == null)
-			{
-				s_instance = new EventSystem();
-			}
-
-			return s_instance;
+			_networkDataListeners[typeof(T)] += function;
+		}
+		else
+		{
+			_networkDataListeners[typeof(T)] = function;
 		}
 	}
 
 	/// <summary>
-	/// 	Add listener for custom events.
+	/// 	Add listener for sync requests.
 	/// </summary>
-	public static void AddListener(Type group, NetworkDataDelegate function)
+	public static void AddSyncRequestListener<T>(Func<NetworkData, Task<NetworkData>> function)
 	{
-		if (Instance._networkDataGroups.ContainsKey(group))
+		if (_syncRequestListeners.ContainsKey(typeof(T)))
 		{
-			ConcurrentDictionary<Type, NetworkDataDelegate> concurrentDictionary = Instance._networkDataGroups;
-			concurrentDictionary[group] = (NetworkDataDelegate)Delegate.Combine(concurrentDictionary[group], function);
+			_syncRequestListeners[typeof(T)] += function;
 		}
 		else
 		{
-			Instance._networkDataGroups[group] = function;
-		}
-	}
-
-	/// <summary>
-	/// 	Add listener for custom events.
-	/// </summary>
-	public static void AddListener(InternalEventType group, InternalEventsDelegate function)
-	{
-		if (Instance._internalDataGroups.ContainsKey(group))
-		{
-			ConcurrentDictionary<InternalEventType, InternalEventsDelegate> concurrentDictionary = Instance._internalDataGroups;
-			concurrentDictionary[group] = (InternalEventsDelegate)Delegate.Combine(concurrentDictionary[group], function);
-		}
-		else
-		{
-			Instance._internalDataGroups[group] = function;
+			_syncRequestListeners[typeof(T)] = function;
 		}
 	}
 
 	/// <summary>
 	/// 	Remove listener for custom events.
 	/// </summary>
-	public static void RemoveListener(Type group, NetworkDataDelegate function)
+	public static void RemoveListener<T>(Action<NetworkData> function)
 	{
-		if (Instance._networkDataGroups.ContainsKey(group))
+		if (_networkDataListeners.ContainsKey(typeof(T)))
 		{
-			ConcurrentDictionary<Type, NetworkDataDelegate> concurrentDictionary = Instance._networkDataGroups;
-			concurrentDictionary[group] = (NetworkDataDelegate)Delegate.Remove(concurrentDictionary[group], function);
+			_networkDataListeners[typeof(T)] -= function;
 		}
 	}
 
 	/// <summary>
-	/// 	Remove listener for custom events.
+	/// 	Remove listener for sync events.
 	/// </summary>
-	public static void RemoveListener(InternalEventType group, InternalEventsDelegate function)
+	public static void RemoveSyncRequestListener<T, TResult>(Func<T, Task<TResult>> function)
 	{
-		if (Instance._internalDataGroups.ContainsKey(group))
+		if (_syncRequestListeners.ContainsKey(typeof(T)))
 		{
-			ConcurrentDictionary<InternalEventType, InternalEventsDelegate> concurrentDictionary = Instance._internalDataGroups;
-			concurrentDictionary[group] = (InternalEventsDelegate)Delegate.Remove(concurrentDictionary[group], function);
+			_syncRequestListeners[typeof(T)] -= function as Func<NetworkData, Task<NetworkData>>;
 		}
 	}
 
 	/// <summary>
 	/// 	Execute corresponding code for request.
 	/// </summary>
-	internal void Invoke(NetworkData data)
+	internal static void Invoke(NetworkData data)
 	{
-		if (_networkDataGroups.ContainsKey(data.GetType()) && _networkDataGroups[data.GetType()] != null)
+		if (_networkDataListeners.ContainsKey(data.GetType()) && _networkDataListeners[data.GetType()] != null)
 		{
-			if (_invokeImmediatelyDataTypes.Contains(data.GetType()) || Thread.CurrentThread.ManagedThreadId == Server.MainThreadId)
+			if (_invokeImmediatelyDataTypes.Contains(data.GetType()) || Environment.CurrentManagedThreadId == Server.MainThreadId)
 			{
-				_networkDataGroups[data.GetType()](data);
+				_networkDataListeners[data.GetType()](data);
 			}
 			else
 			{
 				_networkBuffer.Enqueue(data);
 			}
 		}
+		else
+		{
+			Debug.LogWarningFormat("Got message with type {0} with no registered listener.", data.GetType());
+		}
 	}
 
-	/// <summary>
-	/// 	Execute corresponding code for request.
-	/// </summary>
-	internal void Invoke(InternalEventData data)
+	internal static Task<NetworkData> InvokeSyncRequest(NetworkData data)
 	{
-		if (_internalDataGroups.ContainsKey(data.Type) && _internalDataGroups[data.Type] != null)
+		if (_syncRequestListeners.ContainsKey(data.GetType()))
 		{
-			if (Thread.CurrentThread.ManagedThreadId == Server.MainThreadId)
-			{
-				_internalDataGroups[data.Type](data);
-			}
-			else
-			{
-				_internalBuffer.Enqueue(data);
-			}
+			return _syncRequestListeners[data.GetType()](data);
 		}
 		else
 		{
-			Debug.Error("Cannot invoke ", data.Type, data);
+			Debug.LogWarningFormat("Got sync request with type {0} with no registered listener.", data.GetType());
+			return null;
 		}
 	}
 
 	/// <summary>
 	/// 	Execute code for requests stored in queue.
 	/// </summary>
-	internal void InvokeQueuedData()
+	internal static void InvokeQueuedData()
 	{
 		while (_networkBuffer.Count > 0)
 		{
-			try
+			if (_networkBuffer.TryDequeue(out var data2) && _networkDataListeners.TryGetValue(data2.GetType(), out var networkDataDelegate))
 			{
-				if (_networkBuffer.TryDequeue(out var data2) && _networkDataGroups.TryGetValue(data2.GetType(), out var ndd))
-				{
-					ndd(data2);
-				}
-			}
-			catch (Exception ex)
-			{
-				Debug.Exception(ex);
-			}
-		}
-		while (_internalBuffer.Count > 0)
-		{
-			try
-			{
-				if (_internalBuffer.TryDequeue(out var data) && _internalDataGroups.TryGetValue(data.Type, out var ied))
-				{
-					ied(data);
-				}
-			}
-			catch (Exception ex2)
-			{
-				Debug.Exception(ex2);
+				networkDataDelegate(data2);
 			}
 		}
 	}

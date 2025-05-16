@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -18,9 +19,9 @@ public class GeneratorScrubber : Generator
 		ScrubberCartridgeConsumption = (genData.AuxData as GeneratorScrubbedAirAuxData).ScrubberCartridgeConsumption;
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		GetScopeMultiplier(MachineryPartSlotScope.ResourcesConsumption, out var _, out var _, out var _);
 		PartsWearFactor = 0f;
 	}

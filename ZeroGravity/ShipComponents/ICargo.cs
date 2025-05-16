@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 
 namespace ZeroGravity.ShipComponents;
@@ -9,5 +10,5 @@ public interface ICargo
 
 	CargoCompartmentData GetCompartment(int? id = null);
 
-	float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false);
+	Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false);
 }

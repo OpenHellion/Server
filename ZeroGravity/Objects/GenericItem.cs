@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -8,7 +8,7 @@ public class GenericItem : Item
 {
 	public GenericItemSubType SubType;
 
-	private GenericItemStats stats;
+	private GenericItemStats stats = new GenericItemStats();
 
 	public override DynamicObjectStats StatsNew => stats;
 
@@ -24,27 +24,33 @@ public class GenericItem : Item
 		}
 	}
 
-	public GenericItem(DynamicObjectAuxData data)
+	private GenericItem()
 	{
-		stats = new GenericItemStats();
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<GenericItem> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		GenericItem genericItem = new();
+		if (data != null)
+		{
+			await genericItem.SetData(data);
+		}
+
+		return genericItem;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		GenericItemData i = data as GenericItemData;
-		stats.Health = base.Health;
+		stats.Health = Health;
 		SubType = i.SubType;
 		Look = i.Look;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -58,23 +64,16 @@ public class GenericItem : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataGenericItem data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataGenericItem data)
-			{
-				Debug.Warning("PersistenceObjectDataGenericItem data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.GenericData);
-			}
+			Debug.LogWarning("PersistenceObjectDataGenericItem data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.GenericData);
 		}
 	}
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -69,10 +70,10 @@ public abstract class SubSystem : VesselComponent
 		}
 		_PowerUpTime = data.PowerUpTime;
 		_CoolDownTime = data.CoolDownTime;
-		Status = data.Status;
+		SetStatus(data.Status);
 		_AutoReactivate = data.AutoReactivate;
 		shouldAutoReactivate = Status != SystemStatus.OffLine && AutoReactivate;
-		base.OperationRate = data.OperationRate;
+		OperationRate = data.OperationRate;
 		AutoTuneOperationRate = data.AutoTuneOperationRate;
 		baseRadarSignature = data.RadarSignature;
 		SetAuxData(data.AuxData);
@@ -83,15 +84,15 @@ public abstract class SubSystem : VesselComponent
 		return null;
 	}
 
-	public virtual void SetDetails(SubSystemDetails details)
+	public virtual async Task SetDetails(SubSystemDetails details)
 	{
 		if (details.Status == SystemStatus.OnLine)
 		{
-			GoOnLine();
+			await GoOnLine();
 		}
 		else if (details.Status == SystemStatus.OffLine)
 		{
-			GoOffLine(autoRestart: false);
+			await GoOffLine(autoRestart: false);
 		}
 		SetAuxDetails(details.AuxDetails);
 	}
@@ -145,7 +146,7 @@ public abstract class SubSystem : VesselComponent
 		}
 		if (targetOpRate > float.Epsilon)
 		{
-			base.OperationRate = targetOpRate;
+			OperationRate = targetOpRate;
 			reservedCapacities = targetCapacities;
 			reservedQuantities = targetQuantities;
 			return true;

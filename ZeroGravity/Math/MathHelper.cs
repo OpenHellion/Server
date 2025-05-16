@@ -107,7 +107,7 @@ public static class MathHelper
 
 	public static double AngleSigned(Vector3D vec1, Vector3D vec2, Vector3D planeNormal)
 	{
-		return Vector3D.Angle(vec1, vec2) * (double)Sign(Vector3D.Dot(planeNormal, Vector3D.Cross(vec1, vec2)));
+		return Vector3D.Angle(vec1, vec2) * Sign(Vector3D.Dot(planeNormal, Vector3D.Cross(vec1, vec2)));
 	}
 
 	public static Vector3D RotateAroundPivot(Vector3D vector, Vector3D pivot, Vector3D angles)
@@ -127,7 +127,7 @@ public static class MathHelper
 
 	public static float RandomRange(float min, float max)
 	{
-		return (float)(_randGenerator.NextDouble() * (double)(max - min) + (double)min);
+		return (float)(_randGenerator.NextDouble() * (max - min) + min);
 	}
 
 	public static double RandomRange(double min, double max)

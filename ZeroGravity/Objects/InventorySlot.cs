@@ -59,7 +59,7 @@ public class InventorySlot
 
 	public bool CanStoreItem(ItemType itemType)
 	{
-		return SlotType == Type.Hands || (this == Inventory.OutfitSlot && itemType >= ItemType.AltairPressurisedSuit && itemType <= (ItemType)399) || (ItemTypes?.Contains(itemType) ?? false);
+		return SlotType == Type.Hands || (this == Inventory.OutfitSlot && itemType is >= ItemType.AltairPressurisedSuit and <= (ItemType)399) || (ItemTypes?.Contains(itemType) ?? false);
 	}
 
 	public SpaceObject GetParent()
@@ -72,7 +72,7 @@ public class InventorySlot
 		{
 			return Outfit.DynamicObj;
 		}
-		Debug.Error("Slot has no parent", SlotID, SlotType);
+		Debug.LogError("Slot has no parent", SlotID, SlotType);
 		return null;
 	}
 

@@ -1,5 +1,6 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -42,7 +43,7 @@ public class VesselDockingPort : IPersistantObject
 		}
 		if (parentPort == null)
 		{
-			parentPort = DockedVessel.DockingPorts.Find((VesselDockingPort m) => m.ID.InSceneID == DockedToID.InSceneID);
+			parentPort = DockedVessel.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == DockedToID.InSceneID);
 		}
 		List<ExecutorMergeDetails> retVal = new List<ExecutorMergeDetails>();
 		foreach (SceneTriggerExecutor exec in parentPort.MergeExecutors.Keys)
@@ -53,8 +54,8 @@ public class VesselDockingPort : IPersistantObject
 			{
 				retVal.Add(new ExecutorMergeDetails
 				{
-					ParentTriggerID = new VesselObjectID(parent.ParentShip.GUID, parent.InSceneID),
-					ChildTriggerID = new VesselObjectID(child.ParentShip.GUID, child.InSceneID)
+					ParentTriggerID = new VesselObjectID(parent.ParentShip.Guid, parent.InSceneID),
+					ChildTriggerID = new VesselObjectID(child.ParentShip.Guid, child.InSceneID)
 				});
 			}
 		}
@@ -70,23 +71,17 @@ public class VesselDockingPort : IPersistantObject
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataDockingPort data)
 		{
-			if (persistenceData is not PersistenceObjectDataDockingPort data)
-			{
-				Debug.Warning("PersistenceObjectDataDoor data is null");
-			}
-			else
-			{
-				Locked = data.Locked;
-			}
+			Debug.LogWarning("PersistenceObjectDataDoor data is null");
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			Locked = data.Locked;
 		}
+		return Task.CompletedTask;
 	}
 
 	public SceneDockingPortDetails GetDetails()

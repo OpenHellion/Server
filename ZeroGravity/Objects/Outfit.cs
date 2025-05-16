@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -33,22 +33,25 @@ public class Outfit : Item
 
 	public Dictionary<short, InventorySlot> InventorySlots { get; private set; }
 
-	public Outfit()
+	private Outfit()
 	{
 	}
 
-	public Outfit(DynamicObjectAuxData data)
+	public static async Task<Outfit> CreateOutfitAsync(DynamicObjectAuxData data)
 	{
+		Outfit outfit = new();
 		if (data != null)
 		{
-			SetData(data);
+			await outfit.SetData(data);
 		}
+
+		return outfit;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
-		base.Armor *= base.TierMultiplier;
+		await base.SetData(data);
+		Armor *= TierMultiplier;
 		OutfitData od = data as OutfitData;
 		InventorySlots = new Dictionary<short, InventorySlot>();
 		foreach (InventorySlotData isd in od.InventorySlots)
@@ -66,9 +69,9 @@ public class Outfit : Item
 		CollisionResistance = od.CollisionResistance;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -101,23 +104,16 @@ public class Outfit : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataOutfit data)
 		{
-			if (persistenceData is not PersistenceObjectDataOutfit data)
-			{
-				Debug.Warning("PersistenceObjectDataOutfit data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.OutfitData);
-				base.LoadPersistenceData(persistenceData);
-			}
+			Debug.LogWarning("PersistenceObjectDataOutfit data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.OutfitData);
+			await base.LoadPersistenceData(persistenceData);
 		}
 	}
 }

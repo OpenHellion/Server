@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -54,23 +55,33 @@ public class SubSystemRCS : SubSystem
 		{
 			if (Server.Instance.RunTime.TotalSeconds - lastSwitchOnTime > 1.0 && _Status != SystemStatus.OffLine)
 			{
-				Status = SystemStatus.OffLine;
+				SetStatus(SystemStatus.OffLine);
 			}
 			return base.Status;
 		}
-		protected set
-		{
-			if (value == SystemStatus.OnLine)
-			{
-				lastSwitchOnTime = Server.Instance.RunTime.TotalSeconds;
-			}
-			base.Status = value;
-		}
 	}
 
-	public override void Update(double duration)
+	protected override async Task SetStatusAsync(SystemStatus status)
 	{
-		base.Update(duration);
+		if (status == SystemStatus.OnLine)
+		{
+			lastSwitchOnTime = Server.Instance.RunTime.TotalSeconds;
+		}
+		await base.SetStatusAsync(status);
+	}
+
+	protected override void SetStatus(SystemStatus status)
+	{
+		if (status == SystemStatus.OnLine)
+		{
+			lastSwitchOnTime = Server.Instance.RunTime.TotalSeconds;
+		}
+		base.SetStatus(status);
+	}
+
+	public override async Task Update(double duration)
+	{
+		await base.Update(duration);
 		accelerationFactor = GetScopeMultiplier(MachineryPartSlotScope.Output);
 	}
 

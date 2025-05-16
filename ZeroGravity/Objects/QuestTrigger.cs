@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Spawn;
@@ -65,35 +66,74 @@ public class QuestTrigger
 		{
 			return _Status;
 		}
-		set
-		{
-			if (_Status != value)
-			{
-				_Status = value;
-				if (_Status == QuestStatus.Active && !SpawnRuleName.IsNullOrEmpty())
-				{
-					SpawnQuestStation();
-				}
-			}
-		}
 	}
 
-	public QuestTrigger(Quest quest, QuestTriggerData data)
+	private QuestTrigger()
 	{
-		ID = data.ID;
-		BatchID = data.BatchID;
-		Type = data.Type;
-		Station = data.Station;
-		Tag = data.Tag;
-		Celestial = data.Celestial;
-		if (Type == QuestTriggerType.Activate)
+	}
+
+	public static async Task<QuestTrigger> CreateQuestTriggerAsync(Quest quest, QuestTriggerData data)
+	{
+		var questTrigger = new QuestTrigger
 		{
-			Status = QuestStatus.Active;
+			ID = data.ID,
+			BatchID = data.BatchID,
+			Type = data.Type,
+			Station = data.Station,
+			Tag = data.Tag,
+			Celestial = data.Celestial,
+			DependencyBatchID = data.DependencyBatchID,
+			DependencyTpe = data.DependencyTpe,
+			SpawnRuleName = data.SpawnRuleName,
+			Quest = quest
+		};
+		if (questTrigger.Type == QuestTriggerType.Activate)
+		{
+			await questTrigger.SetQuestStatusAsync(QuestStatus.Active);
 		}
-		DependencyBatchID = data.DependencyBatchID;
-		DependencyTpe = data.DependencyTpe;
-		SpawnRuleName = data.SpawnRuleName;
-		Quest = quest;
+		return questTrigger;
+	}
+
+	public static async Task<List<QuestTrigger>> CreateQuestTriggersAsync(Quest quest, List<QuestTriggerData> data)
+	{
+		List<QuestTrigger> triggers = [];
+		foreach (QuestTriggerData element in data)
+		{
+			QuestTrigger trigger = new QuestTrigger
+			{
+				ID = element.ID,
+				BatchID = element.BatchID,
+				Type = element.Type,
+				Station = element.Station,
+				Tag = element.Tag,
+				Celestial = element.Celestial,
+				DependencyBatchID = element.DependencyBatchID,
+				DependencyTpe = element.DependencyTpe,
+				SpawnRuleName = element.SpawnRuleName,
+				Quest = quest
+			};
+
+			triggers.Add(trigger);
+
+			if (trigger.Type == QuestTriggerType.Activate)
+			{
+				await trigger.SetQuestStatusAsync(QuestStatus.Active);
+			}
+		}
+
+		return triggers;
+	}
+
+	public async Task SetQuestStatusAsync(QuestStatus status)
+	{
+		if (_Status != status)
+		{
+			_Status = status;
+			if (_Status == QuestStatus.Active && !SpawnRuleName.IsNullOrEmpty())
+			{
+				await SpawnManager.SpawnQuestSetup(this);
+			}
+		}
 	}
 
 	public QuestTriggerDetails GetDetails()
@@ -107,7 +147,7 @@ public class QuestTrigger
 		};
 	}
 
-	public void UpdateDependentTriggers(Quest quest)
+	public async Task UpdateDependentTriggers(Quest quest)
 	{
 		if (BatchID == 0)
 		{
@@ -124,7 +164,7 @@ public class QuestTrigger
 			}
 			if ((qt2.DependencyTpe == QuestTriggerDependencyTpe.Any && completedCount > 0) || (qt2.DependencyTpe == QuestTriggerDependencyTpe.All && completedCount == batch.Count))
 			{
-				qt2.Status = QuestStatus.Active;
+				await qt2.SetQuestStatusAsync(QuestStatus.Active);
 			}
 		}
 		if (!fixIncomplete)
@@ -133,20 +173,15 @@ public class QuestTrigger
 		}
 		foreach (QuestTrigger qt in batch)
 		{
-			qt.Status = QuestStatus.Completed;
+			await qt.SetQuestStatusAsync(QuestStatus.Completed);
 		}
-	}
-
-	private void SpawnQuestStation()
-	{
-		SpawnManager.SpawnQuestSetup(this);
 	}
 
 	public QuestTriggerID GetQuestTriggerID()
 	{
 		return new QuestTriggerID
 		{
-			PlayerGUID = Quest.Player.GUID,
+			PlayerGUID = Quest.Player.Guid,
 			QuestID = Quest.ID,
 			ID = ID
 		};

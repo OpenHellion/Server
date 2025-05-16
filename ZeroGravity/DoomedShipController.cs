@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Math;
 
 namespace ZeroGravity;
@@ -54,15 +55,17 @@ public class DoomedShipController : IPersistantObject
 		return data;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		if (persistenceData is not PersistenceDataDoomController data)
 		{
-			Debug.Warning("PersistenceDataDoomController wrong type");
+			Debug.LogWarning("PersistenceDataDoomController wrong type");
 		}
 		else
 		{
 			spawnTimer = data.SpawnTimer;
 		}
+
+		return Task.CompletedTask;
 	}
 }

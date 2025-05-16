@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -19,24 +19,24 @@ public class DisposableHackingTool : Item
 		}
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		DisposableHackingToolStats dhs = stats as DisposableHackingToolStats;
 		if (dhs.Use)
 		{
 			objStats.Use = dhs.Use;
-			base.DynamicObj.SendStatsToClient();
-			TakeDamage(TypeOfDamage.None, 1f);
+			await DynamicObj.SendStatsToClient();
+			await TakeDamage(TypeOfDamage.None, 1f);
 			return true;
 		}
 		return false;
 	}
 
-	public void Destroy()
+	public async Task Destroy()
 	{
 		SetInventorySlot(null);
 		SetAttachPoint(null);
-		base.DynamicObj.DestroyDynamicObject();
+		await DynamicObj.DestroyDynamicObject();
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -48,24 +48,17 @@ public class DisposableHackingTool : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataHackingTool data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataHackingTool data)
-			{
-				Debug.Warning("PersistenceObjectDataHackingTool data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.HackingToolData);
-				ApplyTierMultiplier();
-			}
+			Debug.LogWarning("PersistenceObjectDataHackingTool data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.HackingToolData);
+			ApplyTierMultiplier();
 		}
 	}
 
@@ -73,8 +66,8 @@ public class DisposableHackingTool : Item
 	{
 		if (!TierMultiplierApplied)
 		{
-			base.MaxHealth *= base.TierMultiplier;
-			base.Health *= base.TierMultiplier;
+			MaxHealth *= TierMultiplier;
+			Health *= TierMultiplier;
 		}
 		base.ApplyTierMultiplier();
 	}

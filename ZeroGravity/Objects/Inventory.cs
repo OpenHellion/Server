@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Network;
 
@@ -146,7 +147,7 @@ public class Inventory
 		return true;
 	}
 
-	public bool AddItemToInventory(Item item, short slotID)
+	public async Task<bool> AddItemToInventory(Item item, short slotID)
 	{
 		item.DynamicObj.PickedUp();
 		if (item is Outfit outfit && slotID == -2)
@@ -173,7 +174,7 @@ public class Inventory
 		if (newSlot.Item != null && newSlot.Item != item)
 		{
 			InventorySlot itemSlot = item.Slot;
-			if (item.DynamicObj.Parent is DynamicObject dynamicObject && dynamicObject.Item != null)
+			if (item.DynamicObj.Parent is DynamicObject { Item: not null } dynamicObject)
 			{
 				Item parentItem = dynamicObject.Item;
 				if (parentItem == newSlot.Item)
@@ -209,7 +210,7 @@ public class Inventory
 				},
 				AttachData = targetSlotItem.DynamicObj.GetCurrAttachData()
 			};
-			NetworkController.SendToClientsSubscribedTo(dosm, -1L, targetSlotItem.DynamicObj.GetParents(includeMe: false).ToArray());
+			await NetworkController.SendToClientsSubscribedTo(dosm, -1L, targetSlotItem.DynamicObj.GetParents(includeMe: false).ToArray());
 		}
 		item.SetInventorySlot(newSlot);
 		if (parentCorpse != null)

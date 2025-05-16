@@ -1,4 +1,4 @@
-// MsConnection.cs
+// MainServerConnection.cs
 //
 // Copyright (C) 2023, OpenHellion contributors
 //
@@ -24,15 +24,13 @@ using System.Threading.Tasks;
 using OpenHellion.Exceptions;
 using OpenHellion.IO;
 using OpenHellion.Net.Message.MainServer;
-using Telepathy;
-using Server = ZeroGravity.Server;
 
 namespace OpenHellion.Net;
 
 /// <summary>
-/// 	Handles connections to the main server. This is the Nakama docker repository located at: https://github.com/OpenHellion/Nakama
+/// 	Handles connections to the main server. This is the Nakama repository located at: https://github.com/OpenHellion/Nakama
 /// </summary>
-public static class MsConnection
+public static class MainServerConnection
 {
 	public static string IpAddress = "127.0.0.1";
 	public static ushort Port = 7350;
@@ -43,6 +41,10 @@ public static class MsConnection
 	/// <summary>
 	/// 	Send a message to the Nakama main server.
 	/// </summary>
+	/// <exception cref="MainServerException" />
+	/// <exception cref="HttpRequestException" />
+	/// <exception cref="TimeoutException" />
+	/// <exception cref="ArgumentNullException" />
 	public static async Task<T> Send<T>(NakamaMessage message)
 	{
 		if (HttpKey.Contains('&'))
@@ -50,10 +52,12 @@ public static class MsConnection
 			throw new MainServerException("HttpKey contains &.");
 		}
 
+		ArgumentNullException.ThrowIfNull(message);
+
 		// Create new client if one doesn't exist.
 		_httpClient ??= new HttpClient();
 
-		Debug.Log("Sending data to main server:", message.ToString());
+		Debug.Log("Sending data to main server:", message.GetType(), message.ToString());
 		Debug.Log($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap");
 
 		byte[] jsonBytes = Encoding.UTF8.GetBytes(message.ToString());
@@ -70,17 +74,7 @@ public static class MsConnection
 			Version = new Version("2.0")
 		};
 
-		HttpResponseMessage response = null;
-		try
-		{
-			response = await _httpClient.SendAsync(request, Program.CancelToken.Token);
-		}
-		catch (TimeoutException)
-		{
-			Debug.Warning("Connecting to main server timed out. Closing server.");
-			Server.IsRunning = false;
-			return default;
-		}
+		HttpResponseMessage response = await _httpClient.SendAsync(request, Program.CancelToken.Token);
 
 		// Read data as string.
 		string str = await response.Content.ReadAsStringAsync(Program.CancelToken.Token);
@@ -107,5 +101,42 @@ public static class MsConnection
 		}
 
 		return json;
+	}
+
+	/// <summary>
+	/// 	Send a message to the Nakama main server.
+	/// </summary>
+	/// <exception cref="MainServerException" />
+	/// <exception cref="HttpRequestException" />
+	/// <exception cref="TimeoutException" />
+	/// <exception cref="ArgumentNullException" />
+	public static async Task Send(NakamaMessage message)
+	{
+		if (HttpKey.Contains('&'))
+		{
+			throw new MainServerException("HttpKey contains &.");
+		}
+
+		// Create new client if one doesn't exist.
+		_httpClient ??= new HttpClient();
+
+		Debug.Log("Sending data to main server:", message.GetType(), message.ToString());
+		Debug.Log($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap");
+
+		byte[] jsonBytes = Encoding.UTF8.GetBytes(message.ToString());
+
+		var request = new HttpRequestMessage
+		{
+			RequestUri = new Uri($"http://{IpAddress}:{Port}/v2/rpc/{message.GetDestination()}?http_key={HttpKey}&unwrap"),
+			Method = HttpMethod.Post,
+			Content = new ByteArrayContent(jsonBytes, 0, jsonBytes.Length),
+			Headers =
+			{
+				Accept = { new MediaTypeWithQualityHeaderValue("application/json") }
+			},
+			Version = new Version("2.0")
+		};
+
+		await _httpClient.SendAsync(request);
 	}
 }

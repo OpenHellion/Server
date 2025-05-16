@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -35,6 +34,7 @@ public class StatusConnectionListener
 
 	private void Listen()
 	{
+		Debug.Log("Started server status thread.");
 		while (Server.IsRunning && _runThread)
 		{
 			try
@@ -47,10 +47,16 @@ public class StatusConnectionListener
 				StatusConnection connection = new StatusConnection(soc);
 				connection.Start();
 			}
-			catch (Exception ex)
+			catch (SocketException)
 			{
-				Debug.Exception(ex);
+				break;
+			}
+			catch
+			{
+				// Ignored
 			}
 		}
+
+		Debug.Log("Shutting down status connection listener.");
 	}
 }

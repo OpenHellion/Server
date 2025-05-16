@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,14 +30,6 @@ public class SubSystemRadar : SubSystem
 		{
 			return base.Status;
 		}
-		protected set
-		{
-			if (base.Status != SystemStatus.OnLine && value == SystemStatus.OnLine)
-			{
-				stopActiveScanTime = Server.SolarSystemTime + (double)ActiveScanDuration;
-			}
-			base.Status = value;
-		}
 	}
 
 	public SubSystemRadar(SpaceObjectVessel vessel, VesselObjectID id, SubSystemData ssData)
@@ -59,12 +50,21 @@ public class SubSystemRadar : SubSystem
 		}
 	}
 
-	public override void Update(double duration)
+	protected override async Task SetStatusAsync(SystemStatus status)
 	{
-		base.Update(duration);
+		if (base.Status != SystemStatus.OnLine && status == SystemStatus.OnLine)
+		{
+			stopActiveScanTime = Server.SolarSystemTime + ActiveScanDuration;
+		}
+		await base.SetStatusAsync(status);
+	}
+
+	public override async Task Update(double duration)
+	{
+		await base.Update(duration);
 		if (stopActiveScanTime > 0.0 && stopActiveScanTime <= Server.SolarSystemTime && Status == SystemStatus.OnLine)
 		{
-			GoOffLine(autoRestart: false);
+			await GoOffLine(autoRestart: false);
 		}
 	}
 
@@ -76,17 +76,10 @@ public class SubSystemRadar : SubSystem
 			select m as SpaceObjectVessel).ToList();
 		Parallel.ForEach(vessels, delegate(SpaceObjectVessel vessel)
 		{
-			try
+			double magnitude = (ParentVessel.Position - vessel.Position).Magnitude;
+			if (magnitude <= PassiveScanSensitivity * 1000.0 * vessel.GetCompoundRadarSignature())
 			{
-				double magnitude = (ParentVessel.Position - vessel.Position).Magnitude;
-				if (magnitude <= PassiveScanSensitivity * 1000.0 * (double)vessel.GetCompoundRadarSignature())
-				{
-					list.Add(vessel.GUID);
-				}
-			}
-			catch (Exception ex)
-			{
-				Debug.Exception(ex);
+				list.Add(vessel.Guid);
 			}
 		});
 	}
@@ -100,30 +93,23 @@ public class SubSystemRadar : SubSystem
 			select m as SpaceObjectVessel).ToList();
 		Parallel.ForEach(vessels, delegate(SpaceObjectVessel vessel)
 		{
-			try
+			Vector3D vector3D = vessel.Position - ParentVessel.Position;
+			float num = (float)Vector3D.Angle(direction, vector3D.Normalized);
+			if (num <= angle / 2f)
 			{
-				Vector3D vector3D = vessel.Position - ParentVessel.Position;
-				float num = (float)Vector3D.Angle(direction, vector3D.Normalized);
-				if (num <= angle / 2f)
+				double magnitude = vector3D.Magnitude;
+				double num2 = vessel.GetCompoundRadarSignature();
+				if (magnitude > PassiveScanSensitivity * 1000.0 * num2)
 				{
-					double magnitude = vector3D.Magnitude;
-					double num2 = vessel.GetCompoundRadarSignature();
-					if (magnitude > PassiveScanSensitivity * 1000.0 * num2)
+					if (magnitude <= ActiveScanSensitivity * 1000.0 * num2)
 					{
-						if (magnitude <= ActiveScanSensitivity * 1000.0 * num2)
-						{
-							active.Add(vessel.GUID);
-						}
-						else if (magnitude <= ActiveScanFuzzySensitivity * 1000.0 * num2)
-						{
-							fuzzy.Add(vessel.GUID);
-						}
+						active.Add(vessel.Guid);
+					}
+					else if (magnitude <= ActiveScanFuzzySensitivity * 1000.0 * num2)
+					{
+						fuzzy.Add(vessel.Guid);
 					}
 				}
-			}
-			catch (Exception ex)
-			{
-				Debug.Exception(ex);
 			}
 		});
 	}

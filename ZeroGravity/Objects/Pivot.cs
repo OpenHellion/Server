@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Math;
 
 namespace ZeroGravity.Objects;
@@ -37,13 +38,13 @@ public class Pivot : ArtificialBody
 	}
 
 	public Pivot(SpaceObjectTransferable child, ArtificialBody abody)
-		: base(child.GUID, initializeOrbit: true, abody.Position, abody.Velocity, Vector3D.Forward, Vector3D.Up)
+		: base(child.Guid, initializeOrbit: true, abody.Position, abody.Velocity, Vector3D.Forward, Vector3D.Up)
 	{
 		Child = child;
 	}
 
 	public Pivot(SpaceObjectTransferable child, Vector3D position, Vector3D velocity)
-		: base(child.GUID, initializeOrbit: true, position, velocity, Vector3D.Forward, Vector3D.Up)
+		: base(child.Guid, initializeOrbit: true, position, velocity, Vector3D.Forward, Vector3D.Up)
 	{
 		Child = child;
 	}
@@ -55,8 +56,8 @@ public class Pivot : ArtificialBody
 		Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
-		base.Destroy();
+		await base.Destroy();
 	}
 }

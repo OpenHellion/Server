@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BulletSharp;
 using BulletSharp.Math;
 using ZeroGravity.Data;
@@ -9,13 +10,13 @@ namespace ZeroGravity.BulletPhysics;
 
 public class BulletPhysicsController
 {
-	private BroadphaseInterface broadphase;
+	private readonly BroadphaseInterface _broadphase;
 
-	private DefaultCollisionConfiguration collisionConfiguration;
+	private readonly DefaultCollisionConfiguration _collisionConfiguration;
 
-	private CollisionDispatcher dispatcher;
+	private readonly CollisionDispatcher _dispatcher;
 
-	public DiscreteDynamicsWorld dynamicsWorld;
+	private readonly DiscreteDynamicsWorld _dynamicsWorld;
 
 	public double Restitution = 0.85;
 
@@ -25,13 +26,13 @@ public class BulletPhysicsController
 
 	public BulletPhysicsController()
 	{
-		collisionConfiguration = new DefaultCollisionConfiguration();
-		dispatcher = new CollisionDispatcher(collisionConfiguration);
-		broadphase = new DbvtBroadphase();
-		dynamicsWorld = new DiscreteDynamicsWorld(dispatcher, broadphase, null, collisionConfiguration);
-		dynamicsWorld.Gravity = Vector3.Zero;
-		dynamicsWorld.SetInternalTickCallback(InternalTickCallback);
-		GImpactCollisionAlgorithm.RegisterAlgorithm(dispatcher);
+		_collisionConfiguration = new DefaultCollisionConfiguration();
+		_dispatcher = new CollisionDispatcher(_collisionConfiguration);
+		_broadphase = new DbvtBroadphase();
+		_dynamicsWorld = new DiscreteDynamicsWorld(_dispatcher, _broadphase, null, _collisionConfiguration);
+		_dynamicsWorld.Gravity = Vector3.Zero;
+		_dynamicsWorld.SetInternalTickCallback(InternalTickCallback);
+		GImpactCollisionAlgorithm.RegisterAlgorithm(_dispatcher);
 	}
 
 	public void CreateAndAddRigidBody(SpaceObjectVessel vessel)
@@ -58,9 +59,8 @@ public class BulletPhysicsController
 		}
 		foreach (VesselMeshColliderData data3 in vessel.MeshCollidersData)
 		{
-			GImpactMeshShape shape3 = null;
 			Matrix k = BulletHelper.AffineTransformation(1f, data3.Rotation.ToQuaternion(), data3.CenterPosition.ToVector3());
-			shape3 = new GImpactMeshShape(new TriangleIndexVertexArray(data3.Indices, data3.Vertices));
+			GImpactMeshShape shape3 = new GImpactMeshShape(new TriangleIndexVertexArray(data3.Indices, data3.Vertices));
 			shape3.LocalScaling = data3.Scale.ToVector3();
 			shape3.UpdateBound();
 			if (shape3 != null)
@@ -77,7 +77,7 @@ public class BulletPhysicsController
 		double AdditionalMass = 0.0;
 		if (vessel.AllDockedVessels.Count > 0)
 		{
-			foreach (Ship p in vessel.AllDockedVessels)
+			foreach (Ship p in vessel.AllDockedVessels.Cast<Ship>())
 			{
 				AdditionalMass += p.Mass;
 				CompoundShape newCompound = new CompoundShape();
@@ -128,8 +128,11 @@ public class BulletPhysicsController
 		rigidBody.Friction = Friction;
 		rigidBody.ForceActivationState(ActivationState.DisableDeactivation);
 		rigidBody.UserObject = vessel;
-		dynamicsWorld.AddRigidBody(rigidBody);
-		compound.GetBoundingSphere(out var _, out var sphereRadius);
+		lock (_dynamicsWorld)
+		{
+			_dynamicsWorld.AddRigidBody(rigidBody);
+		}
+		compound.GetBoundingSphere(out _, out var sphereRadius);
 		vessel.SetRadius(sphereRadius);
 		vessel.RigidBody = rigidBody;
 	}
@@ -161,9 +164,8 @@ public class BulletPhysicsController
 		{
 			if (data3.AffectingCenterOfMass)
 			{
-				GImpactMeshShape shape3 = null;
 				Matrix k = BulletHelper.AffineTransformation(1f, data3.Rotation.ToQuaternion(), data3.CenterPosition.ToVector3());
-				shape3 = new GImpactMeshShape(new TriangleIndexVertexArray(data3.Indices, data3.Vertices));
+				GImpactMeshShape shape3 = new GImpactMeshShape(new TriangleIndexVertexArray(data3.Indices, data3.Vertices));
 				shape3.LocalScaling = data3.Scale.ToVector3();
 				shape3.UpdateBound();
 				if (shape3 != null)
@@ -174,7 +176,7 @@ public class BulletPhysicsController
 		}
 		if (vessel.AllDockedVessels.Count > 0)
 		{
-			foreach (Ship p in vessel.AllDockedVessels)
+			foreach (Ship p in vessel.AllDockedVessels.Cast<Ship>())
 			{
 				CompoundShape newCompound = new CompoundShape();
 				Matrix relative = BulletHelper.AffineTransformation(1f, p.RelativeRotationFromMainParent.ToQuaternion(), p.RelativePositionFromMainParent.ToVector3());
@@ -197,9 +199,8 @@ public class BulletPhysicsController
 				}
 				foreach (VesselMeshColliderData data in p.MeshCollidersData)
 				{
-					GImpactMeshShape shape = null;
 					Matrix i = BulletHelper.AffineTransformation(1f, data.Rotation.ToQuaternion(), data.CenterPosition.ToVector3());
-					shape = new GImpactMeshShape(new TriangleIndexVertexArray(data.Indices, data.Vertices));
+					GImpactMeshShape shape = new GImpactMeshShape(new TriangleIndexVertexArray(data.Indices, data.Vertices));
 					shape.LocalScaling = data.Scale.ToVector3();
 					shape.UpdateBound();
 					if (shape != null)
@@ -216,26 +217,32 @@ public class BulletPhysicsController
 
 	public bool RayCast(Vector3 from, Vector3 to, out ClosestRayResultCallback result)
 	{
-		result = new ClosestRayResultCallback(ref from, ref to);
-		dynamicsWorld.RayTest(from, to, result);
+		lock (_dynamicsWorld)
+		{
+			result = new ClosestRayResultCallback(ref from, ref to);
+			_dynamicsWorld.RayTest(from, to, result);
+		}
 		return result.HasHit;
 	}
 
 	public bool RayCastAll(Vector3 from, Vector3 to, out AllHitsRayResultCallback result)
 	{
-		result = new AllHitsRayResultCallback(from, to);
-		dynamicsWorld.RayTest(from, to, result);
+		lock (_dynamicsWorld)
+		{
+			result = new AllHitsRayResultCallback(from, to);
+			_dynamicsWorld.RayTest(from, to, result);
+		}
 		return result.HasHit;
 	}
 
-	private void InternalTickCallback(DynamicsWorld world, double timeStep)
+	private async void InternalTickCallback(DynamicsWorld world, double timeStep)
 	{
-		foreach (SpaceObjectVessel vess in Server.Instance.AllVessels)
-		{
-			vess.ReadPhysicsParameters();
-		}
 		try
 		{
+			foreach (SpaceObjectVessel vess in Server.Instance.AllVessels)
+			{
+				vess.ReadPhysicsParameters();
+			}
 			int k = world.Dispatcher.NumManifolds;
 			for (int i = 0; i < k; i++)
 			{
@@ -246,11 +253,11 @@ public class BulletPhysicsController
 				List<long> shipsGUID = new List<long>();
 				if (obA.UserObject is Ship ship)
 				{
-					shipsGUID.Add(ship.GUID);
+					shipsGUID.Add(ship.Guid);
 				}
 				if (obB.UserObject is Ship o)
 				{
-					shipsGUID.Add(o.GUID);
+					shipsGUID.Add(o.Guid);
 				}
 				int numContacts = contactManifold.NumContacts;
 				for (int j = 0; j < numContacts; j++)
@@ -258,15 +265,16 @@ public class BulletPhysicsController
 					ManifoldPoint pt = contactManifold.GetContactPoint(j);
 					if (pt.AppliedImpulse.IsNotEpsilonZeroD() && shipsGUID.Count > 0)
 					{
-						(Server.Instance.GetVessel(shipsGUID[0]) as Ship).SendCollision(vel.Length, pt.AppliedImpulse, pt.LifeTime, shipsGUID.Count > 1 ? shipsGUID[1] : -1);
+						await (Server.Instance.GetVessel(shipsGUID[0]) as Ship).SendCollision(vel.Length, pt.AppliedImpulse, pt.LifeTime, shipsGUID.Count > 1 ? shipsGUID[1] : -1);
 					}
 				}
 				contactManifold.ClearManifold();
 			}
 		}
-		catch (Exception ex)
+		catch (InvalidOperationException ex)
 		{
-			Debug.Exception(ex);
+			Debug.LogException(ex);
+			return;
 		}
 	}
 
@@ -274,13 +282,9 @@ public class BulletPhysicsController
 	{
 		double deltaTime = Server.SolarSystemTime - prevUpdateTime;
 		prevUpdateTime = Server.SolarSystemTime;
-		try
+		lock (_dynamicsWorld)
 		{
-			dynamicsWorld.StepSimulation(deltaTime);
-		}
-		catch (Exception ex)
-		{
-			Debug.Exception(ex);
+			_dynamicsWorld.StepSimulation(deltaTime);
 		}
 	}
 
@@ -288,11 +292,14 @@ public class BulletPhysicsController
 	{
 		try
 		{
-			if (ship.RigidBody != null && dynamicsWorld.CollisionObjectArray.Contains(ship.RigidBody))
+			lock (_dynamicsWorld)
 			{
-				dynamicsWorld.RemoveRigidBody(ship.RigidBody);
-				ship.RigidBody = null;
-				return true;
+				if (ship.RigidBody != null && _dynamicsWorld.CollisionObjectArray.Contains(ship.RigidBody))
+				{
+					_dynamicsWorld.RemoveRigidBody(ship.RigidBody);
+					ship.RigidBody = null;
+					return true;
+				}
 			}
 			if (ship.IsDocked)
 			{
@@ -302,8 +309,8 @@ public class BulletPhysicsController
 		}
 		catch (Exception ex)
 		{
-			Debug.Exception(ex);
+			Debug.LogException(ex);
+			return false;
 		}
-		return false;
 	}
 }

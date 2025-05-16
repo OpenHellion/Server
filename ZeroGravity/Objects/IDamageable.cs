@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 
 namespace ZeroGravity.Objects;
@@ -15,5 +16,5 @@ public interface IDamageable
 
 	bool Repairable { get; }
 
-	void TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false);
+	Task TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false);
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -86,7 +87,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 		}
 	}
 
-	public void Cancel(bool currentItemOnly = false)
+	public async Task Cancel(bool currentItemOnly = false)
 	{
 		if (ItemsInQueue.Count == 0)
 		{
@@ -98,12 +99,12 @@ public class SubSystemFabricator : SubSystem, ICargo
 			Dictionary<ResourceType, float> resources = Item.GetCraftingResources(ItemsInQueue.First());
 			foreach (KeyValuePair<ResourceType, float> kv in resources)
 			{
-				ChangeQuantityBy(GetCompartment().ID, kv.Key, kv.Value, wholeAmount: true);
+				await ChangeQuantityByAsync(GetCompartment().ID, kv.Key, kv.Value, wholeAmount: true);
 			}
 		}
 		if (Status == SystemStatus.OnLine || (Status == SystemStatus.OffLine && SecondaryStatus == SystemSecondaryStatus.Malfunction))
 		{
-			GoOffLine(autoRestart: false);
+			await GoOffLine(autoRestart: false);
 		}
 		ItemsInQueue.RemoveAt(0);
 		StatusChanged = true;
@@ -113,9 +114,9 @@ public class SubSystemFabricator : SubSystem, ICargo
 		}
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
-		base.Update(duration);
+		await base.Update(duration);
 		if (AttachPoints == null || AttachPoints.Count == 0)
 		{
 			return;
@@ -130,14 +131,14 @@ public class SubSystemFabricator : SubSystem, ICargo
 			if (ap != null)
 			{
 				ItemCompoundType ict = ItemsInQueue.First();
-				DynamicObject.SpawnDynamicObject(ict.Type, ict.SubType, ict.PartType, ParentVessel, ap.InSceneID, null, null, null, ict.Tier);
+				await DynamicObject.SpawnDynamicObject(ict.Type, ict.SubType, ict.PartType, ParentVessel, ap.InSceneID, null, null, null, ict.Tier);
 				ItemsInQueue.RemoveAt(0);
 				StatusChanged = true;
 				TimeLeft = -1.0;
 			}
 			if (Status == SystemStatus.OnLine)
 			{
-				GoOffLine(autoRestart: false);
+				await GoOffLine(autoRestart: false);
 			}
 		}
 		else
@@ -156,15 +157,17 @@ public class SubSystemFabricator : SubSystem, ICargo
 			Dictionary<ResourceType, float> resources = Item.GetCraftingResources(item);
 			foreach (KeyValuePair<ResourceType, float> kv in resources)
 			{
-				ChangeQuantityBy(GetCompartment().ID, kv.Key, 0f - kv.Value, wholeAmount: true);
+				await ChangeQuantityByAsync(GetCompartment().ID, kv.Key, 0f - kv.Value, wholeAmount: true);
 			}
 			TimeLeft = resources.Sum((KeyValuePair<ResourceType, float> m) => m.Value) * TimePerResourceUnit;
-			GoOnLine();
+			await GoOnLine();
 		}
 	}
 
-	public override void SetDetails(SubSystemDetails details)
+	// Why does this override base class functionality?
+	public override Task SetDetails(SubSystemDetails details)
 	{
+		return Task.CompletedTask;
 	}
 
 	public CargoCompartmentData GetCompartment(int? id = null)
@@ -176,7 +179,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 		return CargoCompartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoCompartmentData compartment = Compartments.Find((CargoCompartmentData m) => m.ID == compartmentID);
 		CargoResourceData res = compartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
@@ -184,7 +187,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 		{
 			if (wholeAmount)
 			{
-				return 0f;
+				return Task.FromResult(0f);
 			}
 			res = new CargoResourceData
 			{
@@ -198,7 +201,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 		float resourceAvailable = res.Quantity;
 		if (wholeAmount && resourceAvailable - quantity < float.Epsilon)
 		{
-			return 0f;
+			return Task.FromResult(0f);
 		}
 		if (quantity > 0f && quantity > freeSpace)
 		{
@@ -214,7 +217,7 @@ public class SubSystemFabricator : SubSystem, ICargo
 			compartment.Resources.Remove(res);
 		}
 		StatusChanged = true;
-		return qty;
+		return Task.FromResult(qty);
 	}
 
 	public bool HasEnoughResources(ItemType itemType, GenericItemSubType subType, MachineryPartType partType, int tier)

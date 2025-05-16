@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -14,22 +14,29 @@ internal class MeleeWeapon : Item
 
 	public override DynamicObjectStats StatsNew => null;
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
-	public MeleeWeapon(DynamicObjectAuxData data)
+	private MeleeWeapon()
 	{
+	}
+
+	public static async Task<MeleeWeapon> CreateAsync(DynamicObjectAuxData data)
+	{
+		MeleeWeapon meleeWeapon = new();
 		if (data != null)
 		{
-			SetData(data);
+			await meleeWeapon.SetData(data);
 		}
+
+		return meleeWeapon;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		MeleeWeaponData mwd = data as MeleeWeaponData;
 		RateOfFire = mwd.RateOfFire;
 		Damage = mwd.Damage;
@@ -48,23 +55,16 @@ internal class MeleeWeapon : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataMeleeWeapon data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataMeleeWeapon data)
-			{
-				Debug.Warning("PersistenceObjectDataMeleeWeapon data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.MeleeWeaponData);
-			}
+			Debug.LogWarning("PersistenceObjectDataMeleeWeapon data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.MeleeWeaponData);
 		}
 	}
 }

@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -6,7 +6,7 @@ namespace ZeroGravity.Objects;
 
 public class Magazine : Item
 {
-	private MagazineStats _stats;
+	private MagazineStats _stats = new();
 
 	private int _bulletCount;
 
@@ -18,54 +18,51 @@ public class Magazine : Item
 		{
 			return _bulletCount;
 		}
-		private set
-		{
-			_bulletCount = value;
-			_stats.BulletCount = value;
-			if (value <= 0)
-			{
-				DestroyItem();
-			}
-		}
 	}
 
 	public int MaxBulletCount { get; private set; }
 
 	public bool HasAmmo => BulletCount > 0;
 
-	public Magazine(DynamicObjectAuxData data)
+	private Magazine()
 	{
-		_stats = new MagazineStats();
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Magazine> CreateMagazineAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		Magazine magazine = new Magazine();
+		if (data != null)
+		{
+			await magazine.SetData(data);
+		}
+
+		return magazine;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		MagazineData md = data as MagazineData;
-		BulletCount = md.BulletCount;
+		await SetBulletCountAsync(md.BulletCount);
 		MaxBulletCount = md.MaxBulletCount;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		MagazineStats ms = stats as MagazineStats;
-		if (ms.BulletsFrom.HasValue && ms.BulletsTo.HasValue && (ms.BulletsFrom.Value == base.GUID || ms.BulletsTo.Value == base.GUID))
+		if (ms.BulletsFrom.HasValue && ms.BulletsTo.HasValue && (ms.BulletsFrom.Value == GUID || ms.BulletsTo.Value == GUID))
 		{
-			Magazine magFrom = ms.BulletsFrom.Value == base.GUID ? this : Server.Instance.GetItem(ms.BulletsFrom.Value) as Magazine;
-			Magazine magTo = ms.BulletsTo.Value == base.GUID ? this : Server.Instance.GetItem(ms.BulletsTo.Value) as Magazine;
+			Magazine magFrom = ms.BulletsFrom.Value == GUID ? this : Server.Instance.GetItem(ms.BulletsFrom.Value) as Magazine;
+			Magazine magTo = ms.BulletsTo.Value == GUID ? this : Server.Instance.GetItem(ms.BulletsTo.Value) as Magazine;
 			if (magFrom != null && magTo != null)
 			{
-				SplitMagazines(magFrom, magTo);
+				await SplitMagazines(magFrom, magTo);
 			}
 		}
 		return false;
 	}
 
-	private static void SplitMagazines(Magazine fromMag, Magazine toMag)
+	private static async Task SplitMagazines(Magazine fromMag, Magazine toMag)
 	{
 		int splitCount = toMag.MaxBulletCount - toMag.BulletCount;
 		if (toMag.BulletCount == 0)
@@ -76,22 +73,32 @@ public class Magazine : Item
 		{
 			splitCount = fromMag.BulletCount;
 		}
-		toMag.BulletCount += splitCount;
-		fromMag.BulletCount -= splitCount;
-		fromMag.DynamicObj.SendStatsToClient();
-		toMag.DynamicObj.SendStatsToClient();
+		await toMag.SetBulletCountAsync(splitCount);
+		await fromMag.SetBulletCountAsync(splitCount);
+		await fromMag.DynamicObj.SendStatsToClient();
+		await toMag.DynamicObj.SendStatsToClient();
 	}
 
-	public void ChangeQuantity(int amount)
+	public async Task ChangeQuantity(int amount)
 	{
-		BulletCount += amount;
+		await SetBulletCountAsync(amount);
 		if (BulletCount == 0)
 		{
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 		else
 		{
-			base.DynamicObj.StatsChanged = true;
+			DynamicObj.StatsChanged = true;
+		}
+	}
+
+	private async Task SetBulletCountAsync(int amount)
+	{
+		_bulletCount = amount;
+		_stats.BulletCount = amount;
+		if (amount <= 0)
+		{
+			await DestroyItem();
 		}
 	}
 
@@ -106,23 +113,16 @@ public class Magazine : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataMagazine data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataMagazine data)
-			{
-				Debug.Warning("PersistenceObjectDataMagazine data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.MagazineData);
-			}
+			Debug.LogWarning("PersistenceObjectDataMagazine data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.MagazineData);
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -9,7 +10,7 @@ public class Quest
 {
 	public uint ID;
 
-	public List<QuestTrigger> QuestTriggers;
+	public List<QuestTrigger> QuestTriggers = [];
 
 	public QuestTriggerDependencyTpe ActivationDependencyTpe;
 
@@ -25,15 +26,52 @@ public class Quest
 
 	public bool IsFineshed => Status is QuestStatus.Completed or QuestStatus.Failed;
 
-	public Quest(QuestData data, Player player)
+	private Quest()
 	{
-		ID = data.ID;
-		QuestTriggers = data.QuestTriggers.Select((QuestTriggerData m) => new QuestTrigger(this, m)).ToList();
-		ActivationDependencyTpe = data.ActivationDependencyTpe;
-		CompletionDependencyTpe = data.CompletionDependencyTpe;
-		DependencyQuests = data.DependencyQuests;
-		AutoActivate = data.AutoActivate;
-		Player = player;
+	}
+
+	public static async Task<Quest> CreateQuestAsync(QuestData data, Player player)
+	{
+		var quest = new Quest
+		{
+			ID = data.ID,
+			ActivationDependencyTpe = data.ActivationDependencyTpe,
+			CompletionDependencyTpe = data.CompletionDependencyTpe,
+			DependencyQuests = data.DependencyQuests,
+			AutoActivate = data.AutoActivate,
+			Player = player
+		};
+		foreach (var trigger in data.QuestTriggers)
+		{
+			quest.QuestTriggers.Add(await QuestTrigger.CreateQuestTriggerAsync(quest, trigger));
+		}
+		return quest;
+	}
+
+	public static async Task<List<Quest>> CreateQuestsAsync(List<QuestData> data, Player player)
+	{
+		List<Quest> quests = [];
+		foreach (QuestData element in data)
+		{
+			Quest quest = new()
+			{
+				ID = element.ID,
+				ActivationDependencyTpe = element.ActivationDependencyTpe,
+				CompletionDependencyTpe = element.CompletionDependencyTpe,
+				DependencyQuests = element.DependencyQuests,
+				AutoActivate = element.AutoActivate,
+				Player = player
+			};
+
+			if (element.QuestTriggers?.Count > 0)
+			{
+				quest.QuestTriggers = await QuestTrigger.CreateQuestTriggersAsync(quest, element.QuestTriggers);
+			}
+
+			quests.Add(quest);
+		}
+
+		return quests;
 	}
 
 	public QuestDetails GetDetails()

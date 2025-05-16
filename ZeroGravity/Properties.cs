@@ -21,25 +21,14 @@ public class Properties
 
 	private void LoadProperties()
 	{
-		try
+		_propertiesChangedTime = File.GetLastWriteTime(_fileName);
+		_properties.Clear();
+		string[] file = File.ReadAllLines(_fileName);
+		foreach (string row in file)
 		{
-			_propertiesChangedTime = File.GetLastWriteTime(_fileName);
-			_properties.Clear();
-			string[] array = File.ReadAllLines(_fileName);
-			foreach (string row in array)
-			{
-				try
-				{
-					string[] parts = row.Split("=".ToCharArray(), 2);
-					_properties.Add(parts[0].ToLower(), parts[1]);
-				}
-				catch
-				{
-				}
-			}
-		}
-		catch
-		{
+			if (row.IsNullOrEmpty() || row.TrimStart().StartsWith("#")) continue;
+			string[] parts = row.Split("=".ToCharArray(), 2);
+			_properties.Add(parts[0].ToLower(), parts[1]);
 		}
 	}
 

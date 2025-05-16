@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 using OpenHellion.IO;
 using ZeroGravity.Math;
 using ZeroGravity.Objects;
@@ -102,7 +104,7 @@ public class StationBlueprint
 		}
 	}
 
-	public SpaceObjectVessel AssembleStation(string name, string tag, SpawnRuleOrbit spawnRuleOrbit, long? nearArtificialBodyGUID, float? AsteroidResourcesMultiplier)
+	public async Task<SpaceObjectVessel> AssembleStation(string name, string tag, SpawnRuleOrbit spawnRuleOrbit, long? nearArtificialBodyGUID, float? AsteroidResourcesMultiplier)
 	{
 		Dictionary<Structure, GameScenes.SceneId> structures = new Dictionary<Structure, GameScenes.SceneId>();
 		foreach (Structure str2 in Structures)
@@ -121,7 +123,7 @@ public class StationBlueprint
 			if (!spawnedVessels.TryGetValue(str.Key, out var vessel))
 			{
 				string vesselTag2 = tag != "" && str.Key.Tag != "" ? tag + ";" + str.Key.Tag : tag + str.Key.Tag;
-				vessel = mainVessel != null ? SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, nearArtificialBodyGUIDs: new List<long> { mainVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier) : SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, spawnRuleOrbit: spawnRuleOrbit, nearArtificialBodyGUIDs: spawnRuleOrbit == null ? new List<long> { nearArtificialBodyGUID.Value } : null, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: spawnRuleOrbit == null, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
+				vessel = mainVessel != null ? await SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, nearArtificialBodyGUIDs: new List<long> { mainVessel.Guid }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier) : await SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, spawnRuleOrbit: spawnRuleOrbit, nearArtificialBodyGUIDs: spawnRuleOrbit == null ? new List<long> { nearArtificialBodyGUID.Value } : null, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: spawnRuleOrbit == null, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
 				vessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
 				spawnedVessels[str.Key] = vessel;
 			}
@@ -145,7 +147,7 @@ public class StationBlueprint
 					string vesselTag = tag != "" && otherStr.Key.Tag != "" ? tag + ";" + otherStr.Key.Tag : tag + otherStr.Key.Tag;
 					if (!spawnedVessels.TryGetValue(otherStr.Key, out var otherVessel))
 					{
-						otherVessel = SpaceObjectVessel.CreateNew(otherStr.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag, nearArtificialBodyGUIDs: new List<long> { mainVessel.GUID }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
+						otherVessel = await SpaceObjectVessel.CreateNew(otherStr.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag, nearArtificialBodyGUIDs: new List<long> { mainVessel.Guid }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
 						spawnedVessels[otherStr.Key] = otherVessel;
 					}
 					else
@@ -153,30 +155,31 @@ public class StationBlueprint
 						otherVessel = spawnedVessels[otherStr.Key];
 					}
 					otherVessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
-					VesselDockingPort shipPort = vessel.DockingPorts.FirstOrDefault((VesselDockingPort m) => m.OrderID == dp.OrderID);
-					DockingPort dp2 = otherStr.Key.DockingPorts.FirstOrDefault((DockingPort m) => m.DockedStructureID == str.Key.StructureID);
-					int otherOrderID = dp2.OrderID;
-					VesselDockingPort otherPort = otherVessel.DockingPorts.FirstOrDefault((VesselDockingPort m) => m.OrderID == otherOrderID);
+
+					VesselDockingPort shipPort = vessel.DockingPorts.First(m => m.OrderID == dp.OrderID);
+					DockingPort dp2 = otherStr.Key.DockingPorts.First((DockingPort m) => m.DockedStructureID == str.Key.StructureID);
+					VesselDockingPort otherPort = otherVessel.DockingPorts.First(m => m.OrderID == dp2.OrderID);
+
 					if (shipPort == null || otherPort == null)
 					{
 						throw new Exception($"Docking port not found. Station name: {name}, StructureType: {str.Key.StructureType}, StructureID: {str.Key.StructureID}, OrderID: {dp.OrderID}");
 					}
 					if (!shipPort.DockingStatus && !otherPort.DockingStatus)
 					{
-						otherVessel.DockToVessel(otherPort, shipPort, vessel, disableStabilization: true, spawnRuleOrbit == null, buildingStation: true);
+						await otherVessel.DockToVessel(otherPort, shipPort, vessel, disableStabilization: true, spawnRuleOrbit == null, buildingStation: true);
 					}
 				}
 			}
 		}
 		foreach (KeyValuePair<Structure, SpaceObjectVessel> kv in spawnedVessels)
 		{
-			SetStates(kv.Key, kv.Value);
+			await SetStates(kv.Key, kv.Value);
 		}
 		if (spawnRuleOrbit != null)
 		{
 			mainVessel.Orbit = spawnRuleOrbit.GenerateRandomOrbit();
 		}
-		else if (nearArtificialBodyGUID.HasValue && LocalPosition != null && LocalPosition.Length == 3)
+		else if (nearArtificialBodyGUID.HasValue && LocalPosition is { Length: 3 })
 		{
 			ArtificialBody ab = Server.Instance.GetObject(nearArtificialBodyGUID.Value) as ArtificialBody;
 			mainVessel.Orbit = new OrbitParameters();
@@ -185,23 +188,23 @@ public class StationBlueprint
 			mainVessel.Orbit.InitFromCurrentStateVectors(Server.SolarSystemTime);
 		}
 		mainVessel.Orbit.UpdateOrbit();
-		if (LocalAngularVelocity != null && LocalAngularVelocity.Length == 3)
+		if (LocalAngularVelocity is { Length: 3 })
 		{
 			mainVessel.Rotation = LocalAngularVelocity.ToVector3D();
 		}
 		return mainVessel;
 	}
 
-	private void SetStates(Structure structure, SpaceObjectVessel vessel)
+	private async Task SetStates(Structure structure, SpaceObjectVessel vessel)
 	{
 		vessel.IsInvulnerable = structure.Invulnerable.HasValue ? structure.Invulnerable.Value : Invulnerable;
 		if (structure.HealthMultiplier.HasValue)
 		{
-			vessel.Health *= structure.HealthMultiplier.Value;
+			await vessel.SetHealthAsync(vessel.Health * structure.HealthMultiplier.Value);
 		}
 		else if (HealthMultiplier.HasValue)
 		{
-			vessel.Health *= HealthMultiplier.Value;
+			await vessel.SetHealthAsync(vessel.Health * HealthMultiplier.Value);
 		}
 		if (structure.DockingControlsDisabled.HasValue)
 		{
@@ -250,11 +253,11 @@ public class StationBlueprint
 			{
 				if ((structure.SystemsOnline.HasValue && structure.SystemsOnline.Value) || (SystemsOnline.HasValue && SystemsOnline.Value))
 				{
-					vc.GoOnLine();
+					await vc.GoOnLine();
 				}
 				else if ((structure.SystemsOnline.HasValue && !structure.SystemsOnline.Value) || (SystemsOnline.HasValue && !SystemsOnline.Value))
 				{
-					vc.GoOffLine(autoRestart: false);
+					await vc.GoOffLine(autoRestart: false);
 				}
 			}
 		}
@@ -269,58 +272,51 @@ public class StationBlueprint
 				door.IsLocked = false;
 			}
 		}
-		foreach (VesselDockingPort vdp in vessel.DockingPorts)
+		if (vessel.DockingPorts != null)
 		{
-			DockingPort dp = structure.DockingPorts.FirstOrDefault((DockingPort m) => m.OrderID == vdp.OrderID);
-			if (dp != null)
+			foreach (VesselDockingPort vdp in vessel.DockingPorts)
 			{
-				vdp.Locked = dp.Locked;
+				DockingPort dp = structure.DockingPorts.FirstOrDefault((DockingPort m) => m.OrderID == vdp.OrderID);
+				if (dp != null)
+				{
+					vdp.Locked = dp.Locked;
+				}
 			}
 		}
 	}
 
-	public static List<SpaceObjectVessel> AssembleStation(string blueprintName, string name, string tag, SpawnRuleOrbit spawnRuleOrbit, long? nearArtificialBodyGUID, float? AsteroidResourcesMultiplier = 1f)
+	public static async Task<List<SpaceObjectVessel>> AssembleStation(string blueprintName, string name, string tag, SpawnRuleOrbit spawnRuleOrbit, long? nearArtificialBodyGUID, float? AsteroidResourcesMultiplier = 1f)
 	{
-		List<SpaceObjectVessel> list = new List<SpaceObjectVessel>();
+		List<SpaceObjectVessel> list = [];
 		string fileName = configDir + "Data/Stations/" + blueprintName + ".json";
 		try
 		{
-			StationBlueprint sb = JsonSerialiser.Load<StationBlueprint>(fileName);
-			SpaceObjectVessel mainVessel2 = sb.AssembleStation(name.IsNullOrEmpty() ? sb.Name : name, tag, spawnRuleOrbit, nearArtificialBodyGUID, AsteroidResourcesMultiplier);
-			list.Add(mainVessel2);
-			mainVessel2.UpdateVesselData();
-			return list;
-		}
-		catch (Exception)
-		{
-			try
+			Queue<StationBlueprint> stationBlueprints = new(JsonSerialiser.Load<StationBlueprint[]>(fileName));
+
+			var mainVesselBlueprint = stationBlueprints.Dequeue();
+			SpaceObjectVessel mainVessel = await mainVesselBlueprint.AssembleStation(name.IsNullOrEmpty() ? mainVesselBlueprint.Name : name, tag, spawnRuleOrbit, nearArtificialBodyGUID, AsteroidResourcesMultiplier);
+			mainVessel.UpdateVesselData();
+			list.Add(mainVessel);
+
+			if (stationBlueprints.Count != 0)
 			{
-				StationBlueprint[] sbs = JsonSerialiser.Load<StationBlueprint[]>(fileName);
-				SpaceObjectVessel mainVessel = null;
-				StationBlueprint[] array = sbs;
-				foreach (StationBlueprint sb2 in array)
+				foreach (StationBlueprint blueprint in stationBlueprints)
 				{
-					if (mainVessel == null)
-					{
-						mainVessel = sb2.AssembleStation(name.IsNullOrEmpty() ? sb2.Name : name, tag, spawnRuleOrbit, nearArtificialBodyGUID, AsteroidResourcesMultiplier);
-						mainVessel.UpdateVesselData();
-						list.Add(mainVessel);
-						continue;
-					}
-					SpaceObjectVessel vessel = sb2.AssembleStation(sb2.Name, tag, null, mainVessel.GUID, AsteroidResourcesMultiplier);
-					if (sb2.MatchVelocity.HasValue && sb2.MatchVelocity.Value)
+					SpaceObjectVessel vessel = await blueprint.AssembleStation(blueprint.Name, tag, null, mainVessel.Guid, AsteroidResourcesMultiplier);
+					if (blueprint.MatchVelocity.HasValue && blueprint.MatchVelocity.Value)
 					{
 						vessel.StabilizeToTarget(mainVessel, forceStabilize: true);
 					}
 					vessel.UpdateVesselData();
 					list.Add(vessel);
 				}
-				return list;
 			}
-			catch (Exception ex)
-			{
-				Debug.Exception(ex);
-			}
+
+			return list;
+		}
+		catch (JsonSerializationException)
+		{
+			Debug.LogWarningFormat("Invalid JSON in bluprint {0}", fileName);
 		}
 		return null;
 	}

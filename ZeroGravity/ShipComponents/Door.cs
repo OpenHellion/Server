@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -123,7 +123,7 @@ public class Door : IAirConsumer, IPersistantObject
 				{
 					pDiff = System.Math.Abs(Room1.AirPressure - Room2.AirPressure);
 				}
-				return (float)(0.61 * (double)PassageArea * System.Math.Sqrt((double)(2f * pDiff * 100000f) / 1.225));
+				return (float)(0.61 * PassageArea * System.Math.Sqrt(2f * pDiff * 100000f / 1.225));
 			}
 			return 0f;
 		}
@@ -157,22 +157,17 @@ public class Door : IAirConsumer, IPersistantObject
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataDoor data)
 		{
-			if (persistenceData is not PersistenceObjectDataDoor data)
-			{
-				Debug.Warning("PersistenceObjectDataDoor data is null");
-				return;
-			}
-			HasPower = data.HasPower;
-			IsLocked = data.IsLocked;
-			IsOpen = data.IsOpen;
+			Debug.LogWarning("PersistenceObjectDataDoor data is null");
+			return Task.CompletedTask;
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		HasPower = data.HasPower;
+		IsLocked = data.IsLocked;
+		IsOpen = data.IsOpen;
+
+		return Task.CompletedTask;
 	}
 }

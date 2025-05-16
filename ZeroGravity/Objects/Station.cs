@@ -4,6 +4,10 @@ using ZeroGravity.Math;
 
 namespace ZeroGravity.Objects;
 
+/// <summary>
+///		Unfinished class from the original developers. Probably intended to be a large space station.
+///		Might be cool to implement later.
+/// </summary>
 public class Station : SpaceObjectVessel
 {
 	private List<Vector3D> playerSpawnPoints = new List<Vector3D>();

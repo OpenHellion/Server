@@ -49,7 +49,7 @@ public class SelfDestructTimer
 
 	public void Reset()
 	{
-		_DestructionSolarSystemTime = Server.SolarSystemTime + (double)setTime;
+		_DestructionSolarSystemTime = Server.SolarSystemTime + setTime;
 	}
 
 	public SelfDestructTimerData GetData()

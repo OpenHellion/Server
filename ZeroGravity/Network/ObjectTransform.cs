@@ -27,7 +27,7 @@ public class ObjectTransform
 
 	public List<CharacterMovementMessage> CharactersMovement;
 
-	public List<DynamicObectMovementMessage> DynamicObjectsMovement;
+	public List<DynamicObjectMovementMessage> DynamicObjectsMovement;
 
 	public List<CorpseMovementMessage> CorpsesMovement;
 

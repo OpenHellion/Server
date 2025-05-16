@@ -23,42 +23,40 @@ public class SolarSystem
 
 	public const double DetailsLimitSubscribe = 2250000.0;
 
-	private double currentTime;
+	private double _currentTime;
 
-	private List<CelestialBody> celesitalBodies = new List<CelestialBody>();
+	private List<CelestialBody> _celestialBodies = new List<CelestialBody>();
 
-	private ConcurrentDictionary<long, ArtificialBody> artificialBodies = new ConcurrentDictionary<long, ArtificialBody>();
-
-	private List<Station> stations = new List<Station>();
+	private ConcurrentDictionary<long, ArtificialBody> _artificialBodies = new ConcurrentDictionary<long, ArtificialBody>();
 
 	public bool CheckDestroyMarkedBodies;
 
-	private double timeCorrection;
+	private double _timeCorrection;
 
-	public double CurrentTime => currentTime;
+	public double CurrentTime => _currentTime;
 
-	public int ArtificialBodiesCount => artificialBodies.Count;
+	public int ArtificialBodiesCount => _artificialBodies.Count;
 
 	public void AddCelestialBody(CelestialBody body)
 	{
-		celesitalBodies.Add(body);
+		_celestialBodies.Add(body);
 	}
 
 	public CelestialBody GetCelestialBody(long guid)
 	{
-		return celesitalBodies.Find((CelestialBody m) => m.GUID == guid);
+		return _celestialBodies.Find((CelestialBody m) => m.GUID == guid);
 	}
 
 	public CelestialBody FindCelestialBodyParent(Vector3D position)
 	{
-		CelestialBody foundBody = celesitalBodies[0];
-		double currMinDistance = (celesitalBodies[0].Position - position).SqrMagnitude;
-		for (int i = 1; i < celesitalBodies.Count; i++)
+		CelestialBody foundBody = _celestialBodies[0];
+		double currMinDistance = (_celestialBodies[0].Position - position).SqrMagnitude;
+		for (int i = 1; i < _celestialBodies.Count; i++)
 		{
-			double tmpDistance = (celesitalBodies[i].Position - position).SqrMagnitude;
-			if (tmpDistance < celesitalBodies[i].Orbit.GravityInfluenceRadiusSquared && tmpDistance < currMinDistance)
+			double tmpDistance = (_celestialBodies[i].Position - position).SqrMagnitude;
+			if (tmpDistance < _celestialBodies[i].Orbit.GravityInfluenceRadiusSquared && tmpDistance < currMinDistance)
 			{
-				foundBody = celesitalBodies[i];
+				foundBody = _celestialBodies[i];
 				currMinDistance = tmpDistance;
 			}
 		}
@@ -67,19 +65,19 @@ public class SolarSystem
 
 	public void AddArtificialBody(ArtificialBody body)
 	{
-		artificialBodies[body.GUID] = body;
+		_artificialBodies[body.Guid] = body;
 	}
 
 	public void RemoveArtificialBody(ArtificialBody body)
 	{
-		artificialBodies.TryRemove(body.GUID, out body);
+		_artificialBodies.TryRemove(body.Guid, out body);
 	}
 
 	public void CalculatePositionsAfterTime(double time)
 	{
-		currentTime = time;
-		timeCorrection = HiResTime.Milliseconds / 1000.0 - time;
-		foreach (CelestialBody body in celesitalBodies)
+		_currentTime = time;
+		_timeCorrection = HiResTime.Milliseconds / 1000.0 - time;
+		foreach (CelestialBody body in _celestialBodies)
 		{
 			body.Update();
 		}
@@ -87,104 +85,54 @@ public class SolarSystem
 
 	public void UpdateTime(double timeDelta)
 	{
-		currentTime = HiResTime.Milliseconds / 1000.0 - timeCorrection;
+		_currentTime = HiResTime.Milliseconds / 1000.0 - _timeCorrection;
 	}
 
-	public void UpdatePositions()
+	public async Task UpdatePositions()
 	{
-		try
+		foreach (CelestialBody body in _celestialBodies)
 		{
-			foreach (CelestialBody body in celesitalBodies)
-			{
-				body.Update();
-			}
-			List<ArtificialBody> abs = new List<ArtificialBody>(artificialBodies.Values);
-			Parallel.ForEach(abs, delegate(ArtificialBody ab)
-			{
-				try
-				{
-					ab.Update();
-				}
-				catch (Exception ex3)
-				{
-					Debug.Exception(ex3);
-				}
-			});
-			Parallel.ForEach(abs, delegate(ArtificialBody ab)
-			{
-				try
-				{
-					ab.AfterUpdate();
-				}
-				catch (Exception ex2)
-				{
-					Debug.Exception(ex2);
-				}
-			});
-			if (!CheckDestroyMarkedBodies)
-			{
-				return;
-			}
-			foreach (ArtificialBody ab2 in abs.Where((ArtificialBody m) => m.MarkForDestruction))
-			{
-				Server.Instance.DestroyArtificialBody(ab2);
-			}
-			CheckDestroyMarkedBodies = false;
+			body.Update();
 		}
-		catch (Exception ex)
+		List<ArtificialBody> artificialBodies = new List<ArtificialBody>(_artificialBodies.Values);
+		await Parallel.ForEachAsync(artificialBodies, async (ab, ct) =>
 		{
-			Debug.Exception(ex);
+			await ab.Update();
+		});
+		await Parallel.ForEachAsync(artificialBodies, async (ArtificialBody ab, CancellationToken _) =>
+		{
+			await ab.AfterUpdate();
+		});
+		if (!CheckDestroyMarkedBodies)
+		{
+			return;
 		}
+		foreach (ArtificialBody ab2 in artificialBodies.Where((ArtificialBody m) => m.MarkForDestruction))
+		{
+			await Server.Instance.DestroyArtificialBody(ab2);
+		}
+		CheckDestroyMarkedBodies = false;
 	}
 
-	public void SendMovementMessage()
+	public async Task SendMovementMessage()
 	{
-		try
+		Player[] players = Server.Instance.AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive).ToArray();
+		if (players.Length < 1)
 		{
-			Player[] players = Server.Instance.AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive).ToArray();
-			if (players.Length < 1)
-			{
-				return;
-			}
-			EventWaitHandle wh = new AutoResetEvent(initialState: false);
-
-			// Create cancellation token.
-			CancellationTokenSource cts = new();
-
-			Task t = Task.Factory.StartNew(() =>
-			{
-				ParallelLoopResult parallelLoopResult = Parallel.ForEach(players, delegate(Player pl)
-				{
-					SendMovementMessageToPlayer(pl);
-				});
-				wh.Set();
-			}, cts.Token);
-
-
-			if (!wh.WaitOne(10000))
-			{
-				Debug.Warning("SendMovementMessage thread timeout. Aborting...");
-
-				// Request cancellation.
-				cts.Cancel();
-
-				// Clean up.
-				cts.Dispose();
-			}
-			foreach (Player kv in Server.Instance.AllPlayers)
-			{
-				kv.TransformData = null;
-			}
+			return;
 		}
-		finally
+
+		await Parallel.ForEachAsync(players, async (pl, ct) => await SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
+		foreach (Player player in Server.Instance.AllPlayers)
 		{
+			player.TransformData = null;
 		}
 	}
 
 	/// <summary>
 	/// 	Send a message to the player that contains all of the moved objects.
 	/// </summary>
-	public void SendMovementMessageToPlayer(Player player)
+	public async Task SendMovementMessageToPlayer(Player player)
 	{
 		MovementMessage movementMessage = new MovementMessage
 		{
@@ -193,17 +141,17 @@ public class SolarSystem
 			Transforms = new List<ObjectTransform>()
 		};
 
-		if (player.Parent is SpaceObjectVessel parent && parent.IsDocked)
+		if (player.Parent is SpaceObjectVessel { IsDocked: true } parent)
 		{
 			parent.Orbit.CopyDataFrom(parent.DockedToMainVessel.Orbit, 0.0, exactCopy: true);
 		}
 
 		// Loops through each artificial body in the universe, and adds all contents to the movement message.
-		foreach (ArtificialBody artificialBody in artificialBodies.Values)
+		foreach (ArtificialBody artificialBody in _artificialBodies.Values)
 		{
 			ObjectTransform bodyTransform = new ObjectTransform
 			{
-				GUID = artificialBody.GUID,
+				GUID = artificialBody.Guid,
 				Type = artificialBody.ObjectType
 			};
 
@@ -218,16 +166,16 @@ public class SolarSystem
 			if (artificialBody.StabilizeToTargetObj is not null)
 			{
 				if (artificialBody.StabilizeToTargetTime >= player.LastMovementMessageSolarSystemTime
-					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.GUID)))
+					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.Guid)))
 				{
-					bodyTransform.StabilizeToTargetGUID = artificialBody.StabilizeToTargetObj.GUID;
+					bodyTransform.StabilizeToTargetGUID = artificialBody.StabilizeToTargetObj.Guid;
 					bodyTransform.StabilizeToTargetRelPosition = artificialBody.StabilizeToTargetRelPosition.ToArray();
 				}
 			}
 			else if (orbit.IsOrbitValid)
 			{
 				if (orbit.LastChangeTime >= player.LastMovementMessageSolarSystemTime
-					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.GUID)))
+					|| (player.UpdateArtificialBodyMovement.Count > 0 && player.UpdateArtificialBodyMovement.Contains(artificialBody.Guid)))
 				{
 					bodyTransform.Orbit = new OrbitData
 					{
@@ -255,12 +203,12 @@ public class SolarSystem
 			}
 
 			bodyTransform.CharactersMovement = new List<CharacterMovementMessage>();
-			bodyTransform.DynamicObjectsMovement = new List<DynamicObectMovementMessage>();
+			bodyTransform.DynamicObjectsMovement = new List<DynamicObjectMovementMessage>();
 			bodyTransform.CorpsesMovement = new List<CorpseMovementMessage>();
 
 			if (artificialBody is SpaceObjectVessel vessel)
 			{
-				if (player.Parent.GUID == vessel.GUID || player.IsSubscribedTo(vessel.GUID))
+				if (player.Parent.Guid == vessel.Guid || player.IsSubscribedTo(vessel.Guid))
 				{
 					foreach (Player crewPlayer in vessel.VesselCrew)
 					{
@@ -276,7 +224,7 @@ public class SolarSystem
 
 					foreach (Corpse playerCorpse in vessel.Corpses.Values)
 					{
-						if (playerCorpse.PlayerReceivesMovementMessage(player.GUID))
+						if (playerCorpse.PlayerReceivesMovementMessage(player.Guid))
 						{
 							CorpseMovementMessage corpseMovement = playerCorpse.GetMovementMessage();
 							if (corpseMovement is not null)
@@ -288,9 +236,9 @@ public class SolarSystem
 
 					foreach (DynamicObject dynamicObject in vessel.DynamicObjects.Values)
 					{
-						if (dynamicObject.PlayerReceivesMovementMessage(player.GUID) && dynamicObject.LastChangeTime >= player.LastMovementMessageSolarSystemTime)
+						if (dynamicObject.PlayerReceivesMovementMessage(player.Guid) && dynamicObject.LastChangeTime >= player.LastMovementMessageSolarSystemTime)
 						{
-							DynamicObectMovementMessage dynamicOjectMovement = dynamicObject.GetDynamicObectMovementMessage();
+							DynamicObjectMovementMessage dynamicOjectMovement = dynamicObject.GetDynamicObectMovementMessage();
 							if (dynamicOjectMovement is not null)
 							{
 								bodyTransform.DynamicObjectsMovement.Add(dynamicOjectMovement);
@@ -317,7 +265,7 @@ public class SolarSystem
 					case SpaceObjectType.CorpsePivot:
 					{
 						Corpse playerCorpse = pivot.Child as Corpse;
-						if (playerCorpse.PlayerReceivesMovementMessage(player.GUID))
+						if (playerCorpse.PlayerReceivesMovementMessage(player.Guid))
 						{
 							CorpseMovementMessage corpseMovement = playerCorpse.GetMovementMessage();
 							if (corpseMovement is not null)
@@ -331,9 +279,9 @@ public class SolarSystem
 					case SpaceObjectType.DynamicObjectPivot:
 					{
 						DynamicObject dynamicObject = pivot.Child as DynamicObject;
-						if (dynamicObject.PlayerReceivesMovementMessage(player.GUID))
+						if (dynamicObject.PlayerReceivesMovementMessage(player.Guid))
 						{
-							DynamicObectMovementMessage dynamicObjectMovement = dynamicObject.GetDynamicObectMovementMessage();
+							DynamicObjectMovementMessage dynamicObjectMovement = dynamicObject.GetDynamicObectMovementMessage();
 							if (dynamicObjectMovement is not null)
 							{
 								bodyTransform.DynamicObjectsMovement.Add(dynamicObjectMovement);
@@ -349,7 +297,7 @@ public class SolarSystem
 				List<CorpseMovementMessage> corpsesMovement = bodyTransform.CorpsesMovement;
 				if (corpsesMovement is not { Count: > 0 })
 				{
-					List<DynamicObectMovementMessage> dynamicObjectsMovement = bodyTransform.DynamicObjectsMovement;
+					List<DynamicObjectMovementMessage> dynamicObjectsMovement = bodyTransform.DynamicObjectsMovement;
 					if (dynamicObjectsMovement is not { Count: > 0 } && !bodyTransform.StabilizeToTargetGUID.HasValue)
 					{
 						continue;
@@ -369,11 +317,12 @@ public class SolarSystem
 
 		player.LastMovementMessageSolarSystemTime = CurrentTime;
 		player.UpdateArtificialBodyMovement.Clear();
-		NetworkController.SendToGameClient(player.GUID, movementMessage);
+		await NetworkController.Send(player.Guid, movementMessage);
 	}
 
 	public void InitializeData()
 	{
+		Debug.Log("Initialising celestial boldies data...");
 		foreach (CelestialBodyData cbd in StaticData.SolarSystem.CelestialBodies)
 		{
 			CelestialBody newBody = new CelestialBody(cbd.GUID);
@@ -381,36 +330,36 @@ public class SolarSystem
 			newBody.AsteroidGasBurstTimeMin = cbd.AsteroidGasBurstTimeMin;
 			newBody.AsteroidGasBurstTimeMax = cbd.AsteroidGasBurstTimeMax;
 			newBody.AsteroidResources = cbd.AsteroidResources.ToList();
-			celesitalBodies.Add(newBody);
+			_celestialBodies.Add(newBody);
 		}
 	}
 
 	public ArtificialBody[] GetArtificialBodies()
 	{
-		return artificialBodies.Values.ToArray();
+		return _artificialBodies.Values.ToArray();
 	}
 
 	public List<CelestialBody> GetCelestialBodies()
 	{
-		return celesitalBodies;
+		return _celestialBodies;
 	}
 
 	public ArtificialBody[] GetArtificialBodieslsInRange(ArtificialBody ab, double radius)
 	{
 		double sqRadius = radius * radius;
-		return artificialBodies.Values.Where((ArtificialBody m) => m != ab && m.Parent == ab.Parent && (m.Position - ab.Position).SqrMagnitude <= sqRadius).ToArray();
+		return _artificialBodies.Values.Where((ArtificialBody m) => m != ab && m.Parent == ab.Parent && (m.Position - ab.Position).SqrMagnitude <= sqRadius).ToArray();
 	}
 
 	public ArtificialBody[] GetArtificialBodieslsInRange(Vector3D position, double radius)
 	{
 		double sqRadius = radius * radius;
-		return artificialBodies.Values.Where((ArtificialBody m) => (m.Position - position).SqrMagnitude <= sqRadius).ToArray();
+		return _artificialBodies.Values.Where((ArtificialBody m) => (m.Position - position).SqrMagnitude <= sqRadius).ToArray();
 	}
 
 	public ArtificialBody[] GetArtificialBodieslsInRange(CelestialBody celestial, Vector3D position, double radius)
 	{
 		double sqRadius = radius * radius;
-		return artificialBodies.Values.Where((ArtificialBody m) => m.Orbit.Parent.CelestialBody == celestial && (m.Orbit.RelativePosition - position).SqrMagnitude <= sqRadius).ToArray();
+		return _artificialBodies.Values.Where((ArtificialBody m) => m.Orbit.Parent.CelestialBody == celestial && (m.Orbit.RelativePosition - position).SqrMagnitude <= sqRadius).ToArray();
 	}
 
 	public void GetSpawnPosition(SpaceObjectType type, double objectRadius, bool checkPosition, out Vector3D position, out Vector3D velocity, out Vector3D forward, out Vector3D up, List<long> nearArtificialBodyGUIDs, List<long> celestialBodyGUIDs, Vector3D? positionOffset, Vector3D? velocityAtPosition, QuaternionD? localRotation, double distanceFromSurfacePercMin, double distanceFromSurfacePercMax, SpawnRuleOrbit spawnRuleOrbit, double celestialBodyDeathDistanceMultiplier, double artificialBodyDistanceCheck, out OrbitParameters orbit)
@@ -422,7 +371,7 @@ public class SolarSystem
 		orbit = null;
 		CelestialBody parentBody = null;
 		ArtificialBody ab = null;
-		if (nearArtificialBodyGUIDs != null && nearArtificialBodyGUIDs.Count > 0)
+		if (nearArtificialBodyGUIDs is { Count: > 0 })
 		{
 			SpaceObject so = nearArtificialBodyGUIDs.Count != 1 ? Server.Instance.GetObject(nearArtificialBodyGUIDs[MathHelper.RandomRange(0, nearArtificialBodyGUIDs.Count)]) : Server.Instance.GetObject(nearArtificialBodyGUIDs[0]);
 			if (so is ArtificialBody body)
@@ -463,7 +412,7 @@ public class SolarSystem
 		}
 		if (parentBody == null)
 		{
-			if (celestialBodyGUIDs != null && celestialBodyGUIDs.Count > 0)
+			if (celestialBodyGUIDs is { Count: > 0 })
 			{
 				parentBody = celestialBodyGUIDs.Count != 1 ? Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[MathHelper.RandomRange(0, celestialBodyGUIDs.Count)]) : Server.Instance.SolarSystem.GetCelestialBody(celestialBodyGUIDs[0]);
 			}
@@ -492,8 +441,7 @@ public class SolarSystem
 			}
 			else
 			{
-				double distance = 0.0;
-				distance = parentBody.GUID != 1 ? parentBody.Orbit.Radius + (parentBody.Orbit.GravityInfluenceRadius - parentBody.Orbit.Radius) * MathHelper.RandomRange(distanceFromSurfacePercMin, distanceFromSurfacePercMax) : parentBody.Orbit.Radius + (483940704314.0 - parentBody.Orbit.Radius) * MathHelper.RandomRange(0.1, 1.0);
+				double distance = parentBody.GUID != 1 ? parentBody.Orbit.Radius + (parentBody.Orbit.GravityInfluenceRadius - parentBody.Orbit.Radius) * MathHelper.RandomRange(distanceFromSurfacePercMin, distanceFromSurfacePercMax) : parentBody.Orbit.Radius + (483940704314.0 - parentBody.Orbit.Radius) * MathHelper.RandomRange(0.1, 1.0);
 				position = new Vector3D(0.0 - distance, 0.0, 0.0);
 				velocity = Vector3D.Back * parentBody.Orbit.RandomOrbitVelocityMagnitudeAtDistance(distance);
 				QuaternionD randomRot2 = MathHelper.RandomRotation();
@@ -517,11 +465,11 @@ public class SolarSystem
 		int positionIteration = 0;
 		if (checkPosition)
 		{
-			int spawnPointClear = 0;
+			int spawnPointClear;
 			do
 			{
 				spawnPointClear = 0;
-				foreach (CelestialBody cb in celesitalBodies)
+				foreach (CelestialBody cb in _celestialBodies)
 				{
 					if (cb.Orbit.IsOrbitValid && cb.GUID != 1 && cb.Position.DistanceSquared(position) < System.Math.Pow(cb.Orbit.Radius + Server.CelestialBodyDeathDistance * celestialBodyDeathDistanceMultiplier + objectRadius, 2.0))
 					{

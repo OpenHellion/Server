@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -63,29 +64,12 @@ public class SubSystemFTL : SubSystem
 		{
 			return base.Status;
 		}
-		protected set
-		{
-			bool setPrimary = false;
-			if (Status == SystemStatus.OnLine && value != SystemStatus.OnLine && ParentVessel.CurrentCourse != null)
-			{
-				ParentVessel.CurrentCourse.Invalidate();
-			}
-			else if (Status != SystemStatus.OnLine && value == SystemStatus.OnLine)
-			{
-				setPrimary = true;
-			}
-			base.Status = value;
-			if (setPrimary)
-			{
-				(ParentVessel as Ship).CheckMainPropulsionVessel();
-			}
-		}
 	}
 
 	public SubSystemFTL(SpaceObjectVessel vessel, VesselObjectID id, SubSystemData ssData)
 		: base(vessel, id, ssData)
 	{
-		base.OperationRate = 0f;
+		OperationRate = 0f;
 		_PowerUpTime = 0f;
 	}
 
@@ -127,11 +111,29 @@ public class SubSystemFTL : SubSystem
 		};
 	}
 
-	public override void Update(double duration)
+	protected override async Task SetStatusAsync(SystemStatus status)
 	{
-		base.Update(duration);
-		base.OperationRate = ParentVessel.CurrentCourse != null && ParentVessel.CurrentCourse.IsInProgress ? 1 : 0;
-		MachineryPart mp = MachineryParts.Values.FirstOrDefault((MachineryPart m) => m != null && m.PartType == MachineryPartType.SingularityCellDetonator);
+		bool setPrimary = false;
+		if (Status == SystemStatus.OnLine && status != SystemStatus.OnLine && ParentVessel.CurrentCourse != null)
+		{
+			await ParentVessel.CurrentCourse.Invalidate();
+		}
+		else if (Status != SystemStatus.OnLine && status == SystemStatus.OnLine)
+		{
+			setPrimary = true;
+		}
+		await base.SetStatusAsync(status);
+		if (setPrimary)
+		{
+			await (ParentVessel as Ship).CheckMainPropulsionVessel();
+		}
+	}
+
+	public override async Task Update(double duration)
+	{
+		await base.Update(duration);
+		OperationRate = ParentVessel.CurrentCourse is { IsInProgress: true } ? 1 : 0;
+		MachineryPart mp = MachineryParts.Values.FirstOrDefault((MachineryPart m) => m is { PartType: MachineryPartType.SingularityCellDetonator });
 		if (mp == null)
 		{
 			MaxWarp = 0;
@@ -163,11 +165,11 @@ public class SubSystemFTL : SubSystem
 		return dict;
 	}
 
-	public void ConsumeWarpResources(List<int> slots, float warpFuel, float warpPower)
+	public async Task ConsumeWarpResources(List<int> slots, float warpFuel, float warpPower)
 	{
 		ParentVessel.Capacitor.Capacity = MathHelper.Clamp(ParentVessel.Capacitor.Capacity - warpPower, 0f, ParentVessel.Capacitor.MaxCapacity);
 		List<MachineryPart> list = new List<MachineryPart>();
-		if (slots != null && slots.Count > 0 && warpFuel > 0f)
+		if (slots is { Count: > 0 } && warpFuel > 0f)
 		{
 			foreach (int slotIndex in slots)
 			{
@@ -196,13 +198,13 @@ public class SubSystemFTL : SubSystem
 				warpCell.Health -= warpFuel;
 				warpFuel = 0f;
 			}
-			warpCell.DynamicObj.SendStatsToClient();
+			await warpCell.DynamicObj.SendStatsToClient();
 		}
 	}
 
 	public override bool CheckAvailableResources(float consumptionFactor, float duration, bool standby, ref Dictionary<IResourceProvider, float> reservedCapacities, ref Dictionary<ResourceContainer, float> reservedQuantities, ref string debugText)
 	{
-		if (!canGoOnline || base.Defective)
+		if (!canGoOnline || Defective)
 		{
 			return false;
 		}

@@ -1,4 +1,4 @@
-using System;
+using System.Threading.Tasks;
 using System.Timers;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -11,43 +11,49 @@ public class Medpack : Item
 
 	public float MaxHp;
 
-	private MedpackStats medStats;
+	private MedpackStats medStats = new();
 
 	private Timer destroyTimer;
 
 	public override DynamicObjectStats StatsNew => medStats;
 
-	public Medpack(DynamicObjectAuxData data)
+	private Medpack()
 	{
-		medStats = new MedpackStats();
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Medpack> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		Medpack medpack = new();
+		if (data != null)
+		{
+			await medpack.SetData(data);
+		}
+
+		return medpack;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		MedpackData md = data as MedpackData;
 		RegenRate = md.RegenRate;
 		MaxHp = md.MaxHP;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		MedpackStats ms = stats as MedpackStats;
 		if (ms.Use)
 		{
-			if (base.DynamicObj.Parent is Player)
+			if (DynamicObj.Parent is Player)
 			{
-				(base.DynamicObj.Parent as Player).Stats.HealOverTime(RegenRate, MaxHp / RegenRate);
+				(DynamicObj.Parent as Player).Stats.HealOverTime(RegenRate, MaxHp / RegenRate);
 			}
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 			destroyTimer = new Timer(2500.0);
-			destroyTimer.Elapsed += delegate
+			destroyTimer.Elapsed += async delegate
 			{
-				DestroyItem();
+				await DestroyItem();
 			};
 			destroyTimer.Enabled = true;
 			return true;
@@ -55,9 +61,9 @@ public class Medpack : Item
 		return false;
 	}
 
-	public override void DestroyItem()
+	public override async Task DestroyItem()
 	{
-		base.DestroyItem();
+		await base.DestroyItem();
 		if (destroyTimer != null)
 		{
 			destroyTimer.Dispose();
@@ -75,23 +81,16 @@ public class Medpack : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataMedpack data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataMedpack data)
-			{
-				Debug.Warning("PersistenceObjectDataMedpack data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.MedpackData);
-			}
+			Debug.LogWarning("PersistenceObjectDataMedpack data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.MedpackData);
 		}
 	}
 }

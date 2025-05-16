@@ -18,16 +18,8 @@ public class PersistenceJsonConverter : JsonConverter
 		{
 			return null;
 		}
-		try
-		{
-			JObject jo = JObject.Load(reader);
-			return PersistenceData.GetData(jo, serializer);
-		}
-		catch (Exception ex)
-		{
-			Debug.Exception(ex);
-		}
-		return null;
+		JObject jo = JObject.Load(reader);
+		return PersistenceData.GetData(jo, serializer);
 	}
 
 	public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)

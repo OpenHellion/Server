@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
@@ -27,17 +27,24 @@ internal class Canister : Item, ICargo
 
 	public List<CargoCompartmentData> Compartments => _compartments;
 
-	public Canister(DynamicObjectAuxData data)
+	private Canister()
 	{
-		if (data != null)
-		{
-			SetData(data);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<Canister> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		Canister canister = new();
+		if (data != null)
+		{
+			await canister.SetData(data);
+		}
+
+		return canister;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		SetCanisterData((data as CanisterData).CargoCompartment);
 		ApplyTierMultiplier();
 	}
@@ -52,20 +59,20 @@ internal class Canister : Item, ICargo
 	{
 		if (!TierMultiplierApplied)
 		{
-			cargoCompartment.Capacity *= base.TierMultiplier;
+			cargoCompartment.Capacity *= TierMultiplier;
 		}
 		base.ApplyTierMultiplier();
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		if (stats is not CanisterStats data)
 		{
 			return false;
 		}
-		if (data.UseCanister.HasValue && data.UseCanister.Value && base.DynamicObj.Parent is Player)
+		if (data.UseCanister.HasValue && data.UseCanister.Value && DynamicObj.Parent is Player)
 		{
-			Player player = base.DynamicObj.Parent as Player;
+			Player player = DynamicObj.Parent as Player;
 			if (player.CurrentJetpack != null)
 			{
 				foreach (CargoCompartmentData compJ in player.CurrentJetpack.Compartments)
@@ -109,23 +116,23 @@ internal class Canister : Item, ICargo
 						}
 					}
 				}
-				base.DynamicObj.SendStatsToClient();
-				player.CurrentJetpack.DynamicObj.SendStatsToClient();
+				await DynamicObj.SendStatsToClient();
+				await player.CurrentJetpack.DynamicObj.SendStatsToClient();
 			}
 		}
 		return false;
 	}
 
-	public void ChangeQuantity(Dictionary<ResourceType, float> newResources)
+	public async Task ChangeQuantity(Dictionary<ResourceType, float> newResources)
 	{
 		foreach (KeyValuePair<ResourceType, float> res in newResources)
 		{
-			changeQuantityBy(res.Key, res.Value, sendStats: false);
+			await ChangeQuantityBy(res.Key, res.Value, sendStats: false);
 		}
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 	}
 
-	private float changeQuantityBy(ResourceType resourceType, float quantity, bool sendStats = true)
+	private async Task<float> ChangeQuantityBy(ResourceType resourceType, float quantity, bool sendStats = true)
 	{
 		CargoResourceData res = cargoCompartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
 		if (res == null)
@@ -161,10 +168,10 @@ internal class Canister : Item, ICargo
 		{
 			cargoCompartment.Resources.Remove(res);
 		}
-		base.DynamicObj.StatsChanged = true;
+		DynamicObj.StatsChanged = true;
 		if (System.Math.Abs(ResourceChangedCounter[resourceType] / cargoCompartment.Capacity) >= 0.01f)
 		{
-			base.DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 			ResourceChangedCounter[resourceType] = 0f;
 		}
 		return qty;
@@ -179,9 +186,9 @@ internal class Canister : Item, ICargo
 		return _compartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public async Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
-		return changeQuantityBy(resourceType, quantity);
+		return await ChangeQuantityBy(resourceType, quantity);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -192,23 +199,16 @@ internal class Canister : Item, ICargo
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataCanister data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataCanister data)
-			{
-				Debug.Warning("PersistenceObjectDataCanister data is null", base.GUID);
-			}
-			else
-			{
-				SetCanisterData(data.Compartment);
-			}
+			Debug.LogWarning("PersistenceObjectDataCanister data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			SetCanisterData(data.Compartment);
 		}
 	}
 }

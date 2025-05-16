@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.Objects;
@@ -18,7 +19,7 @@ public class ResourceContainerAirTank : ResourceContainer
 		return new PersistenceObjectDataCargo
 		{
 			InSceneID = ID.InSceneID,
-			CargoCompartments = base.Compartments,
+			CargoCompartments = Compartments,
 			AuxData = new PersistenceObjectAuxDataAirTank
 			{
 				AirQuality = AirQuality
@@ -26,9 +27,9 @@ public class ResourceContainerAirTank : ResourceContainer
 		};
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		base.LoadPersistenceData(persistenceData);
+		await base.LoadPersistenceData(persistenceData);
 		AirQuality = ((persistenceData as PersistenceObjectDataCargo).AuxData as PersistenceObjectAuxDataAirTank).AirQuality;
 	}
 
@@ -36,7 +37,7 @@ public class ResourceContainerAirTank : ResourceContainer
 	{
 		return new AirTankAuxDetails
 		{
-			AirQuality = base.Compartments[0].Resources[0].Quantity > float.Epsilon ? AirQuality : 0f
+			AirQuality = Compartments[0].Resources[0].Quantity > float.Epsilon ? AirQuality : 0f
 		};
 	}
 }

@@ -1,8 +1,10 @@
+using System.Threading.Tasks;
+
 namespace ZeroGravity;
 
 public interface IPersistantObject
 {
 	PersistenceObjectData GetPersistenceData();
 
-	void LoadPersistenceData(PersistenceObjectData persistenceData);
+	Task LoadPersistenceData(PersistenceObjectData persistenceData);
 }

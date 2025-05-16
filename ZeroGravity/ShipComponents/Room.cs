@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -222,7 +223,7 @@ public class Room : IPersistantObject, IResourceUser
 	{
 		return new PersistenceObjectDataRoom
 		{
-			GUID = ParentVessel.GUID,
+			GUID = ParentVessel.Guid,
 			InSceneID = ID.InSceneID,
 			AirPressure = AirPressure,
 			AirQuality = AirQuality,
@@ -235,28 +236,23 @@ public class Room : IPersistantObject, IResourceUser
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataRoom data)
 		{
-			if (persistenceData is not PersistenceObjectDataRoom data)
-			{
-				Debug.Warning("PersistenceObjectDataRoom data is null");
-				return;
-			}
-			_AirPressure = data.AirPressure;
-			_AirQuality = data.AirQuality;
-			_AirPressureChangeRate = data.AirPressureChangeRate;
-			_AirQualityChangeRate = data.AirQualityChangeRate;
-			_Temperature = data.Temperature;
-			_UseGravity = data.UseGravity;
-			GravityMalfunction = data.GravityMalfunction;
-			AirFiltering = data.AirFiltering;
+			Debug.LogWarning("PersistenceObjectDataRoom data is null");
+			return Task.CompletedTask;
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		_AirPressure = data.AirPressure;
+		_AirQuality = data.AirQuality;
+		_AirPressureChangeRate = data.AirPressureChangeRate;
+		_AirQualityChangeRate = data.AirQualityChangeRate;
+		_Temperature = data.Temperature;
+		_UseGravity = data.UseGravity;
+		GravityMalfunction = data.GravityMalfunction;
+		AirFiltering = data.AirFiltering;
+
+		return Task.CompletedTask;
 	}
 
 	public RoomDetails GetDetails()

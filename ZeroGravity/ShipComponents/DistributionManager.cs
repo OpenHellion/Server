@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -60,7 +62,7 @@ public class DistributionManager
 
 		public List<IAirConsumer> AirConsumers = new List<IAirConsumer>();
 
-		public bool IsAirOk => (double)AirPressure > -0.67 * (double)AirQuality + 1.0;
+		public bool IsAirOk => AirPressure > -0.67 * AirQuality + 1.0;
 
 		public float AirPressure
 		{
@@ -247,35 +249,41 @@ public class DistributionManager
 		}
 	}
 
+	public struct ComsumerRoomReserved
+	{
+		public Dictionary<IResourceProvider, float> Capacities;
+		public Dictionary<ResourceContainer, float> Quantities;
+	}
+
 	private static List<Type> consumersOrder;
 
-	private static Dictionary<short, StructureSceneData> structureDefs;
+	private static readonly ConcurrentDictionary<short, StructureSceneData> _structureDefs;
 
-	private Dictionary<IResourceProvider, DistributionNode> resourceProviderNodes = new Dictionary<IResourceProvider, DistributionNode>();
+	private readonly ConcurrentDictionary<IResourceProvider, DistributionNode> _resourceProviderNodes = new();
 
-	private Dictionary<VesselObjectID, Generator> idGenerators = new Dictionary<VesselObjectID, Generator>();
+	private readonly ConcurrentDictionary<VesselObjectID, Generator> _idGenerators = new();
 
-	private Dictionary<VesselObjectID, VesselComponent> idMachineryPartSlots = new Dictionary<VesselObjectID, VesselComponent>();
+	private readonly ConcurrentDictionary<VesselObjectID, VesselComponent> _idMachineryPartSlots = new();
 
-	private Dictionary<VesselObjectID, SubSystem> idSubSystems = new Dictionary<VesselObjectID, SubSystem>();
+	private readonly ConcurrentDictionary<VesselObjectID, SubSystem> _idSubSystems = new();
 
-	private Dictionary<VesselObjectID, Room> idRooms = new Dictionary<VesselObjectID, Room>();
+	private readonly ConcurrentDictionary<VesselObjectID, Room> _idRooms = new();
 
-	private Dictionary<VesselObjectID, ResourceContainer> idResourceContainers = new Dictionary<VesselObjectID, ResourceContainer>();
+	private readonly ConcurrentDictionary<VesselObjectID, ResourceContainer> _idResourceContainers = new ();
 
-	private Dictionary<VesselObjectID, Door> idDoors = new Dictionary<VesselObjectID, Door>();
+	private readonly ConcurrentDictionary<VesselObjectID, Door> _idDoors = new();
 
-	private Dictionary<long, DistributionNode> distributionNodes = new Dictionary<long, DistributionNode>();
+	private readonly ConcurrentDictionary<long, DistributionNode> _distributionNodes = new();
 
-	private Dictionary<Room, CompoundRoom> compoundRooms = new Dictionary<Room, CompoundRoom>();
+	private readonly ConcurrentDictionary<Room, CompoundRoom> _compoundRooms = new();
 
-	private Dictionary<Player, Room> playerRooms = new Dictionary<Player, Room>();
+	private readonly ConcurrentDictionary<Player, Room> _playerRooms = new();
 
 	private DateTime prevSystemsUpdateTime;
 
-	public Dictionary<DistributionSystemType, float> AvailableResourceCapacities = new Dictionary<DistributionSystemType, float>();
+	private readonly ConcurrentDictionary<DistributionSystemType, float> _availableResourceCapacities = new();
 
-	public Dictionary<DistributionSystemType, float> AvailableResourceQuantities = new Dictionary<DistributionSystemType, float>();
+	private readonly ConcurrentDictionary<DistributionSystemType, float> _availableResourceQuantities = new();
 
 	private bool isCompoundDM;
 
@@ -292,11 +300,11 @@ public class DistributionManager
 			typeof(SubSystemFTL),
 			typeof(SubSystemEngine)
 		};
-		structureDefs = new Dictionary<short, StructureSceneData>();
+		_structureDefs = new();
 		consumersOrder = consumersOrder.OrderByDescending((Type m) => consumersOrder.IndexOf(m)).ToList();
 		foreach (StructureSceneData s in StaticData.StructuresDataList)
 		{
-			structureDefs[s.ItemID] = s;
+			_structureDefs[s.ItemID] = s;
 		}
 	}
 
@@ -316,11 +324,11 @@ public class DistributionManager
 		float rate = 1f;
 		if (door.Room1 != null)
 		{
-			compoundRooms.TryGetValue(door.Room1, out cr1);
+			_compoundRooms.TryGetValue(door.Room1, out cr1);
 		}
 		if (door.Room2 != null)
 		{
-			compoundRooms.TryGetValue(door.Room2, out cr2);
+			_compoundRooms.TryGetValue(door.Room2, out cr2);
 		}
 		if (cr1 == cr2)
 		{
@@ -331,7 +339,7 @@ public class DistributionManager
 			float sumArea = 0f;
 			if (cr1.AirPressure <= float.Epsilon)
 			{
-				foreach (Door d in cr1.AirConsumers.Where((IAirConsumer m) => m is Door door1 && door1.isExternal && !door1.IsSealed))
+				foreach (Door d in cr1.AirConsumers.Where((IAirConsumer m) => m is Door { isExternal: true, IsSealed: false }).Cast<Door>())
 				{
 					sumArea += d.PassageArea;
 				}
@@ -341,11 +349,11 @@ public class DistributionManager
 				}
 				direction = 2;
 				qty = cr2.Volume * cr2.AirPressure;
-				rate = (float)(0.61 * (double)area * System.Math.Sqrt((double)(2f * cr2.AirPressure * 100000f) / 1.225));
+				rate = (float)(0.61 * area * System.Math.Sqrt(2f * cr2.AirPressure * 100000f / 1.225));
 			}
 			else if (cr2.AirPressure <= float.Epsilon)
 			{
-				foreach (Door d2 in cr2.AirConsumers.Where((IAirConsumer m) => m is Door door1 && door1.isExternal && !door1.IsSealed))
+				foreach (Door d2 in cr2.AirConsumers.Where((IAirConsumer m) => m is Door { isExternal: true, IsSealed: false }).Cast<Door>())
 				{
 					sumArea += d2.PassageArea;
 				}
@@ -355,7 +363,7 @@ public class DistributionManager
 				}
 				direction = 1;
 				qty = cr1.Volume * cr1.AirPressure;
-				rate = (float)(0.61 * (double)area * System.Math.Sqrt((double)(2f * cr1.AirPressure * 100000f) / 1.225));
+				rate = (float)(0.61 * area * System.Math.Sqrt(2f * cr1.AirPressure * 100000f / 1.225));
 			}
 			if (direction == 0)
 			{
@@ -368,23 +376,23 @@ public class DistributionManager
 					direction = 2;
 				}
 				qty = System.Math.Abs((cr2.Volume * (cr1.Volume * cr1.AirPressure) - cr1.Volume * (cr2.Volume * cr2.AirPressure)) / (cr1.Volume + cr2.Volume));
-				rate = (float)(0.61 * (double)area * System.Math.Sqrt(2.0 * System.Math.Abs((double)((cr1.AirPressure - cr2.AirPressure) * 100000f) / 1.225)));
+				rate = (float)(0.61 * area * System.Math.Sqrt(2.0 * System.Math.Abs((cr1.AirPressure - cr2.AirPressure) * 100000f / 1.225)));
 			}
 		}
-		else if (cr1 != null && cr1.AirPressure > float.Epsilon)
+		else if (cr1 is { AirPressure: > float.Epsilon })
 		{
 			direction = 1;
 			qty = cr1.Volume * cr1.AirPressure;
-			rate = (float)(0.61 * (double)area * System.Math.Sqrt((double)(2f * cr1.AirPressure * 100000f) / 1.225));
+			rate = (float)(0.61 * area * System.Math.Sqrt(2f * cr1.AirPressure * 100000f / 1.225));
 		}
-		else if (cr2 != null && cr2.AirPressure > float.Epsilon)
+		else if (cr2 is { AirPressure: > float.Epsilon })
 		{
 			direction = 2;
 			qty = cr2.Volume * cr2.AirPressure;
-			rate = (float)(0.61 * (double)area * System.Math.Sqrt((double)(2f * cr2.AirPressure * 100000f) / 1.225));
+			rate = (float)(0.61 * area * System.Math.Sqrt(2f * cr2.AirPressure * 100000f / 1.225));
 		}
 		float time;
-		if (rate <= float.Epsilon || (double)(time = qty / rate) < 0.05)
+		if (rate <= float.Epsilon || (time = qty / rate) < 0.05)
 		{
 			direction = 0;
 			return 0f;
@@ -424,15 +432,15 @@ public class DistributionManager
 			{
 				continue;
 			}
-			DistributionNode node1 = distributionNodes[vessel.GUID];
-			VesselDockingPort dockedPort = port.DockedVessel.DockingPorts.Find((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
-			DistributionNode node2 = distributionNodes[port.DockedVessel.GUID];
+			DistributionNode node1 = _distributionNodes[vessel.Guid];
+			DistributionNode node2 = _distributionNodes[port.DockedVessel.Guid];
+			VesselDockingPort dockedPort = port.DockedVessel.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == port.DockedToID.InSceneID);
 			LinkDistributionNodes(node1, node2);
 			int[] doorsIDs = port.DoorsIDs;
 			for (int i = 0; i < doorsIDs.Length; i++)
 			{
 				short door1Id = (short)doorsIDs[i];
-				VesselObjectID id1 = new VesselObjectID(vessel.GUID, door1Id);
+				VesselObjectID id1 = new VesselObjectID(vessel.Guid, door1Id);
 				VesselObjectID matchingID = null;
 				Door door1 = GetDoor(id1);
 				if (door1 is not { isExternal: true })
@@ -445,19 +453,19 @@ public class DistributionManager
 				for (int j = 0; j < doorsIDs2.Length; j++)
 				{
 					short door2Id = (short)doorsIDs2[j];
-					VesselObjectID id2 = new VesselObjectID(port.DockedVessel.GUID, door2Id);
+					VesselObjectID id2 = new VesselObjectID(port.DockedVessel.Guid, door2Id);
 					Door door2 = GetDoor(id2);
 					if (door2 != null)
 					{
 						double dist = (door1.PositionRelativeToDockingPort - QuaternionD.AngleAxis(180.0, Vector3D.Up) * door2.PositionRelativeToDockingPort).Magnitude;
-						if (dist <= (double)port.DoorPairingDistance && dist < minDist)
+						if (dist <= port.DoorPairingDistance && dist < minDist)
 						{
 							matchingDoor = door2;
 							matchingID = id2;
 						}
 					}
 				}
-				if (matchingDoor != null && matchingDoor.isExternal)
+				if (matchingDoor is { isExternal: true })
 				{
 					PairDoors(door1, matchingDoor);
 				}
@@ -534,22 +542,22 @@ public class DistributionManager
 
 	public void UnpairAllDoors()
 	{
-		foreach (KeyValuePair<VesselObjectID, Door> idDoor in idDoors)
+		foreach (KeyValuePair<VesselObjectID, Door> idDoor in _idDoors)
 		{
 			Door door = idDoor.Value;
 			if (door.LockedAutoToggle)
 			{
 				door.IsLocked = true;
 			}
-			if (door.Room1 != null && door.Room1.GravityAutoToggle)
+			if (door.Room1 is { GravityAutoToggle: true })
 			{
 				door.Room1.UseGravity = false;
 			}
-			if (door.Room2 != null && door.Room2.GravityAutoToggle)
+			if (door.Room2 is { GravityAutoToggle: true })
 			{
 				door.Room2.UseGravity = false;
 			}
-			if (door.PairedDoorID != null && idDoors.TryGetValue(door.PairedDoorID, out var otherDoor))
+			if (door.PairedDoorID != null && _idDoors.TryGetValue(door.PairedDoorID, out var otherDoor))
 			{
 				UnpairDoor(otherDoor);
 			}
@@ -559,8 +567,8 @@ public class DistributionManager
 
 	private void UnpairDoor(Door door)
 	{
-		VesselObjectID room1ID = idRooms.FirstOrDefault((KeyValuePair<VesselObjectID, Room> m) => m.Value == door.Room1).Key;
-		VesselObjectID room2ID = idRooms.FirstOrDefault((KeyValuePair<VesselObjectID, Room> m) => m.Value == door.Room2).Key;
+		VesselObjectID room1ID = _idRooms.FirstOrDefault((KeyValuePair<VesselObjectID, Room> m) => m.Value == door.Room1).Key;
+		VesselObjectID room2ID = _idRooms.FirstOrDefault((KeyValuePair<VesselObjectID, Room> m) => m.Value == door.Room2).Key;
 		if (room1ID != null && room2ID != null && (room1ID.VesselGUID != door.ID.VesselGUID || room2ID.VesselGUID != door.ID.VesselGUID))
 		{
 			door.Room1.LinkedRooms.Remove(door.Room2);
@@ -579,7 +587,7 @@ public class DistributionManager
 
 	public Door GetDoor(VesselObjectID sid)
 	{
-		if (idDoors.TryGetValue(sid, out var ret))
+		if (_idDoors.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -588,7 +596,7 @@ public class DistributionManager
 
 	public Room GetRoom(VesselObjectID sid)
 	{
-		if (idRooms.TryGetValue(sid, out var ret))
+		if (_idRooms.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -597,7 +605,7 @@ public class DistributionManager
 
 	public SubSystem GetSubSystem(VesselObjectID sid)
 	{
-		if (idSubSystems.TryGetValue(sid, out var ret))
+		if (_idSubSystems.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -606,7 +614,7 @@ public class DistributionManager
 
 	public Generator GetGenerator(VesselObjectID sid)
 	{
-		if (idGenerators.TryGetValue(sid, out var ret))
+		if (_idGenerators.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -615,11 +623,11 @@ public class DistributionManager
 
 	public VesselComponent GetVesselComponent(VesselObjectID sid)
 	{
-		if (idSubSystems.TryGetValue(sid, out var ss))
+		if (_idSubSystems.TryGetValue(sid, out var ss))
 		{
 			return ss;
 		}
-		if (idGenerators.TryGetValue(sid, out var gen))
+		if (_idGenerators.TryGetValue(sid, out var gen))
 		{
 			return gen;
 		}
@@ -628,7 +636,7 @@ public class DistributionManager
 
 	public ResourceContainer GetResourceContainer(VesselObjectID sid)
 	{
-		if (idResourceContainers.TryGetValue(sid, out var ret))
+		if (_idResourceContainers.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -637,7 +645,7 @@ public class DistributionManager
 
 	public VesselComponent GetVesselComponentByPartSlot(VesselObjectID sid)
 	{
-		if (idMachineryPartSlots.TryGetValue(sid, out var ret))
+		if (_idMachineryPartSlots.TryGetValue(sid, out var ret))
 		{
 			return ret;
 		}
@@ -646,14 +654,14 @@ public class DistributionManager
 
 	private DistributionNode AddShipDataStructure(SpaceObjectVessel vessel, GameScenes.SceneId sceneID)
 	{
-		StructureSceneData structureSceneData = structureDefs[(short)sceneID];
+		StructureSceneData structureSceneData = _structureDefs[(short)sceneID];
 		foreach (RoomData roomData2 in structureSceneData.Rooms)
 		{
-			VesselObjectID id4 = new VesselObjectID(vessel.GUID, roomData2.InSceneID);
+			VesselObjectID id4 = new VesselObjectID(vessel.Guid, roomData2.InSceneID);
 			Room room3 = vessel.Rooms.Find((Room m) => m.ID.Equals(id4));
 			if (room3 != null)
 			{
-				idRooms[id4] = room3;
+				_idRooms[id4] = room3;
 			}
 		}
 		foreach (DoorData dd in structureSceneData.Doors)
@@ -662,7 +670,7 @@ public class DistributionManager
 			{
 				continue;
 			}
-			VesselObjectID id5 = new VesselObjectID(vessel.GUID, dd.InSceneID);
+			VesselObjectID id5 = new VesselObjectID(vessel.Guid, dd.InSceneID);
 			Door door;
 			if (isCompoundDM)
 			{
@@ -671,8 +679,8 @@ public class DistributionManager
 			else
 			{
 				door = vessel.Doors.Find((Door m) => m.ID.Equals(id5));
-				door.Room1 = GetRoom(new VesselObjectID(vessel.GUID, dd.Room1ID));
-				door.Room2 = GetRoom(new VesselObjectID(vessel.GUID, dd.Room2ID));
+				door.Room1 = GetRoom(new VesselObjectID(vessel.Guid, dd.Room1ID));
+				door.Room2 = GetRoom(new VesselObjectID(vessel.Guid, dd.Room2ID));
 				if (door.Room1 != null)
 				{
 					door.Room1.Doors.Add(door);
@@ -690,13 +698,13 @@ public class DistributionManager
 					}
 				}
 			}
-			idDoors[id5] = door;
+			_idDoors[id5] = door;
 		}
 		DistributionNode node = new DistributionNode();
 		foreach (RoomData roomData in structureSceneData.Rooms)
 		{
-			Room room2 = idRooms[new VesselObjectID(vessel.GUID, roomData.InSceneID)];
-			if (roomData.ParentRoomID > 0 && idRooms.TryGetValue(new VesselObjectID(vessel.GUID, roomData.ParentRoomID), out var parentRoom))
+			Room room2 = _idRooms[new VesselObjectID(vessel.Guid, roomData.InSceneID)];
+			if (roomData.ParentRoomID > 0 && _idRooms.TryGetValue(new VesselObjectID(vessel.Guid, roomData.ParentRoomID), out var parentRoom))
 			{
 				LinkRooms(room2, parentRoom);
 				parentRoom.LinkedRooms.Add(room2);
@@ -706,16 +714,16 @@ public class DistributionManager
 		}
 		foreach (ResourceContainerData rcData in structureSceneData.ResourceContainers)
 		{
-			VesselObjectID id3 = new VesselObjectID(vessel.GUID, rcData.InSceneID);
+			VesselObjectID id3 = new VesselObjectID(vessel.Guid, rcData.InSceneID);
 			ResourceContainer rc = !isCompoundDM ? rcData.DistributionSystemType != DistributionSystemType.Air ? new ResourceContainer(vessel, id3, rcData) : new ResourceContainerAirTank(vessel, id3, rcData) : vessel.DistributionManager.GetResourceContainer(id3);
 			node.ResourceProviders.Add(rc);
 			node.ResourceUsers.Add(rc);
-			idResourceContainers[id3] = rc;
-			resourceProviderNodes[rc] = node;
+			_idResourceContainers[id3] = rc;
+			_resourceProviderNodes[rc] = node;
 		}
 		foreach (SubSystemData ssData in structureSceneData.SubSystems)
 		{
-			VesselObjectID id2 = new VesselObjectID(vessel.GUID, ssData.InSceneID);
+			VesselObjectID id2 = new VesselObjectID(vessel.Guid, ssData.InSceneID);
 			SubSystem ss;
 			if (isCompoundDM)
 			{
@@ -756,9 +764,9 @@ public class DistributionManager
 				foreach (int resourceContainer in ssData.ResourceContainers)
 				{
 					short isid2 = (short)resourceContainer;
-					VesselObjectID rcID2 = new VesselObjectID(vessel.GUID, isid2);
+					VesselObjectID rcID2 = new VesselObjectID(vessel.Guid, isid2);
 					ResourceContainer cr2 = null;
-					if (idResourceContainers.TryGetValue(rcID2, out cr2))
+					if (_idResourceContainers.TryGetValue(rcID2, out cr2))
 					{
 						if (!ss.ResourceContainers.ContainsKey(cr2.OutputType))
 						{
@@ -769,7 +777,7 @@ public class DistributionManager
 				}
 				if (ssData.RoomID > 0)
 				{
-					Room room = idRooms[new VesselObjectID(vessel.GUID, ssData.RoomID)];
+					Room room = _idRooms[new VesselObjectID(vessel.Guid, ssData.RoomID)];
 					room.VesselComponents.Add(ss);
 					ss.Room = room;
 					if (ss is ILifeSupportDevice device)
@@ -779,7 +787,7 @@ public class DistributionManager
 				}
 			}
 			node.ResourceUsers.Add(ss);
-			idSubSystems[id2] = ss;
+			_idSubSystems[id2] = ss;
 			if (ssData.MachineryPartSlots == null)
 			{
 				continue;
@@ -789,8 +797,8 @@ public class DistributionManager
 				short msId2 = (short)machineryPartSlot;
 				if (structureSceneData.AttachPoints.Find((BaseAttachPointData m) => m.InSceneID == msId2) is MachineryPartSlotData slotData2)
 				{
-					VesselObjectID sid2 = new VesselObjectID(vessel.GUID, msId2);
-					idMachineryPartSlots[sid2] = ss;
+					VesselObjectID sid2 = new VesselObjectID(vessel.Guid, msId2);
+					_idMachineryPartSlots[sid2] = ss;
 					if (!isCompoundDM)
 					{
 						ss.InitMachineryPartSlot(sid2, null, slotData2);
@@ -800,7 +808,7 @@ public class DistributionManager
 		}
 		foreach (GeneratorData gData in structureSceneData.Generators)
 		{
-			VesselObjectID id = new VesselObjectID(vessel.GUID, gData.InSceneID);
+			VesselObjectID id = new VesselObjectID(vessel.Guid, gData.InSceneID);
 			Generator gen;
 			if (isCompoundDM)
 			{
@@ -821,9 +829,9 @@ public class DistributionManager
 				foreach (int resourceContainer2 in gData.ResourceContainers)
 				{
 					short isid = (short)resourceContainer2;
-					VesselObjectID rcID = new VesselObjectID(vessel.GUID, isid);
+					VesselObjectID rcID = new VesselObjectID(vessel.Guid, isid);
 					ResourceContainer cr = null;
-					if (idResourceContainers.TryGetValue(rcID, out cr))
+					if (_idResourceContainers.TryGetValue(rcID, out cr))
 					{
 						if (!gen.ResourceContainers.ContainsKey(cr.OutputType))
 						{
@@ -835,8 +843,8 @@ public class DistributionManager
 			}
 			node.ResourceProviders.Add(gen);
 			node.ResourceUsers.Add(gen);
-			idGenerators[id] = gen;
-			resourceProviderNodes[gen] = node;
+			_idGenerators[id] = gen;
+			_resourceProviderNodes[gen] = node;
 			if (gData.MachineryPartSlots == null)
 			{
 				continue;
@@ -846,8 +854,8 @@ public class DistributionManager
 				short msId = (short)machineryPartSlot2;
 				if (structureSceneData.AttachPoints.Find((BaseAttachPointData m) => m.InSceneID == msId) is MachineryPartSlotData slotData)
 				{
-					VesselObjectID sid = new VesselObjectID(vessel.GUID, msId);
-					idMachineryPartSlots[sid] = gen;
+					VesselObjectID sid = new VesselObjectID(vessel.Guid, msId);
+					_idMachineryPartSlots[sid] = gen;
 					if (!isCompoundDM)
 					{
 						gen.InitMachineryPartSlot(sid, null, slotData);
@@ -855,12 +863,12 @@ public class DistributionManager
 				}
 			}
 		}
-		distributionNodes[vessel.GUID] = node;
+		_distributionNodes[vessel.Guid] = node;
 		if (isCompoundDM)
 		{
 			foreach (VesselDockingPort port in vessel.DockingPorts)
 			{
-				if (port.DockingStatus && !distributionNodes.ContainsKey(port.DockedVessel.GUID))
+				if (port.DockingStatus && !_distributionNodes.ContainsKey(port.DockedVessel.Guid))
 				{
 					AddShipDataStructure(port.DockedVessel, port.DockedVessel.VesselData.SceneID);
 				}
@@ -871,7 +879,7 @@ public class DistributionManager
 
 	public void FabricateItem(ItemType itemType, ICargo fromCargo)
 	{
-		if (parentVessel != null && parentVessel.Fabricator != null && fromCargo != null)
+		if (parentVessel is { Fabricator: not null } && fromCargo != null)
 		{
 		}
 	}
@@ -879,7 +887,7 @@ public class DistributionManager
 	public List<GeneratorDetails> GetGeneratorsDetails(bool changedOnly, long vesselGUID = -1L)
 	{
 		List<GeneratorDetails> ret = new List<GeneratorDetails>();
-		foreach (KeyValuePair<VesselObjectID, Generator> kv in idGenerators)
+		foreach (KeyValuePair<VesselObjectID, Generator> kv in _idGenerators)
 		{
 			if (((changedOnly && kv.Value.StatusChanged) || !changedOnly) && (vesselGUID == -1 || kv.Key.VesselGUID == vesselGUID))
 			{
@@ -906,7 +914,7 @@ public class DistributionManager
 	public List<SubSystemDetails> GetSubSystemsDetails(bool changedOnly, long vesselGUID = -1L)
 	{
 		List<SubSystemDetails> ret = new List<SubSystemDetails>();
-		foreach (KeyValuePair<VesselObjectID, SubSystem> kv in idSubSystems)
+		foreach (KeyValuePair<VesselObjectID, SubSystem> kv in _idSubSystems)
 		{
 			if (((changedOnly && kv.Value.StatusChanged) || !changedOnly) && (vesselGUID == -1 || kv.Key.VesselGUID == vesselGUID))
 			{
@@ -930,7 +938,7 @@ public class DistributionManager
 	public List<RoomDetails> GetRoomsDetails(bool changedOnly, long vesselGUID = -1L)
 	{
 		List<RoomDetails> ret = new List<RoomDetails>();
-		foreach (KeyValuePair<VesselObjectID, Room> kv in idRooms)
+		foreach (KeyValuePair<VesselObjectID, Room> kv in _idRooms)
 		{
 			if (((changedOnly && kv.Value.StatusChanged) || !changedOnly) && (vesselGUID == -1 || kv.Key.VesselGUID == vesselGUID))
 			{
@@ -944,7 +952,7 @@ public class DistributionManager
 	public List<DoorDetails> GetDoorsDetails(bool changedOnly, long vesselGUID = -1L)
 	{
 		List<DoorDetails> ret = new List<DoorDetails>();
-		foreach (KeyValuePair<VesselObjectID, Door> kv in idDoors)
+		foreach (KeyValuePair<VesselObjectID, Door> kv in _idDoors)
 		{
 			if (((changedOnly && kv.Value.StatusChanged) || !changedOnly) && (vesselGUID == -1 || kv.Key.VesselGUID == vesselGUID))
 			{
@@ -958,7 +966,7 @@ public class DistributionManager
 	public List<ResourceContainerDetails> GetResourceContainersDetails(bool changedOnly, long vesselGUID = -1L)
 	{
 		List<ResourceContainerDetails> ret = new List<ResourceContainerDetails>();
-		foreach (KeyValuePair<VesselObjectID, ResourceContainer> kv in idResourceContainers)
+		foreach (KeyValuePair<VesselObjectID, ResourceContainer> kv in _idResourceContainers)
 		{
 			if (((changedOnly && kv.Value.StatusChanged) || !changedOnly) && (vesselGUID == -1 || kv.Key.VesselGUID == vesselGUID))
 			{
@@ -971,17 +979,17 @@ public class DistributionManager
 
 	public List<ResourceContainer> GetResourceContainers()
 	{
-		return new List<ResourceContainer>(idResourceContainers.Values);
+		return new List<ResourceContainer>(_idResourceContainers.Values);
 	}
 
 	public List<VesselComponent> GetGenerators()
 	{
-		return new List<VesselComponent>(idGenerators.Values);
+		return new List<VesselComponent>(_idGenerators.Values);
 	}
 
 	public List<VesselComponent> GetSubSystems()
 	{
-		return new List<VesselComponent>(idSubSystems.Values);
+		return new List<VesselComponent>(_idSubSystems.Values);
 	}
 
 	public List<VesselComponent> GetVesselComponents()
@@ -991,10 +999,10 @@ public class DistributionManager
 
 	public List<Room> GetRooms()
 	{
-		return new List<Room>(idRooms.Values);
+		return new List<Room>(_idRooms.Values);
 	}
 
-	public void UpdateSystems(bool connectionsChanged = true, bool compoundRoomsChanged = true)
+	public async Task UpdateSystems(bool connectionsChanged = true, bool compoundRoomsChanged = true)
 	{
 		double duration = initialize ? 0.0 : (DateTime.UtcNow - prevSystemsUpdateTime).TotalSeconds;
 		initialize = false;
@@ -1008,28 +1016,28 @@ public class DistributionManager
 			}
 		}
 		Dictionary<CompoundRoom, float[]> prevRoomValues = new Dictionary<CompoundRoom, float[]>();
-		IEnumerable<CompoundRoom> cavs = compoundRooms.Values.Distinct();
+		IEnumerable<CompoundRoom> cavs = _compoundRooms.Values.Distinct();
 		foreach (CompoundRoom cav in cavs)
 		{
 			prevRoomValues[cav] = new float[2] { cav.AirQuality, cav.AirPressure };
 		}
-		Dictionary<ResourceContainer, float> prevQuantities = idResourceContainers.Values.ToDictionary((ResourceContainer k) => k, (ResourceContainer v) => v.Compartments.Sum((CargoCompartmentData c) => c.Resources.Sum((CargoResourceData r) => r.Quantity)));
-		Dictionary<GeneratorCapacitor, float> prevCapacities = (from m in idGenerators.Values
+		Dictionary<ResourceContainer, float> prevQuantities = _idResourceContainers.Values.ToDictionary((ResourceContainer k) => k, (ResourceContainer v) => v.Compartments.Sum((CargoCompartmentData c) => c.Resources.Sum((CargoResourceData r) => r.Quantity)));
+		Dictionary<GeneratorCapacitor, float> prevCapacities = (from m in _idGenerators.Values
 			where m is GeneratorCapacitor
 			select m as GeneratorCapacitor).ToDictionary((GeneratorCapacitor k) => k, (GeneratorCapacitor v) => v.Capacity);
-		foreach (Generator gen in idGenerators.Values)
+		foreach (Generator gen in _idGenerators.Values)
 		{
-			gen.Update(duration);
+			await gen.Update(duration);
 		}
-		foreach (SubSystem ss in idSubSystems.Values)
+		foreach (SubSystem ss in _idSubSystems.Values)
 		{
-			ss.Update(duration);
+			await ss.Update(duration);
 		}
 		if (compoundRoomsChanged)
 		{
 			CreateCompoundRooms();
 		}
-		IEnumerable<CompoundRoom> compRooms = compoundRooms.Values.Distinct();
+		IEnumerable<CompoundRoom> compRooms = _compoundRooms.Values.Distinct();
 		Dictionary<CompoundRoom, float> prevAirQualities = compRooms.ToDictionary((CompoundRoom k) => k, (CompoundRoom v) => v.AirQuality);
 		Dictionary<CompoundRoom, float> prevAirPressures = compRooms.ToDictionary((CompoundRoom k) => k, (CompoundRoom v) => v.AirPressure);
 		UpdateCompoundRooms((float)duration);
@@ -1037,15 +1045,15 @@ public class DistributionManager
 		{
 			UpdateConnections();
 		}
-		UpdateConsumers((float)duration);
+		await UpdateConsumers((float)duration);
 		foreach (CompoundRoom cr in compRooms)
 		{
-			cr.AirQualityChangeRate = duration > 0.0 ? (float)((double)(cr.AirQuality - prevAirQualities[cr]) / duration) : 0f;
-			cr.AirPressureChangeRate = duration > 0.0 ? (float)((double)(cr.AirPressure - prevAirPressures[cr]) / duration) : 0f;
+			cr.AirQualityChangeRate = duration > 0.0 ? (float)((cr.AirQuality - prevAirQualities[cr]) / duration) : 0f;
+			cr.AirPressureChangeRate = duration > 0.0 ? (float)((cr.AirPressure - prevAirPressures[cr]) / duration) : 0f;
 		}
 		foreach (KeyValuePair<GeneratorCapacitor, float> kvCap in prevCapacities)
 		{
-			kvCap.Key.CapacityChangeRate = duration > 0.0 ? (float)((double)(kvCap.Key.Capacity - kvCap.Value) / duration) : 0f;
+			kvCap.Key.CapacityChangeRate = duration > 0.0 ? (float)((kvCap.Key.Capacity - kvCap.Value) / duration) : 0f;
 		}
 		foreach (KeyValuePair<ResourceContainer, float> kvRc in prevQuantities)
 		{
@@ -1054,28 +1062,28 @@ public class DistributionManager
 				kvRc.Key.QuantityChangeRate = 0f;
 				continue;
 			}
-			kvRc.Key.QuantityChangeRate = (float)((double)(kvRc.Key.Compartments.Sum((CargoCompartmentData c) => c.Resources.Sum((CargoResourceData r) => r.Quantity)) - kvRc.Value) / duration);
+			kvRc.Key.QuantityChangeRate = (float)((kvRc.Key.Compartments.Sum((CargoCompartmentData c) => c.Resources.Sum((CargoResourceData r) => r.Quantity)) - kvRc.Value) / duration);
 		}
 	}
 
 	private void UpdateConnections()
 	{
-		foreach (SubSystem ss in idSubSystems.Values)
+		foreach (SubSystem ss in _idSubSystems.Values)
 		{
 			ss.ConnectedProviders.Clear();
 		}
-		foreach (IResourceProvider rp2 in resourceProviderNodes.Keys)
+		foreach (IResourceProvider rp2 in _resourceProviderNodes.Keys)
 		{
 			if (rp2 is IResourceConsumer consumer)
 			{
 				consumer.ConnectedProviders.Clear();
 			}
 		}
-		foreach (Room room in idRooms.Values)
+		foreach (Room room in _idRooms.Values)
 		{
 			room.ConnectedProviders.Clear();
 		}
-		foreach (KeyValuePair<IResourceProvider, DistributionNode> kv in resourceProviderNodes)
+		foreach (KeyValuePair<IResourceProvider, DistributionNode> kv in _resourceProviderNodes)
 		{
 			IResourceProvider rp = kv.Key;
 			DistributionNode str = kv.Value;
@@ -1083,40 +1091,52 @@ public class DistributionManager
 		}
 	}
 
-	private void UpdateConsumers(float duration)
+	private async Task UpdateConsumers(float duration)
 	{
-		Dictionary<IResourceProvider, float> reservedCapacities = new Dictionary<IResourceProvider, float>();
-		Dictionary<ResourceContainer, float> reservedQuantities = new Dictionary<ResourceContainer, float>();
-		foreach (Generator gen2 in idGenerators.Values)
+		Dictionary<IResourceProvider, float> reservedCapacities = [];
+		Dictionary<ResourceContainer, float> reservedQuantities = [];
+		foreach (Generator gen2 in _idGenerators.Values)
 		{
-			gen2.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
+			var result = await gen2.CheckStatus(1f, duration, standby: true, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (SubSystem ss in idSubSystems.Values.Where((SubSystem m) => m is VesselBaseSystem))
+		foreach (SubSystem ss in _idSubSystems.Values.Where((SubSystem m) => m is VesselBaseSystem))
 		{
-			ss.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
+			var result = await ss.CheckStatus(1f, duration, standby: true, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (SubSystem ss2 in idSubSystems.Values.Where((SubSystem m) => m is not VesselBaseSystem))
+		foreach (SubSystem ss2 in _idSubSystems.Values.Where((SubSystem m) => m is not VesselBaseSystem))
 		{
-			ss2.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
+			var result = await ss2.CheckStatus(1f, duration, standby: true, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		reservedCapacities = new Dictionary<IResourceProvider, float>();
-		reservedQuantities = new Dictionary<ResourceContainer, float>();
-		foreach (SubSystem pc in from m in idSubSystems.Values
+		reservedCapacities = [];
+		reservedQuantities = [];
+		foreach (SubSystem pc in from m in _idSubSystems.Values
 			where m.IsPowerConsumer && m is not VesselBaseSystem
 			orderby consumersOrder.IndexOf(m.GetType()) descending
 			select m)
 		{
-			pc.CheckStatus(pc.OperationRate, duration, pc.SecondaryStatus == SystemSecondaryStatus.Idle, ref reservedCapacities, ref reservedQuantities);
+			var result = await pc.CheckStatus(pc.OperationRate, duration, pc.SecondaryStatus == SystemSecondaryStatus.Idle, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (SubSystem pc2 in idSubSystems.Values.Where((SubSystem m) => m is VesselBaseSystem))
+		foreach (SubSystem pc2 in _idSubSystems.Values.Where((SubSystem m) => m is VesselBaseSystem))
 		{
-			pc2.CheckStatus(pc2.OperationRate, duration, pc2.SecondaryStatus == SystemSecondaryStatus.Idle, ref reservedCapacities, ref reservedQuantities);
+			var result = await pc2.CheckStatus(pc2.OperationRate, duration, pc2.SecondaryStatus == SystemSecondaryStatus.Idle, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (Generator gen4 in idGenerators.Values.Where((Generator m) => m.IsPowerConsumer && m.SecondaryStatus == SystemSecondaryStatus.Idle))
+		foreach (Generator gen4 in _idGenerators.Values.Where((Generator m) => m.IsPowerConsumer && m.SecondaryStatus == SystemSecondaryStatus.Idle))
 		{
-			gen4.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
+			var result = await gen4.CheckStatus(1f, duration, standby: true, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (GeneratorCapacitor cap2 in from m in idGenerators.Values
+		foreach (GeneratorCapacitor cap2 in from m in _idGenerators.Values
 			where m is GeneratorCapacitor
 			select m as GeneratorCapacitor into m
 			orderby m.Capacity / m.MaxCapacity
@@ -1131,50 +1151,56 @@ public class DistributionManager
 				cap2.Capacity = MathHelper.Clamp(cap2.Capacity + diff * duration, 0f, cap2.MaxCapacity);
 			}
 		}
-		foreach (SubSystem ss3 in idSubSystems.Values.Where((SubSystem m) => !m.IsPowerConsumer))
+		foreach (SubSystem ss3 in _idSubSystems.Values.Where((SubSystem m) => !m.IsPowerConsumer))
 		{
-			ss3.CheckStatus(ss3.OperationRate, duration, ss3.SecondaryStatus == SystemSecondaryStatus.Idle, ref reservedCapacities, ref reservedQuantities);
+			var result = await ss3.CheckStatus(ss3.OperationRate, duration, ss3.SecondaryStatus == SystemSecondaryStatus.Idle, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (ResourceContainer rc3 in idResourceContainers.Values.Where((ResourceContainer m) => m.NominalInput > 0f))
+		foreach (ResourceContainer rc3 in _idResourceContainers.Values.Where((ResourceContainer m) => m.NominalInput > 0f))
 		{
 			UpdateConsumerResourceContainer(rc3, duration, ref reservedCapacities, ref reservedQuantities);
 		}
-		foreach (Room room in idRooms.Values)
+		foreach (Room room in _idRooms.Values)
 		{
-			UpdateConsumerRoom(room, duration, ref reservedCapacities, ref reservedQuantities);
-			UpdateConsumerRoomFilter(room, duration, ref reservedCapacities, ref reservedQuantities);
+			await UpdateConsumerRoom(room, duration, reservedCapacities, reservedQuantities);
+			var result = await UpdateConsumerRoomFilter(room, duration, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
-		foreach (Generator gen3 in idGenerators.Values.Where((Generator m) => !m.IsPowerConsumer && m.SecondaryStatus == SystemSecondaryStatus.Idle))
+		foreach (Generator gen3 in _idGenerators.Values.Where((Generator m) => !m.IsPowerConsumer && m.SecondaryStatus == SystemSecondaryStatus.Idle))
 		{
-			gen3.CheckStatus(1f, duration, standby: true, ref reservedCapacities, ref reservedQuantities);
+			var result = await gen3.CheckStatus(1f, duration, standby: true, reservedCapacities, reservedQuantities);
+			reservedCapacities = result.Capacities;
+			reservedQuantities = result.Quantities;
 		}
 		foreach (DistributionSystemType dst in Enum.GetValues(typeof(DistributionSystemType)))
 		{
-			AvailableResourceCapacities[dst] = 0f;
-			AvailableResourceQuantities[dst] = 0f;
+			_availableResourceCapacities[dst] = 0f;
+			_availableResourceQuantities[dst] = 0f;
 		}
-		foreach (ResourceContainer rc2 in idResourceContainers.Values)
+		foreach (ResourceContainer rc2 in _idResourceContainers.Values)
 		{
-			AvailableResourceCapacities[rc2.OutputType] += rc2.MaxOutput;
+			_availableResourceCapacities[rc2.OutputType] += rc2.MaxOutput;
 			if (rc2.IsInUse && rc2.GetCompartment().Resources.Count > 0)
 			{
-				AvailableResourceQuantities[rc2.OutputType] += rc2.GetCompartment().Resources[0].Quantity;
+				_availableResourceQuantities[rc2.OutputType] += rc2.GetCompartment().Resources[0].Quantity;
 			}
 		}
-		foreach (Generator rp2 in idGenerators.Values)
+		foreach (Generator rp2 in _idGenerators.Values)
 		{
-			AvailableResourceCapacities[rp2.OutputType] += rp2.MaxOutput;
+			_availableResourceCapacities[rp2.OutputType] += rp2.MaxOutput;
 		}
-		foreach (IResourceProvider rp in resourceProviderNodes.Keys)
+		foreach (IResourceProvider rp in _resourceProviderNodes.Keys)
 		{
 			rp.Output = 0f;
 		}
 		foreach (KeyValuePair<IResourceProvider, float> kv2 in reservedCapacities)
 		{
 			kv2.Key.Output = kv2.Value;
-			AvailableResourceCapacities[kv2.Key.OutputType] -= kv2.Key.Output;
+			_availableResourceCapacities[kv2.Key.OutputType] -= kv2.Key.Output;
 		}
-		foreach (Generator gen in idGenerators.Values)
+		foreach (Generator gen in _idGenerators.Values)
 		{
 			if (!reservedCapacities.TryGetValue(gen, out var reserved))
 			{
@@ -1185,7 +1211,7 @@ public class DistributionManager
 				cap.Capacity = MathHelper.Clamp(cap.Capacity - reserved * duration, 0f, float.MaxValue);
 			}
 		}
-		foreach (ResourceContainer rc in idResourceContainers.Values)
+		foreach (ResourceContainer rc in _idResourceContainers.Values)
 		{
 			if (!reservedCapacities.ContainsKey(rc))
 			{
@@ -1194,7 +1220,7 @@ public class DistributionManager
 		}
 		foreach (KeyValuePair<ResourceContainer, float> kv in reservedQuantities)
 		{
-			kv.Key.ConsumeResource(kv.Value);
+			await kv.Key.ConsumeResource(kv.Value);
 		}
 	}
 
@@ -1205,7 +1231,7 @@ public class DistributionManager
 		{
 			return;
 		}
-		foreach (Generator gen in resourceProviders.Where((IResourceProvider m) => m is Generator generator && m.OutputType == rc.OutputType && generator.Status == SystemStatus.OnLine))
+		foreach (Generator gen in resourceProviders.Where((IResourceProvider m) => m is Generator generator && m.OutputType == rc.OutputType && generator.Status == SystemStatus.OnLine).Cast<Generator>())
 		{
 			reservedCapacities.TryGetValue(gen, out var alreadyReserved);
 			float capacityAvailable = gen.MaxOutput - alreadyReserved;
@@ -1242,7 +1268,7 @@ public class DistributionManager
 			if (hasResources)
 			{
 				reservedCapacities[gen] = alreadyReserved + tempQty;
-				rc.ChangeQuantityBy(0, rc.Compartments[0].Resources[0].ResourceType, tempQty);
+				rc.ChangeQuantityByAsync(0, rc.Compartments[0].Resources[0].ResourceType, tempQty);
 				if (rc is ResourceContainerAirTank airTank)
 				{
 					airTank.AirQuality = MathHelper.Clamp((tempQty * 1f + airTank.Compartments[0].Resources[0].Quantity * airTank.AirQuality) / (tempQty + airTank.Compartments[0].Resources[0].Quantity), 0f, 1f);
@@ -1251,7 +1277,7 @@ public class DistributionManager
 		}
 	}
 
-	private void UpdateConsumerRoom(Room room, float duration, ref Dictionary<IResourceProvider, float> reservedCapacities, ref Dictionary<ResourceContainer, float> reservedQuantities)
+	private async Task UpdateConsumerRoom(Room room, float duration, Dictionary<IResourceProvider, float> reservedCapacities, Dictionary<ResourceContainer, float> reservedQuantities)
 	{
 		float targetPressure = room.AirPressure;
 		if (room.TargetPressure.HasValue)
@@ -1302,7 +1328,7 @@ public class DistributionManager
 					float minQty = System.Math.Min(System.Math.Min(System.Math.Min(quantityAvailable, airNeeded), room.PressurizeSpeed * duration), (targetPressure - room.AirPressure) * room.CompoundRoom.Volume);
 					if (minQty > float.Epsilon)
 					{
-						float qty2 = System.Math.Abs(airTank2.ChangeQuantityBy(0, resource.ResourceType, 0f - minQty));
+						float qty2 = System.Math.Abs(await airTank2.ChangeQuantityByAsync(0, resource.ResourceType, 0f - minQty));
 						float oldAirQty2 = room.CompoundRoom.Volume * room.CompoundRoom.AirPressure;
 						room.CompoundRoom.AirQuality = (qty2 * airTank2.AirQuality + oldAirQty2 * room.AirQuality) / (qty2 + oldAirQty2);
 						room.CompoundRoom.AirPressure += qty2 / room.CompoundRoom.Volume;
@@ -1321,11 +1347,11 @@ public class DistributionManager
 				return;
 			}
 			float airToDisplace = System.Math.Min(room.CompoundRoom.Volume * room.AirPressure, room.DepressurizeSpeed * duration);
-			foreach (ResourceContainerAirTank airTank in resourceProviders2.Where((IResourceProvider m) => m is ResourceContainerAirTank))
+			foreach (ResourceContainerAirTank airTank in resourceProviders2.Where((IResourceProvider m) => m is ResourceContainerAirTank).Cast<ResourceContainerAirTank>())
 			{
 				float fillQty = System.Math.Min(airToDisplace, (room.AirPressure - targetPressure) * room.CompoundRoom.Volume);
 				float oldAirQty = airTank.Compartments[0].Resources[0].Quantity;
-				float qty = airTank.ChangeQuantityBy(0, ResourceType.Air, fillQty);
+				float qty = await airTank.ChangeQuantityByAsync(0, ResourceType.Air, fillQty);
 				if (oldAirQty <= float.Epsilon)
 				{
 					airTank.AirQuality = room.AirQuality;
@@ -1355,14 +1381,21 @@ public class DistributionManager
 		}
 	}
 
-	private void UpdateConsumerRoomFilter(Room room, float duration, ref Dictionary<IResourceProvider, float> reservedCapacities, ref Dictionary<ResourceContainer, float> reservedQuantities)
+	private async Task<ComsumerRoomReserved> UpdateConsumerRoomFilter(Room room, float duration, Dictionary<IResourceProvider, float> reservedCapacities, Dictionary<ResourceContainer, float> reservedQuantities)
 	{
 		float qtyForScrubbing = room.CompoundRoom.Volume * room.CompoundRoom.AirPressure * (1f - room.CompoundRoom.AirQuality);
 		if (!room.AirFiltering || qtyForScrubbing <= float.Epsilon || room.CompoundRoom.AirQuality + float.Epsilon >= 1f || !room.ConnectedProviders.TryGetValue(DistributionSystemType.ScrubbedAir, out var resourceProviders))
 		{
-			return;
+			return new ComsumerRoomReserved()
+			{
+				Capacities = reservedCapacities,
+				Quantities = reservedQuantities
+			};
 		}
-		foreach (GeneratorScrubber scrubber in resourceProviders.Where((IResourceProvider m) => m is GeneratorScrubber scrubber && scrubber.Status == SystemStatus.OnLine))
+		foreach (GeneratorScrubber scrubber in resourceProviders.Where((IResourceProvider m) => m is GeneratorScrubber
+		         {
+			         Status: SystemStatus.OnLine
+		         }).Cast<GeneratorScrubber>())
 		{
 			reservedCapacities.TryGetValue(scrubber, out var alreadyReserved);
 			float scrubberCap = scrubber.MaxOutput - alreadyReserved;
@@ -1407,17 +1440,20 @@ public class DistributionManager
 			float scrubQty = tempQty / (1f - room.CompoundRoom.AirQuality);
 			float airQty = room.CompoundRoom.Volume * room.CompoundRoom.AirPressure;
 			room.CompoundRoom.AirQuality = airQty > float.Epsilon ? (scrubQty + (airQty - scrubQty) * room.CompoundRoom.AirQuality) / airQty : 0f;
-			List<MachineryPart> cartridges = scrubber.MachineryParts.Values.Where((MachineryPart m) => m != null && m.PartType == MachineryPartType.CarbonFilters).ToList();
+			List<MachineryPart> cartridges = scrubber.MachineryParts.Values.Where((MachineryPart m) => m is
+			{
+				PartType: MachineryPartType.CarbonFilters
+			}).ToList();
 			if (cartridges.Count > 0)
 			{
-				float healthDec = scrubber.ScrubberCartridgeConsumption * tempQty / (float)cartridges.Count;
+				float healthDec = scrubber.ScrubberCartridgeConsumption * tempQty / cartridges.Count;
 				foreach (MachineryPart cartridge in cartridges)
 				{
 					float prevHealth = cartridge.Health;
 					cartridge.Health -= healthDec;
 					if ((int)prevHealth != (int)cartridge.Health || (prevHealth > 0f && cartridge.Health == 0f) || (cartridge.Health != prevHealth && Server.SolarSystemTime - cartridge.DynamicObj.LastStatsSendTime > 10.0))
 					{
-						cartridge.DynamicObj.SendStatsToClient();
+						await cartridge.DynamicObj.SendStatsToClient();
 					}
 				}
 			}
@@ -1428,6 +1464,12 @@ public class DistributionManager
 			}
 			break;
 		}
+
+		return new ComsumerRoomReserved()
+		{
+			Capacities = reservedCapacities,
+			Quantities = reservedQuantities
+		};
 	}
 
 	private void UpdateConnectedConsumers(IResourceProvider resourceProvider, DistributionNode node, HashSet<DistributionNode> traversedNodes = null)
@@ -1457,7 +1499,7 @@ public class DistributionManager
 					consumers.Add(consumer);
 				}
 			}
-			else if ((resourceProvider is Generator && resourceUser2 is ResourceContainer container && container.NominalInput > 0f && container.OutputType == resourceProvider.OutputType) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.Air) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.ScrubbedAir))
+			else if ((resourceProvider is Generator && resourceUser2 is ResourceContainer { NominalInput: > 0f } container && container.OutputType == resourceProvider.OutputType) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.Air) || (resourceUser2 is Room && resourceProvider.OutputType == DistributionSystemType.ScrubbedAir))
 			{
 				consumers.Add(resourceUser2);
 			}
@@ -1468,8 +1510,7 @@ public class DistributionManager
 			resourceProvider.ConnectedConsumers.Add(resourceUser);
 			if (resourceUser is not GeneratorCapacitor || resourceProvider is not GeneratorCapacitor)
 			{
-				SortedSet<IResourceProvider> resourceProviders = null;
-				if (!resourceUser.ConnectedProviders.TryGetValue(resourceProvider.OutputType, out resourceProviders))
+				if (!resourceUser.ConnectedProviders.TryGetValue(resourceProvider.OutputType, out SortedSet<IResourceProvider> resourceProviders))
 				{
 					resourceProviders = resourceUser.ConnectedProviders[resourceProvider.OutputType] = new SortedSet<IResourceProvider>(new ResourceproviderComparer());
 				}
@@ -1487,40 +1528,29 @@ public class DistributionManager
 
 	public void RemovePlayerFromRoom(Player player)
 	{
-		try
+		if (_playerRooms.TryGetValue(player, out var fromRoom))
 		{
-			if (playerRooms.TryGetValue(player, out var fromRoom))
-			{
-				fromRoom.RemoveAirConsumer(player);
-			}
-		}
-		catch (Exception ex)
-		{
-			Debug.Exception(ex);
+			fromRoom.RemoveAirConsumer(player);
 		}
 	}
 
 	private void CreateCompoundRooms()
 	{
 		short compoundRoomId = 0;
-		compoundRooms = new Dictionary<Room, CompoundRoom>();
-		foreach (Room room in idRooms.Values)
+		_compoundRooms.Clear();
+		foreach (Room room in _idRooms.Values)
 		{
-			if (compoundRooms.ContainsKey(room))
-			{
-				continue;
-			}
 			CompoundRoom compoundRoom = new CompoundRoom(room, compoundRoomId++);
 			foreach (Room r in compoundRoom.Rooms)
 			{
-				compoundRooms[r] = compoundRoom;
+				_compoundRooms[r] = compoundRoom;
 			}
 		}
 	}
 
 	private void UpdateCompoundRooms(float duration)
 	{
-		foreach (CompoundRoom cav in compoundRooms.Values.Distinct())
+		foreach (CompoundRoom cav in _compoundRooms.Values.Distinct())
 		{
 			float qualityLoss = 0f;
 			float quantityLoss = 0f;

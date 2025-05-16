@@ -68,7 +68,10 @@ public class OrbitParameters
 			{
 				if (!vessel.IsMainVessel)
 				{
-					return vessel.MainVessel.Orbit.RelativePosition + QuaternionD.LookRotation(vessel.MainVessel.Forward, vessel.MainVessel.Up) * (vessel.RelativePositionFromMainParent - vessel.MainVessel.VesselData.CollidersCenterOffset.ToVector3D());
+					Debug.LogFormat("Vessel {0} (id: {2}) with main vessel {1}.", vessel.FullName, vessel.MainVessel.FullName, vessel.Guid);
+					return vessel.MainVessel.Orbit.RelativePosition
+					+ QuaternionD.LookRotation(vessel.MainVessel.Forward, vessel.MainVessel.Up)
+					* (vessel.RelativePositionFromMainParent - vessel.MainVessel.VesselData.CollidersCenterOffset.ToVector3D());
 				}
 			}
 			return _RelativePosition;
@@ -150,7 +153,7 @@ public class OrbitParameters
 		{
 			if (artificialBodyObj != null)
 			{
-				return artificialBodyObj.GUID;
+				return artificialBodyObj.Guid;
 			}
 			if (celestialBodyObj != null)
 			{
@@ -453,7 +456,7 @@ public class OrbitParameters
 				double Et = 1.0;
 				double E = meanAnomaly + o.eccentricity * System.Math.Sin(meanAnomaly) + 0.5 * o.eccentricity * o.eccentricity * System.Math.Sin(2.0 * meanAnomaly);
 				int calcIndex2 = 0;
-				while (System.Math.Abs(Et) > maxDeltaDiff && (double)calcIndex2 < maxCalculations)
+				while (System.Math.Abs(Et) > maxDeltaDiff && calcIndex2 < maxCalculations)
 				{
 					Et = (meanAnomaly - (E - o.eccentricity * System.Math.Sin(E))) / (1.0 - o.eccentricity * System.Math.Cos(E));
 					E += Et;
@@ -461,13 +464,13 @@ public class OrbitParameters
 				}
 				return E;
 			}
-			double E3 = meanAnomaly + 0.85 * o.eccentricity * (double)System.Math.Sign(System.Math.Sin(meanAnomaly));
-			for (int index = 0; (double)index < maxCalculationsExtremeEcc; index++)
+			double E3 = meanAnomaly + 0.85 * o.eccentricity * System.Math.Sign(System.Math.Sin(meanAnomaly));
+			for (int index = 0; index < maxCalculationsExtremeEcc; index++)
 			{
 				double eccSinE = o.eccentricity * System.Math.Sin(E3);
 				double EeccSinEM = E3 - eccSinE - meanAnomaly;
 				double eccCosE1 = 1.0 - o.eccentricity * System.Math.Cos(E3);
-				E3 += -5.0 * EeccSinEM / (eccCosE1 + (double)System.Math.Sign(eccCosE1) * System.Math.Sqrt(System.Math.Abs(16.0 * eccCosE1 * eccCosE1 - 20.0 * EeccSinEM * eccSinE)));
+				E3 += -5.0 * EeccSinEM / (eccCosE1 + System.Math.Sign(eccCosE1) * System.Math.Sqrt(System.Math.Abs(16.0 * eccCosE1 * eccCosE1 - 20.0 * EeccSinEM * eccSinE)));
 			}
 			return E3;
 		}
@@ -478,7 +481,7 @@ public class OrbitParameters
 		double Et2 = 1.0;
 		double E2 = System.Math.Log(2.0 * meanAnomaly / o.eccentricity + 1.8);
 		int calcIndex = 0;
-		while (System.Math.Abs(Et2) > maxDeltaDiff && (double)calcIndex < maxCalculations)
+		while (System.Math.Abs(Et2) > maxDeltaDiff && calcIndex < maxCalculations)
 		{
 			Et2 = (o.eccentricity * System.Math.Sinh(E2) - E2 - meanAnomaly) / (o.eccentricity * System.Math.Cosh(E2) - 1.0);
 			E2 -= Et2;
@@ -711,7 +714,7 @@ public class OrbitParameters
 		}
 		else
 		{
-			Debug.Warning("ATTEMPTED TO UPDATE INVALID ORBIT");
+			Debug.LogWarning("ATTEMPTED TO UPDATE INVALID ORBIT");
 		}
 	}
 
@@ -751,17 +754,17 @@ public class OrbitParameters
 		List<Vector3D> retVal = new List<Vector3D>();
 		if (eccentricity < 1.0)
 		{
-			double theta = System.Math.PI * 2.0 / (double)numberOfPositions;
+			double theta = System.Math.PI * 2.0 / numberOfPositions;
 			for (int j = 0; j < numberOfPositions; j++)
 			{
-				retVal.Add(PositionAtEccentricAnomaly((double)j * theta, getRelativePosition: true));
+				retVal.Add(PositionAtEccentricAnomaly(j * theta, getRelativePosition: true));
 			}
 		}
 		else
 		{
 			for (int i = 0; i < numberOfPositions; i++)
 			{
-				retVal.Add(PositionAtTimeAfterPeriapsis(timeSincePeriapsis + (double)i * timeStep, getRelativePosition: true));
+				retVal.Add(PositionAtTimeAfterPeriapsis(timeSincePeriapsis + i * timeStep, getRelativePosition: true));
 			}
 		}
 		return retVal;
@@ -776,17 +779,17 @@ public class OrbitParameters
 		List<Vector3D> retVal = new List<Vector3D>();
 		if (eccentricity < 1.0)
 		{
-			double theta = System.Math.PI * 2.0 / (double)numberOfPositions;
+			double theta = System.Math.PI * 2.0 / numberOfPositions;
 			for (int j = 0; j < numberOfPositions; j++)
 			{
-				retVal.Add(VelocityAtEccentricAnomaly((double)j * theta, getRelativeVelocities));
+				retVal.Add(VelocityAtEccentricAnomaly(j * theta, getRelativeVelocities));
 			}
 		}
 		else
 		{
 			for (int i = 0; i < numberOfPositions; i++)
 			{
-				retVal.Add(VelocityAtTimeAfterPeriapsis(timeSincePeriapsis + (double)i * timeStep, getRelativeVelocities));
+				retVal.Add(VelocityAtTimeAfterPeriapsis(timeSincePeriapsis + i * timeStep, getRelativeVelocities));
 			}
 		}
 		return retVal;
@@ -833,7 +836,7 @@ public class OrbitParameters
 		data.ParentGUID = parent.celestialBodyObj.GUID;
 		if (targetVessel != null)
 		{
-			data.GUID = targetVessel.GUID;
+			data.GUID = targetVessel.Guid;
 			if (targetVessel is Ship)
 			{
 				data.ObjectType = SpaceObjectType.Ship;

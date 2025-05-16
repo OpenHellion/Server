@@ -8,7 +8,7 @@ public static class Debug
 
 	public const bool AddTimestamp = true;
 
-	public const string TimestampFormat = "yyyy/MM/dd HH:mm:ss.ffff";
+	public const string TimestampFormat = "HH:mm:ss.ffff";
 
 	public static void Initialize()
 	{
@@ -79,6 +79,13 @@ public static class Debug
 
 	[Conditional("DEBUG")]
 	[Conditional("SHOW_ALL_LOGS")]
+	public static void LogFormat(string message, params object[] args)
+	{
+		WriteToLog(string.Format($"[Debug] {message}", args));
+	}
+
+	[Conditional("DEBUG")]
+	[Conditional("SHOW_ALL_LOGS")]
 	public static void Log(params object[] values)
 	{
 		if (values.Length == 1)
@@ -91,37 +98,22 @@ public static class Debug
 		}
 	}
 
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogIf(bool condition, string message)
-	{
-		if (condition)
-		{
-			WriteToLog($"[Debug] {message}");
-		}
-	}
-
-	[Conditional("DEBUG")]
-	[Conditional("SHOW_ALL_LOGS")]
-	public static void LogIf(bool condition, params object[] values)
-	{
-		if (condition)
-		{
-			Log(values);
-		}
-	}
-
 	public static void UnformattedMessage(string message)
 	{
 		Trace.WriteLine(message);
 	}
 
-	public static void Info(string message)
+	public static void LogInfo(string message)
 	{
 		WriteToLog($"[Info] {message}");
 	}
 
-	public static void Info(params object[] values)
+	public static void LogInfoFormat(string message, params object[] values)
+	{
+		WriteToLog(string.Format($"[Info] {message}", values));
+	}
+
+	public static void LogInfo(params object[] values)
 	{
 		if (values.Length == 1)
 		{
@@ -133,12 +125,17 @@ public static class Debug
 		}
 	}
 
-	public static void Warning(string message)
+	public static void LogWarning(string message)
 	{
 		WriteToLog("[Warn] " + message);
 	}
 
-	public static void Warning(params object[] values)
+	public static void LogWarningFormat(string message, params object[] values)
+	{
+		WriteToLog(string.Format($"[Warn] {message}", values));
+	}
+
+	public static void LogWarning(params object[] values)
 	{
 		if (values.Length == 1)
 		{
@@ -150,12 +147,18 @@ public static class Debug
 		}
 	}
 
-	public static void Error(string message)
+	public static void LogError(string message)
 	{
 		WriteToLog($"[Error] {message}");
 	}
 
-	public static void Error(params object[] values)
+	public static void LogErrorFormat(string message, params object[] values)
+	{
+		WriteToLog(string.Format($"[Error] {message}", values));
+	}
+
+
+	public static void LogError(params object[] values)
 	{
 		if (values.Length == 1)
 		{
@@ -167,7 +170,7 @@ public static class Debug
 		}
 	}
 
-	public static void Exception(Exception ex)
+	public static void LogException(Exception ex)
 	{
 		WriteToLog($"[Exception] {ex}");
 	}

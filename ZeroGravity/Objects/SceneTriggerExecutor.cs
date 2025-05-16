@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -151,7 +151,7 @@ public class SceneTriggerExecutor : IPersistantObject
 		if (!details.IsFail)
 		{
 			StateID = details.NewStateID;
-			if (SpawnPoint != null && SpawnPoint.Player != null)
+			if (SpawnPoint is { Player: not null })
 			{
 				if (StateID == SpawnPoint.ExecutorStateID || (SpawnPoint.ExecutorOccupiedStateIDs != null && SpawnPoint.ExecutorOccupiedStateIDs.Contains(StateID)))
 				{
@@ -208,9 +208,9 @@ public class SceneTriggerExecutor : IPersistantObject
 		bool hasProxWithPlayer = false;
 		foreach (KeyValuePair<int, SceneTriggerProximity> prox in ProximityTriggers)
 		{
-			if (prox.Value.ObjectsInTrigger.Contains(pl.GUID))
+			if (prox.Value.ObjectsInTrigger.Contains(pl.Guid))
 			{
-				prox.Value.ObjectsInTrigger.Remove(pl.GUID);
+				prox.Value.ObjectsInTrigger.Remove(pl.Guid);
 				if (prox.Value.ObjectsInTrigger.Count == 0)
 				{
 					proxEmptied = prox.Value;
@@ -252,21 +252,16 @@ public class SceneTriggerExecutor : IPersistantObject
 		};
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		if (persistenceData is not PersistenceObjectDataExecutor data)
 		{
-			if (persistenceData is not PersistenceObjectDataExecutor data)
-			{
-				Debug.Warning("PersistenceObjectDataExecutor data is null");
-				return;
-			}
-			StateID = data.StateID;
-			PlayerThatActivated = data.PlayerThatActivated;
+			Debug.LogError("PersistenceObjectDataExecutor data is null");
+			return Task.CompletedTask;
 		}
-		catch (Exception e)
-		{
-			Debug.Exception(e);
-		}
+		StateID = data.StateID;
+		PlayerThatActivated = data.PlayerThatActivated;
+
+		return Task.CompletedTask;
 	}
 }

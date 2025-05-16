@@ -1,6 +1,8 @@
+using System.Threading.Tasks;
+
 namespace ZeroGravity.Objects;
 
 public interface IUpdateable
 {
-	void Update(double deltaTime);
+	Task Update(double deltaTime);
 }

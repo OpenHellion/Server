@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
@@ -35,7 +35,7 @@ internal class RepairTool : Item, ICargo
 
 	public override DynamicObjectStats StatsNew => _StatsNew;
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
 		RepairToolStats rts = stats as RepairToolStats;
 		if (rts.Active.HasValue)
@@ -43,21 +43,28 @@ internal class RepairTool : Item, ICargo
 			Active = rts.Active.Value;
 			_StatsNew.Active = Active;
 		}
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 		return false;
 	}
 
-	public RepairTool(DynamicObjectAuxData data)
+	private RepairTool()
 	{
-		if (data != null)
-		{
-			SetData(data as RepairToolData);
-		}
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public static async Task<RepairTool> CreateAsync(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		RepairTool repairTool = new();
+		if (data != null)
+		{
+			await repairTool.SetData(data);
+		}
+
+		return repairTool;
+	}
+
+	public override async Task SetData(DynamicObjectAuxData data)
+	{
+		await base.SetData(data);
 		RepairToolData rtd = data as RepairToolData;
 		RepairAmount = rtd.RepairAmount;
 		UsageCooldown = rtd.UsageCooldown;
@@ -83,7 +90,7 @@ internal class RepairTool : Item, ICargo
 		return rtd;
 	}
 
-	public void RepairVessel(VesselObjectID repairPointID)
+	public async Task RepairVessel(VesselObjectID repairPointID)
 	{
 		SpaceObjectVessel vessel = Server.Instance.GetVessel(repairPointID.VesselGUID);
 		if (vessel == null)
@@ -100,23 +107,23 @@ internal class RepairTool : Item, ICargo
 				repairAmount = currentFuel / FuelConsumption;
 			}
 			float amount = repairPoint.MaxHealth - repairPoint.Health < repairAmount ? repairPoint.MaxHealth - repairPoint.Health : repairAmount;
-			vessel.ChangeHealthBy(amount);
-			repairPoint.Health += amount;
+			await vessel.ChangeHealthBy(amount);
+			await repairPoint.SetHealthAsync(repairPoint.Health + amount);
 			if (vessel.MaxHealth - vessel.Health < float.Epsilon)
 			{
-				repairPoint.Health = repairPoint.MaxHealth;
+				await repairPoint.SetHealthAsync(repairPoint.MaxHealth);
 			}
 			if (amount > 0f)
 			{
 				CargoResourceData res = FuelCompartment.Resources[0];
-				ChangeQuantityBy(FuelCompartment.ID, res.ResourceType, (0f - amount) * FuelConsumption);
+				await ChangeQuantityByAsync(FuelCompartment.ID, res.ResourceType, (0f - amount) * FuelConsumption);
 				_StatsNew.FuelResource = res;
-				base.DynamicObj.SendStatsToClient();
+				await DynamicObj.SendStatsToClient();
 			}
 		}
 	}
 
-	public void RepairItem(long guid)
+	public async Task RepairItem(long guid)
 	{
 		SpaceObject obj = Server.Instance.GetObject(guid);
 		if (obj is not DynamicObject dynamicObject)
@@ -137,19 +144,19 @@ internal class RepairTool : Item, ICargo
 			float repairedAmount = item.Health - oldHealth;
 			if (repairedAmount > 0f)
 			{
-				ConsumeFuel(repairedAmount * FuelConsumption);
+				await ConsumeFuel(repairedAmount * FuelConsumption);
 			}
-			item.DynamicObj.SendStatsToClient();
+			await item.DynamicObj.SendStatsToClient();
 		}
 	}
 
-	public void ConsumeFuel(float amount)
+	public async Task ConsumeFuel(float amount)
 	{
 		CargoResourceData res = FuelCompartment.Resources[0];
-		ChangeQuantityBy(FuelCompartment.ID, res.ResourceType, 0f - amount);
+		await ChangeQuantityByAsync(FuelCompartment.ID, res.ResourceType, 0f - amount);
 		_StatsNew.FuelResource = res;
-		base.DynamicObj.SendStatsToClient();
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 	}
 
 	public CargoCompartmentData GetCompartment(int? id = null)
@@ -161,7 +168,7 @@ internal class RepairTool : Item, ICargo
 		return _Compartments[0];
 	}
 
-	public float ChangeQuantityBy(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	public async Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
 		CargoResourceData res = FuelCompartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
 		if (res == null)
@@ -185,9 +192,9 @@ internal class RepairTool : Item, ICargo
 			qty = 0f - resourceAvailable;
 		}
 		res.Quantity = resourceAvailable + qty;
-		base.DynamicObj.StatsChanged = true;
+		DynamicObj.StatsChanged = true;
 		_StatsNew.FuelResource = GetCompartment(compartmentID).Resources[0];
-		base.DynamicObj.SendStatsToClient();
+		await DynamicObj.SendStatsToClient();
 		return qty;
 	}
 
@@ -199,23 +206,16 @@ internal class RepairTool : Item, ICargo
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataRepairTool data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataRepairTool data)
-			{
-				Debug.Warning("PersistenceObjectDataJetpack data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.RepairToolData);
-			}
+			Debug.LogWarning("PersistenceObjectDataJetpack data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.RepairToolData);
 		}
 	}
 }

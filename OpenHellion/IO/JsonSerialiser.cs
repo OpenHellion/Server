@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -12,11 +11,11 @@ public static class JsonSerialiser
 		Indented
 	}
 
-	private static AuxDataJsonConverter auxDataJsonConverter = new AuxDataJsonConverter();
+	private static readonly AuxDataJsonConverter AuxDataJsonConverter = new AuxDataJsonConverter();
 
-	private static AttachPointDataJsonConverter attachPointDataJsonConverter = new AttachPointDataJsonConverter();
+	private static readonly AttachPointDataJsonConverter AttachPointDataJsonConverter = new AttachPointDataJsonConverter();
 
-	private static PersistenceJsonConverter persistenceJsonConverter = new PersistenceJsonConverter();
+	private static readonly PersistenceJsonConverter PersistenceJsonConverter = new PersistenceJsonConverter();
 
 	public static string Serialize(object obj, Formatting format = Formatting.Indented)
 	{
@@ -38,14 +37,11 @@ public static class JsonSerialiser
 
 	public static T Deserialize<T>(string jsonString)
 	{
-		return JsonConvert.DeserializeObject<T>(jsonString, new JsonConverter[3] { auxDataJsonConverter, attachPointDataJsonConverter, persistenceJsonConverter });
+		return JsonConvert.DeserializeObject<T>(jsonString, AuxDataJsonConverter, AttachPointDataJsonConverter, PersistenceJsonConverter);
 	}
 
 	public static T Load<T>(string filePath)
 	{
-		DateTime t0 = DateTime.UtcNow;
-		T ret = JsonConvert.DeserializeObject<T>(File.ReadAllText(filePath), new JsonConverter[3] { auxDataJsonConverter, attachPointDataJsonConverter, persistenceJsonConverter });
-		DateTime t1 = DateTime.UtcNow;
-		return ret;
+		return JsonConvert.DeserializeObject<T>(File.ReadAllText(filePath), AuxDataJsonConverter, AttachPointDataJsonConverter, PersistenceJsonConverter);
 	}
 }

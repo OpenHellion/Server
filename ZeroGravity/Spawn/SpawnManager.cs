@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -68,11 +69,11 @@ public static class SpawnManager
 		}
 		foreach (KeyValuePair<short, DynamicObjectData> val in StaticData.DynamicObjectsDataList)
 		{
-			if (val.Value.ItemType == ItemType.GenericItem && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is GenericItemData data)
+			if (val.Value.ItemType == ItemType.GenericItem && val.Value.DefaultAuxData is GenericItemData data)
 			{
 				AddItemTypeItemID(val.Value.ItemType, (int)data.SubType, val.Key);
 			}
-			else if (val.Value.ItemType == ItemType.MachineryPart && val.Value.DefaultAuxData != null && val.Value.DefaultAuxData is MachineryPartData partData)
+			else if (val.Value.ItemType == ItemType.MachineryPart && val.Value.DefaultAuxData is MachineryPartData partData)
 			{
 				AddItemTypeItemID(val.Value.ItemType, (int)partData.PartType, val.Key);
 			}
@@ -102,17 +103,6 @@ public static class SpawnManager
 		}
 	}
 
-	private static void InitializeSpawnRules(bool isPersistenceInitialize)
-	{
-		foreach (SpawnRule sr in spawnRules)
-		{
-			if (!sr.IsOneTimeSpawnRule)
-			{
-				sr.Initialize(isPersistenceInitialize);
-			}
-		}
-	}
-
 	public static IItemSlot GetItemSlot(LootItemData data, ref List<SpaceObjectVessel> vessels)
 	{
 		if (vessels.Count == 0)
@@ -126,7 +116,7 @@ public static class SpawnManager
 		}
 		if (priority is SpawnSerialization.AttachPointPriority.Item or SpawnSerialization.AttachPointPriority.TransportBox)
 		{
-			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox) : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
+			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
 				.FirstOrDefault((ItemSlot m) => m.Item == null && m.CanFitItem(data.Type, data.GenericSubType, data.PartType));
 			if (isl2 != null)
 			{
@@ -245,7 +235,7 @@ public static class SpawnManager
 			dat2.OxygenCompartment.Resources[0].SpawnSettings = null;
 			dat2.PropellantCompartment.Resources[0].Quantity = 0f;
 			dat2.PropellantCompartment.Resources[0].SpawnSettings = null;
-			if (data.Cargo != null && data.Cargo.Count > 0)
+			if (data.Cargo is { Count: > 0 })
 			{
 				foreach (LootItemData.CargoResourceData cargo3 in data.Cargo)
 				{
@@ -280,7 +270,7 @@ public static class SpawnManager
 		}
 		else if (defAuxData is CanisterData dat6)
 		{
-			if (data.Cargo != null && data.Cargo.Count > 0)
+			if (data.Cargo is { Count: > 0 })
 			{
 				dat6.CargoCompartment.Resources = null;
 				foreach (LootItemData.CargoResourceData cargo2 in data.Cargo)
@@ -291,7 +281,7 @@ public static class SpawnManager
 		}
 		else if (defAuxData is RepairToolData dat5)
 		{
-			if (data.Cargo != null && data.Cargo.Count > 0)
+			if (data.Cargo is { Count: > 0 })
 			{
 				dat5.FuelCompartment.Resources[0].Quantity = 0f;
 				dat5.FuelCompartment.Resources[0].SpawnSettings = null;
@@ -316,18 +306,18 @@ public static class SpawnManager
 				dat3.Damage = dat3.Damage;
 			}
 		}
-		else if (defAuxData is GenericItemData dat && data.Look != null && data.Look.Count > 0)
+		else if (defAuxData is GenericItemData dat && data.Look is { Count: > 0 })
 		{
 			dat.Look = data.Look[MathHelper.RandomRange(0, data.Look.Count)];
 		}
 		return defAuxData;
 	}
 
-	public static bool SpawnDynamicObject(SpawnRule rule, SpawnRuleLoot loot, IItemSlot ap)
+	public static async Task<bool> SpawnDynamicObject(SpawnRule rule, SpawnRuleLoot loot, IItemSlot ap)
 	{
 		if (ap == null)
 		{
-			Debug.Warning("SPAWN MANAGER - Unable to spawn item because atach point is null", loot.Data.Type);
+			Debug.LogWarning("SPAWN MANAGER - Unable to spawn item because atach point is null", loot.Data.Type);
 			return false;
 		}
 		if (!itemTypeItemID.ContainsKey(loot.Data.Type))
@@ -354,7 +344,7 @@ public static class SpawnManager
 		dynamicObjectSceneData.AuxData = auxData;
 		dynamicObjectSceneData.SpawnSettings = null;
 		DynamicObjectSceneData sceneData = dynamicObjectSceneData;
-		DynamicObject dobj = new DynamicObject(sceneData, ap.Parent, -1L);
+		DynamicObject dobj = await DynamicObject.CreateDynamicObjectAsync(sceneData, ap.Parent, -1L);
 		if (dobj.Item == null)
 		{
 			return true;
@@ -394,11 +384,11 @@ public static class SpawnManager
 		if (!rule.IsOneTimeSpawnRule)
 		{
 			dobj.IsPartOfSpawnSystem = true;
-			SpawnedDynamicObjects.Add(dobj.GUID, new Tuple<SpawnRule, SpawnRuleLoot>(rule, loot));
+			SpawnedDynamicObjects.Add(dobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(rule, loot));
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
+		await NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
 		return true;
 	}
 
@@ -406,12 +396,12 @@ public static class SpawnManager
 	{
 		if (!lootCategories.ContainsKey(categoryName))
 		{
-			Debug.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" does not exist");
+			Debug.LogError($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" does not exist");
 			return new List<LootItemData>();
 		}
 		if (!lootCategories[categoryName].ContainsKey(tier))
 		{
-			Debug.Error($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" has no tier \"{tier.ToString()}\"");
+			Debug.LogError($"SPAWN MANAGER - Rule \"{ruleName}\", loot category \"{categoryName}\" has no tier \"{tier.ToString()}\"");
 			return new List<LootItemData>();
 		}
 		return lootCategories[categoryName][tier];
@@ -438,16 +428,16 @@ public static class SpawnManager
 		return ret;
 	}
 
-	public static Ship SpawnStartingSetup(string name)
+	public static async Task<Ship> SpawnStartingSetup(string name)
 	{
 		SpawnRule sr = startingSceneSpawnRules.OrderBy((SpawnRule m) => MathHelper.RandomNextDouble()).FirstOrDefault((SpawnRule m) => m.Name == name);
-		return sr.ExecuteRule() as Ship;
+		return await sr.ExecuteRule() as Ship;
 	}
 
-	public static Ship SpawnQuestSetup(QuestTrigger questTrigger)
+	public static async Task<Ship> SpawnQuestSetup(QuestTrigger questTrigger)
 	{
 		SpawnRule sr = questSpawnRules.OrderBy((SpawnRule m) => MathHelper.RandomNextDouble()).FirstOrDefault((SpawnRule m) => m.Name == questTrigger.SpawnRuleName);
-		return sr.ExecuteQuestRule(questTrigger) as Ship;
+		return await sr.ExecuteQuestRule(questTrigger) as Ship;
 	}
 
 	private static string ItemDataDebugString(LootItemData data)
@@ -464,7 +454,7 @@ public static class SpawnManager
 	private static void PrintDebugInfo(bool printCategories = false, bool printSpawnRules = false, bool printAttachPoints = false, bool printItemTypeIDs = false)
 	{
 		string dbgString = "";
-		if (printCategories && lootCategories != null && lootCategories.Count > 0)
+		if (printCategories && lootCategories is { Count: > 0 })
 		{
 			dbgString = dbgString + "\nCategories:\n" + new string('=', 78);
 			foreach (KeyValuePair<string, Dictionary<LootTier, List<LootItemData>>> cat in lootCategories)
@@ -505,7 +495,7 @@ public static class SpawnManager
 				}
 			}
 		}
-		if (printItemTypeIDs && itemTypeItemID != null && itemTypeItemID.Count > 0)
+		if (printItemTypeIDs && itemTypeItemID is { Count: > 0 })
 		{
 			dbgString = dbgString + "\n\nItem Type - Item ID:\n" + new string('=', 78);
 			foreach (KeyValuePair<ItemType, Dictionary<int, short>> type in itemTypeItemID)
@@ -525,7 +515,7 @@ public static class SpawnManager
 				}
 			}
 		}
-		Debug.Info(dbgString + "\n");
+		Debug.LogInfo(dbgString + "\n");
 	}
 
 	private static void GenerateSampleData(bool force)
@@ -534,8 +524,9 @@ public static class SpawnManager
 		SpawnSerialization.GenerateSpawnRuleSampleData(force);
 	}
 
-	public static void Initialize(bool isPersistenceInitialize = false)
+	public static async Task Initialize(bool isPersistenceInitialize = false)
 	{
+		Debug.Log("Initialising spawn rules...");
 		LoadData();
 		if (spawnRules == null || spawnRules.Count == 0)
 		{
@@ -545,92 +536,91 @@ public static class SpawnManager
 		{
 			PrintDebugInfo(Settings.PrintCategories, Settings.PrintSpawnRules, Settings.PrintItemAttachPoints, Settings.PrintItemTypeIDs);
 		}
-		InitializeSpawnRules(isPersistenceInitialize);
+		foreach (SpawnRule sr in spawnRules)
+		{
+			if (!sr.IsOneTimeSpawnRule)
+			{
+				await sr.Initialize(isPersistenceInitialize);
+			}
+		}
 	}
 
 	public static PersistenceObjectData GetPersistenceData()
 	{
 		PersistenceObjectDataSpawnManager data = new PersistenceObjectDataSpawnManager();
 		data.SpawnRules = new Dictionary<string, PersistenceObjectDataSpawnManager.SpawnRule>();
-		try
+		Dictionary<SpawnRuleScene, PersistenceObjectDataSpawnManager.SpawnRuleScene> spawnRuleSceneXRef = new Dictionary<SpawnRuleScene, PersistenceObjectDataSpawnManager.SpawnRuleScene>();
+		Dictionary<SpawnRuleLoot, PersistenceObjectDataSpawnManager.SpawnRuleLoot> spawnRuleLootXRef = new Dictionary<SpawnRuleLoot, PersistenceObjectDataSpawnManager.SpawnRuleLoot>();
+		if (spawnRules is { Count: > 0 })
 		{
-			Dictionary<SpawnRuleScene, PersistenceObjectDataSpawnManager.SpawnRuleScene> spawnRuleSceneXRef = new Dictionary<SpawnRuleScene, PersistenceObjectDataSpawnManager.SpawnRuleScene>();
-			Dictionary<SpawnRuleLoot, PersistenceObjectDataSpawnManager.SpawnRuleLoot> spawnRuleLootXRef = new Dictionary<SpawnRuleLoot, PersistenceObjectDataSpawnManager.SpawnRuleLoot>();
-			if (spawnRules != null && spawnRules.Count > 0)
+			foreach (SpawnRule sr in spawnRules)
 			{
-				foreach (SpawnRule sr in spawnRules)
+				if (sr.IsOneTimeSpawnRule)
 				{
-					if (sr.IsOneTimeSpawnRule)
-					{
-						continue;
-					}
-					PersistenceObjectDataSpawnManager.SpawnRule p_sr = new PersistenceObjectDataSpawnManager.SpawnRule
-					{
-						CurrTimerSec = sr.CurrTimerSec,
-						ScenePool = new List<PersistenceObjectDataSpawnManager.SpawnRuleScene>(),
-						LootPool = new List<PersistenceObjectDataSpawnManager.SpawnRuleLoot>(),
-						SpawnedVessels = new List<long>()
-					};
-					if (sr.ScenePool != null)
-					{
-						foreach (SpawnRuleScene sp in sr.ScenePool)
-						{
-							PersistenceObjectDataSpawnManager.SpawnRuleScene p_srs = spawnRuleSceneXRef[sp] = new PersistenceObjectDataSpawnManager.SpawnRuleScene
-							{
-								Vessels = new List<Tuple<long, int>>()
-							};
-							p_sr.ScenePool.Add(p_srs);
-						}
-					}
-					if (sr.LootPool != null)
-					{
-						foreach (SpawnRuleLoot lp in sr.LootPool)
-						{
-							PersistenceObjectDataSpawnManager.SpawnRuleLoot p_srl = spawnRuleLootXRef[lp] = new PersistenceObjectDataSpawnManager.SpawnRuleLoot
-							{
-								DynamicObjects = new List<long>()
-							};
-							p_sr.LootPool.Add(p_srl);
-						}
-					}
-					foreach (SpaceObjectVessel vessel in sr.SpawnedVessels)
-					{
-						p_sr.SpawnedVessels.Add(vessel.GUID);
-					}
-					data.SpawnRules[sr.Name] = p_sr;
+					continue;
 				}
-			}
-			if (SpawnedVessels != null && SpawnedVessels.Count > 0)
-			{
-				foreach (KeyValuePair<long, Tuple<SpawnRule, SpawnRuleScene, int>> ves in SpawnedVessels)
+				PersistenceObjectDataSpawnManager.SpawnRule p_sr = new PersistenceObjectDataSpawnManager.SpawnRule
 				{
-					if (ves.Value.Item2 != null && spawnRuleSceneXRef.ContainsKey(ves.Value.Item2))
+					CurrTimerSec = sr.CurrTimerSec,
+					ScenePool = new List<PersistenceObjectDataSpawnManager.SpawnRuleScene>(),
+					LootPool = new List<PersistenceObjectDataSpawnManager.SpawnRuleLoot>(),
+					SpawnedVessels = new List<long>()
+				};
+				if (sr.ScenePool != null)
+				{
+					foreach (SpawnRuleScene sp in sr.ScenePool)
 					{
-						spawnRuleSceneXRef[ves.Value.Item2].Vessels.Add(new Tuple<long, int>(ves.Key, ves.Value.Item3));
+						PersistenceObjectDataSpawnManager.SpawnRuleScene p_srs = spawnRuleSceneXRef[sp] = new PersistenceObjectDataSpawnManager.SpawnRuleScene
+						{
+							Vessels = new List<Tuple<long, int>>()
+						};
+						p_sr.ScenePool.Add(p_srs);
 					}
 				}
-			}
-			if (SpawnedDynamicObjects != null && SpawnedDynamicObjects.Count > 0)
-			{
-				foreach (KeyValuePair<long, Tuple<SpawnRule, SpawnRuleLoot>> obj in SpawnedDynamicObjects)
+				if (sr.LootPool != null)
 				{
-					if (spawnRuleLootXRef.ContainsKey(obj.Value.Item2))
+					foreach (SpawnRuleLoot lp in sr.LootPool)
 					{
-						spawnRuleLootXRef[obj.Value.Item2].DynamicObjects.Add(obj.Key);
+						PersistenceObjectDataSpawnManager.SpawnRuleLoot p_srl = spawnRuleLootXRef[lp] = new PersistenceObjectDataSpawnManager.SpawnRuleLoot
+						{
+							DynamicObjects = new List<long>()
+						};
+						p_sr.LootPool.Add(p_srl);
 					}
+				}
+				foreach (SpaceObjectVessel vessel in sr.SpawnedVessels)
+				{
+					p_sr.SpawnedVessels.Add(vessel.Guid);
+				}
+				data.SpawnRules[sr.Name] = p_sr;
+			}
+		}
+		if (SpawnedVessels is { Count: > 0 })
+		{
+			foreach (KeyValuePair<long, Tuple<SpawnRule, SpawnRuleScene, int>> ves in SpawnedVessels)
+			{
+				if (ves.Value.Item2 != null && spawnRuleSceneXRef.ContainsKey(ves.Value.Item2))
+				{
+					spawnRuleSceneXRef[ves.Value.Item2].Vessels.Add(new Tuple<long, int>(ves.Key, ves.Value.Item3));
 				}
 			}
 		}
-		catch (Exception ex)
+		if (SpawnedDynamicObjects is { Count: > 0 })
 		{
-			Debug.Exception(ex);
+			foreach (KeyValuePair<long, Tuple<SpawnRule, SpawnRuleLoot>> obj in SpawnedDynamicObjects)
+			{
+				if (spawnRuleLootXRef.ContainsKey(obj.Value.Item2))
+				{
+					spawnRuleLootXRef[obj.Value.Item2].DynamicObjects.Add(obj.Key);
+				}
+			}
 		}
 		return data;
 	}
 
-	public static void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public static async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		Initialize(isPersistenceInitialize: true);
+		await Initialize(isPersistenceInitialize: true);
 		if (persistenceData is not PersistenceObjectDataSpawnManager data || data.SpawnRules == null)
 		{
 			return;
@@ -659,7 +649,7 @@ public static class SpawnManager
 						if (tmpVess != null && tmpSr.AddVesselToRule(tmpVess, tmpSr.ScenePool[j], p_ves.Item2))
 						{
 							tmpVess.IsPartOfSpawnSystem = true;
-							SpawnedVessels[tmpVess.GUID] = new Tuple<SpawnRule, SpawnRuleScene, int>(tmpSr, tmpSr.ScenePool[j], p_ves.Item2);
+							SpawnedVessels[tmpVess.Guid] = new Tuple<SpawnRule, SpawnRuleScene, int>(tmpSr, tmpSr.ScenePool[j], p_ves.Item2);
 						}
 					}
 				}
@@ -677,7 +667,7 @@ public static class SpawnManager
 						if (Server.Instance.GetObject(p_dobj) is DynamicObject tmpDobj && tmpSr.AddDynamicObjectToRule(tmpDobj, tmpSr.LootPool[i]))
 						{
 							tmpDobj.IsPartOfSpawnSystem = true;
-							SpawnedDynamicObjects.Add(tmpDobj.GUID, new Tuple<SpawnRule, SpawnRuleLoot>(tmpSr, tmpSr.LootPool[i]));
+							SpawnedDynamicObjects.Add(tmpDobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(tmpSr, tmpSr.LootPool[i]));
 						}
 					}
 				}
@@ -695,7 +685,7 @@ public static class SpawnManager
 					if (p_sr.Value.ScenePool == null || p_sr.Value.ScenePool.Count == 0)
 					{
 						vessel.IsPartOfSpawnSystem = true;
-						SpawnedVessels[vessel.GUID] = new Tuple<SpawnRule, SpawnRuleScene, int>(tmpSr, null, 0);
+						SpawnedVessels[vessel.Guid] = new Tuple<SpawnRule, SpawnRuleScene, int>(tmpSr, null, 0);
 					}
 				}
 			}
@@ -706,7 +696,7 @@ public static class SpawnManager
 		}
 	}
 
-	public static void UpdateTimers(double deltaTime)
+	public static async Task UpdateTimers(double deltaTime)
 	{
 		foreach (SpawnRule sr in timedSpawnRules)
 		{
@@ -715,7 +705,7 @@ public static class SpawnManager
 			{
 				if (!sr.IsOneTimeSpawnRule)
 				{
-					sr.ExecuteRule();
+					await sr.ExecuteRule();
 				}
 				sr.CurrTimerSec = 0.0;
 			}
@@ -725,9 +715,9 @@ public static class SpawnManager
 	public static void RemoveSpawnSystemObject(SpaceObject obj, bool checkChildren)
 	{
 		obj.IsPartOfSpawnSystem = false;
-		if (obj is DynamicObject dobj2 && SpawnedDynamicObjects.ContainsKey(dobj2.GUID))
+		if (obj is DynamicObject dobj2 && SpawnedDynamicObjects.ContainsKey(dobj2.Guid))
 		{
-			if (!SpawnedDynamicObjects[dobj2.GUID].Item1.RemoveDynamicObject(dobj2, SpawnedDynamicObjects[dobj2.GUID].Item2))
+			if (!SpawnedDynamicObjects[dobj2.Guid].Item1.RemoveDynamicObject(dobj2, SpawnedDynamicObjects[dobj2.Guid].Item2))
 			{
 				return;
 			}
@@ -741,16 +731,16 @@ public static class SpawnManager
 					}
 				}
 			}
-			SpawnedDynamicObjects.Remove(dobj2.GUID);
+			SpawnedDynamicObjects.Remove(dobj2.Guid);
 		}
 		else
 		{
-			if (obj is not SpaceObjectVessel ves || !SpawnedVessels.ContainsKey(ves.GUID))
+			if (obj is not SpaceObjectVessel ves || !SpawnedVessels.ContainsKey(ves.Guid))
 			{
 				return;
 			}
 
-			SpawnRule sr = SpawnedVessels[ves.GUID].Item1;
+			SpawnRule sr = SpawnedVessels[ves.Guid].Item1;
 			if (sr.LocationType == SpawnRuleLocationType.Station && sr.DoNotRemoveVesselsFromSpawnSystem)
 			{
 				return;
@@ -771,9 +761,9 @@ public static class SpawnManager
 			}
 			else
 			{
-				sr.RemoveSpaceObjectVessel(ves, SpawnedVessels[ves.GUID].Item2, SpawnedVessels[ves.GUID].Item3);
+				sr.RemoveSpaceObjectVessel(ves, SpawnedVessels[ves.Guid].Item2, SpawnedVessels[ves.Guid].Item3);
 			}
-			SpawnedVessels.Remove(ves.GUID);
+			SpawnedVessels.Remove(ves.Guid);
 		}
 	}
 
@@ -787,7 +777,7 @@ public static class SpawnManager
 				SpaceObjectVessel ves2 = sr.SpawnedVessels.FirstOrDefault((SpaceObjectVessel m) => m.IsMainVessel);
 				if (ves2 != null)
 				{
-					return ves2.GUID;
+					return ves2.Guid;
 				}
 			}
 			else
@@ -796,21 +786,21 @@ public static class SpawnManager
 				sr = spawnRules.FirstOrDefault((SpawnRule m) => (ves = m.SpawnedVessels.FirstOrDefault((SpaceObjectVessel n) => n.IsMainVessel && n.VesselData != null && n.VesselData.VesselRegistration == stationName)) != null && (!celestial.HasValue || (celestial.HasValue && m.Orbit.CelestialBody == celestial.Value)));
 				if (ves != null)
 				{
-					return ves.GUID;
+					return ves.Guid;
 				}
 			}
 		}
 		return 0L;
 	}
 
-	public static bool RespawnBlueprintRule(string name)
+	public static async Task<bool> RespawnBlueprintRule(string name)
 	{
 		SpawnRule sr = spawnRules.FirstOrDefault((SpawnRule m) => m.Name.ToLower().Replace(' ', '_').Contains(name.ToLower()));
 		if (sr is not { LocationType: SpawnRuleLocationType.Station })
 		{
 			return false;
 		}
-		sr.ExecuteRule(force: true);
+		await sr.ExecuteRule(force: true);
 		return true;
 	}
 }

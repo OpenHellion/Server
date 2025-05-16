@@ -76,7 +76,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public bool IsAttached => Item != null && (Item.Slot != null || Item.AttachPointType != 0 || Parent is DynamicObject);
 
-	public short InvSlotID => (short)(Item != null && Item.Slot != null ? Item.Slot.SlotID : -1111);
+	public short InvSlotID => (short)(Item is { Slot: not null } ? Item.Slot.SlotID : -1111);
 
 	public bool StatsChanged { get; set; }
 
@@ -113,12 +113,12 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			if (_Parent != null)
 			{
-				_Parent.DynamicObjects.TryRemove(GUID, out var _);
+				_Parent.DynamicObjects.TryRemove(Guid, out var _);
 			}
 			_Parent = value;
 			if (_Parent != null && !_Parent.DynamicObjects.Values.Contains(this))
 			{
-				_Parent.DynamicObjects[GUID] = this;
+				_Parent.DynamicObjects[Guid] = this;
 			}
 			if (_Parent is Pivot)
 			{
@@ -131,14 +131,14 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 	}
 
-	public void SendStatsToClient()
+	public async Task SendStatsToClient()
 	{
 		DynamicObjectStatsMessage dosm = new DynamicObjectStatsMessage();
-		dosm.Info.GUID = GUID;
+		dosm.Info.GUID = Guid;
 		dosm.Info.Stats = StatsNew;
 		if (Parent != null)
 		{
-			NetworkController.SendToClientsSubscribedToParents(dosm, Parent, -1L);
+			await NetworkController.SendToClientsSubscribedToParents(dosm, Parent, -1L);
 		}
 		StatsChanged = false;
 		LastStatsSendTime = Server.SolarSystemTime;
@@ -159,7 +159,6 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					RespawnTime = RespawnTime,
 					MaxHealth = SpawnMaxHealth,
 					MinHealth = SpawnMinHealth,
-					WearMultiplier = SpawnWearMultiplier,
 					ApDetails = APDetails
 				});
 			}
@@ -170,20 +169,26 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 	}
 
-	public DynamicObject(DynamicObjectSceneData dosd, SpaceObject parent, long guid = -1L, bool ignoreSpawnSettings = false)
+	private DynamicObject(DynamicObjectSceneData dosd, long guid = -1L)
 		: base(guid == -1 ? GUIDFactory.NextObjectGUID() : guid, dosd.Position.ToVector3D(), QuaternionD.LookRotation(dosd.Forward.ToVector3D(), dosd.Up.ToVector3D()))
+	{}
+
+	public static async Task<DynamicObject> CreateDynamicObjectAsync(DynamicObjectSceneData dosd, SpaceObject parent, long guid = -1L, bool ignoreSpawnSettings = false)
 	{
-		DynamicObjectSceneData = ObjectCopier.DeepCopy(dosd);
+		var dynamicObject = new DynamicObject(dosd, guid)
+		{
+			DynamicObjectSceneData = ObjectCopier.DeepCopy(dosd)
+		};
 		if (ignoreSpawnSettings)
 		{
-			DynamicObjectSceneData.SpawnSettings = null;
+			dynamicObject.DynamicObjectSceneData.SpawnSettings = null;
 		}
-		ItemID = DynamicObjectSceneData.ItemID;
-		DynamicObjectData dod = StaticData.DynamicObjectsDataList[ItemID];
-		ItemType = StaticData.DynamicObjectsDataList[ItemID].ItemType;
-		Parent = parent;
-		Item = Item.Create(this, ItemType, DynamicObjectSceneData.AuxData);
-		if (Item is ICargo cargoItem)
+		dynamicObject.ItemID = dynamicObject.DynamicObjectSceneData.ItemID;
+		DynamicObjectData dod = StaticData.DynamicObjectsDataList[dynamicObject.ItemID];
+		dynamicObject.ItemType = StaticData.DynamicObjectsDataList[dynamicObject.ItemID].ItemType;
+		dynamicObject.Parent = parent;
+		dynamicObject.Item = await Item.Create(dynamicObject, dynamicObject.ItemType, dynamicObject.DynamicObjectSceneData.AuxData);
+		if (dynamicObject.Item is ICargo cargoItem)
 		{
 			if (cargoItem.Compartments != null && !ignoreSpawnSettings)
 			{
@@ -194,7 +199,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 						ResourcesSpawnSettings[] spawnSettings = resource.SpawnSettings;
 						foreach (ResourcesSpawnSettings rss in spawnSettings)
 						{
-							if (Parent is SpaceObjectVessel && (Parent as SpaceObjectVessel).CheckTag(rss.Tag, rss.Case))
+							if (dynamicObject.Parent is SpaceObjectVessel && (dynamicObject.Parent as SpaceObjectVessel).CheckTag(rss.Tag, rss.Case))
 							{
 								float qty = MathHelper.RandomRange(rss.MinQuantity, rss.MaxQuantity);
 								resource.Quantity = 0f;
@@ -211,66 +216,68 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 				cargoItem.GetCompartment().Resources.RemoveAll((CargoResourceData m) => m.Quantity <= float.Epsilon);
 			}
 		}
-		Server.Instance.Add(this);
-		ConnectToNetworkController();
-		LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
+		Server.Instance.Add(dynamicObject);
+		dynamicObject.ConnectToNetworkController();
+		dynamicObject.LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
+
+		return dynamicObject;
 	}
 
-	private void SelfDestructCheck(double dbl)
+	private async void SelfDestructCheck(double dbl)
 	{
 		if (Parent is Pivot && (DateTime.UtcNow - lastSenderTime).TotalSeconds >= 300.0)
 		{
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, SelfDestructCheck);
-			Destroy();
+			await Destroy();
 		}
 	}
 
 	public void ConnectToNetworkController()
 	{
-		EventSystem.AddListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
-		EventSystem.AddListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
+		EventSystem.AddListener<DynamicObjectMovementMessage>(DynamicObectMovementMessageListener);
+		EventSystem.AddListener<DynamicObjectStatsMessage>(DynamicObjectStatsMessageListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
-		EventSystem.RemoveListener(typeof(DynamicObectMovementMessage), DynamicObectMovementMessageListener);
-		EventSystem.RemoveListener(typeof(DynamicObjectStatsMessage), DynamicObjectStatsMessageListener);
+		EventSystem.RemoveListener<DynamicObjectMovementMessage>(DynamicObectMovementMessageListener);
+		EventSystem.RemoveListener<DynamicObjectStatsMessage>(DynamicObjectStatsMessageListener);
 	}
 
 	private void DynamicObectMovementMessageListener(NetworkData data)
 	{
-		DynamicObectMovementMessage mdom = data as DynamicObectMovementMessage;
-		if (mdom.GUID != GUID)
+		var message = data as DynamicObjectMovementMessage;
+		if (message.GUID != Guid)
 		{
 			return;
 		}
-		if (MasterClientID != mdom.Sender)
+		if (MasterClientID != message.Sender)
 		{
 			if ((DateTime.UtcNow - takeoverTime).TotalSeconds < 0.8)
 			{
 				return;
 			}
 			takeoverTime = DateTime.UtcNow;
-			MasterClientID = mdom.Sender;
+			MasterClientID = message.Sender;
 		}
-		if (MasterClientID == 0L || mdom.Sender == MasterClientID || MasterPlayer == null || (MasterPlayer.Parent != Parent && MasterClientID != mdom.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
+		if (MasterClientID == 0L || message.Sender == MasterClientID || MasterPlayer == null || (MasterPlayer.Parent != Parent && MasterClientID != message.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
 		{
-			MasterClientID = mdom.Sender;
+			MasterClientID = message.Sender;
 			lastSenderTime = DateTime.UtcNow;
 			bool changed = false;
-			if (!LocalPosition.IsEpsilonEqual(mdom.LocalPosition.ToVector3D(), 0.0001))
+			if (!LocalPosition.IsEpsilonEqual(message.LocalPosition.ToVector3D(), 0.0001))
 			{
-				LocalPosition = mdom.LocalPosition.ToVector3D();
+				LocalPosition = message.LocalPosition.ToVector3D();
 				changed = true;
 			}
-			if (!LocalRotation.IsEpsilonEqual(mdom.LocalRotation.ToQuaternionD(), 1E-05))
+			if (!LocalRotation.IsEpsilonEqual(message.LocalRotation.ToQuaternionD(), 1E-05))
 			{
-				LocalRotation = mdom.LocalRotation.ToQuaternionD();
+				LocalRotation = message.LocalRotation.ToQuaternionD();
 				changed = true;
 			}
-			velocity = mdom.Velocity.ToVector3D();
-			angularVelocity = mdom.AngularVelocity.ToVector3D();
-			collisionImpactVelocity = mdom.ImpactVelocity;
+			velocity = message.Velocity.ToVector3D();
+			angularVelocity = message.AngularVelocity.ToVector3D();
+			collisionImpactVelocity = message.ImpactVelocity;
 			if (changed)
 			{
 				LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
@@ -285,226 +292,224 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	private string GetUnknownAttachMessage(DynamicObjectAttachData data)
 	{
 		DynamicObjectAttachData curr = GetCurrAttachData();
-		return string.Format("Current: {0}, {1}, {10}, {2}, {3}, {4}\r\nNew: {5}, {6}, {7}, {8}, {9}", curr.ParentGUID, curr.ParentType, curr.IsAttached, curr.InventorySlotID, curr.APDetails != null ? curr.APDetails.InSceneID : 0, data.ParentGUID, data.ParentType, data.IsAttached, data.InventorySlotID, data.APDetails != null ? data.APDetails.InSceneID : 0, Parent != null && Parent is Ship ? (Parent as Ship).SceneID : GameScenes.SceneId.None);
+		return string.Format("Current: {0}, {1}, {10}, {2}, {3}, {4}\r\nNew: {5}, {6}, {7}, {8}, {9}", curr.ParentGUID, curr.ParentType, curr.IsAttached, curr.InventorySlotID, curr.APDetails != null ? curr.APDetails.InSceneID : 0, data.ParentGUID, data.ParentType, data.IsAttached, data.InventorySlotID, data.APDetails != null ? data.APDetails.InSceneID : 0, Parent is Ship ? (Parent as Ship).SceneID : GameScenes.SceneId.None);
 	}
 
 	private bool CanBePickedUp(Player player, DynamicObject parentDObj)
 	{
-		return parentDObj.Parent == player || (parentDObj.Item != null && parentDObj.Item is Outfit && parentDObj.Parent is not Player);
+		return parentDObj.Parent == player || (parentDObj.Item is Outfit && parentDObj.Parent is not Player);
 	}
 
-	private void DynamicObjectStatsMessageListener(NetworkData data)
+	private async void DynamicObjectStatsMessageListener(NetworkData data)
 	{
-		DynamicObjectStatsMessage dosm = data as DynamicObjectStatsMessage;
-		if (dosm.Info.GUID != GUID)
+		var message = data as DynamicObjectStatsMessage;
+		if (message.Info.GUID != Guid)
 		{
 			return;
 		}
 		SpaceObject oldParent = Parent;
-		try
+
+		if (message.Info.Stats != null && Item != null && Parent.Guid == message.Sender)
 		{
-			if (dosm.Info.Stats != null && Item != null && Parent.GUID == dosm.Sender)
+			StatsChanged = await Item.ChangeStats(message.Info.Stats) || StatsChanged;
+		}
+		if (message.AttachData != null)
+		{
+			bool changeListener = false;
+			SpaceObject newParent = null;
+			Task removeFromOldParent = null;
+			if (oldParent is Player && message.Sender == oldParent.Guid)
 			{
-				StatsChanged = Item.ChangeStats(dosm.Info.Stats) || StatsChanged;
+				removeFromOldParent = new Task(delegate
+				{
+					(oldParent as Player).PlayerInventory.DropItem(InvSlotID);
+				});
 			}
-			if (dosm.AttachData != null)
+			else if (oldParent is SpaceObjectVessel)
 			{
-				bool changeListener = false;
-				SpaceObject newParent = null;
-				Task removeFromOldParent = null;
-				if (oldParent is Player && dosm.Sender == oldParent.GUID)
+				removeFromOldParent = new Task(delegate
 				{
-					removeFromOldParent = new Task(delegate
+					if (Item.AttachPointType != 0 || Item.AttachPointID != null)
 					{
-						(oldParent as Player).PlayerInventory.DropItem(InvSlotID);
-					});
-				}
-				else if (oldParent is SpaceObjectVessel)
-				{
-					removeFromOldParent = new Task(delegate
-					{
-						if (Item.AttachPointType != 0 || Item.AttachPointID != null)
+						if (Item is MachineryPart)
 						{
-							if (Item is MachineryPart)
-							{
-								(oldParent as SpaceObjectVessel).RemoveMachineryPart(Item.AttachPointID);
-							}
-							Item.SetAttachPoint(null);
+							(oldParent as SpaceObjectVessel).RemoveMachineryPart(Item.AttachPointID);
 						}
-					});
-				}
-				else if (oldParent is Pivot && MasterClientID == dosm.Sender)
+						Item.SetAttachPoint(null);
+					}
+				});
+			}
+			else if (oldParent is Pivot && MasterClientID == message.Sender)
+			{
+				removeFromOldParent = new Task(delegate
 				{
-					removeFromOldParent = new Task(delegate
+					Pivot pivot = oldParent as Pivot;
+					if (message.AttachData.LocalPosition != null && message.AttachData.LocalRotation != null)
 					{
-						Pivot pivot = oldParent as Pivot;
-						if (dosm.AttachData.LocalPosition != null && dosm.AttachData.LocalRotation != null)
-						{
-							LocalPosition = dosm.AttachData.LocalPosition.ToVector3D();
-							LocalRotation = dosm.AttachData.LocalRotation.ToQuaternionD();
-						}
-						foreach (Player current in Server.Instance.AllPlayers)
-						{
-							if (current.IsSubscribedTo(pivot.GUID))
-							{
-								current.UnsubscribeFrom(pivot);
-							}
-						}
-						Server.Instance.SolarSystem.RemoveArtificialBody(pivot);
-					});
-				}
-				else if (oldParent is DynamicObject)
-				{
-					removeFromOldParent = new Task(delegate
+						LocalPosition = message.AttachData.LocalPosition.ToVector3D();
+						LocalRotation = message.AttachData.LocalRotation.ToQuaternionD();
+					}
+					foreach (Player current in Server.Instance.AllPlayers)
 					{
-						if ((oldParent as DynamicObject).Item.Slots != null && (oldParent as DynamicObject).Item.Slots.TryGetValue(Item.ItemSlotID, out var value))
+						if (current.IsSubscribedTo(pivot.Guid))
 						{
-							if (Item != value.Item)
-							{
-								return;
-							}
-							value.Item = null;
-						}
-						Item.ItemSlotID = 0;
-					});
-				}
-				else if (oldParent is Corpse)
-				{
-					removeFromOldParent = new Task(delegate
-					{
-					});
-				}
-				if (removeFromOldParent != null)
-				{
-					if (dosm.AttachData.ParentType == SpaceObjectType.Player)
-					{
-						newParent = Server.Instance.GetObject(dosm.AttachData.ParentGUID) as Player;
-						if ((newParent as Player).PlayerInventory.AddItemToInventory(Item, dosm.AttachData.InventorySlotID) && oldParent is not Player)
-						{
-							removeFromOldParent.RunSynchronously();
+							current.UnsubscribeFrom(pivot);
 						}
 					}
-					else if (dosm.AttachData.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station)
+					Server.Instance.SolarSystem.RemoveArtificialBody(pivot);
+				});
+			}
+			else if (oldParent is DynamicObject)
+			{
+				removeFromOldParent = new Task(delegate
+				{
+					if ((oldParent as DynamicObject).Item.Slots != null && (oldParent as DynamicObject).Item.Slots.TryGetValue(Item.ItemSlotID, out var value))
 					{
-						newParent = Server.Instance.GetObject(dosm.AttachData.ParentGUID) as SpaceObjectVessel;
-						if (dosm.AttachData.IsAttached)
+						if (Item != value.Item)
 						{
-							removeFromOldParent.RunSynchronously();
-							Parent = newParent;
-							(newParent as SpaceObjectVessel).AttachPoints.TryGetValue(dosm.AttachData.APDetails.InSceneID, out var ap);
-							if (ap == null || !ap.CanFitItem(Item))
-							{
-								return;
-							}
-							if (Item != null && dosm.AttachData.APDetails != null)
-							{
-								Item.SetAttachPoint(dosm.AttachData.APDetails);
-							}
-							if (Item != null && Item.AttachPointType != 0 && Item is MachineryPart part && part.AttachPointType == AttachPointType.MachineryPartSlot)
-							{
-								(newParent as SpaceObjectVessel).FitMachineryPart(part.AttachPointID, part);
-							}
+							return;
 						}
-						else
-						{
-							removeFromOldParent.RunSynchronously();
-							LocalPosition = dosm.AttachData.LocalPosition.ToVector3D();
-							LocalRotation = dosm.AttachData.LocalPosition.ToQuaternionD();
-						}
+						value.Item = null;
 					}
-					else if (dosm.AttachData.ParentType is SpaceObjectType.PlayerPivot or SpaceObjectType.CorpsePivot or SpaceObjectType.DynamicObjectPivot)
+					Item.ItemSlotID = 0;
+				});
+			}
+			else if (oldParent is Corpse)
+			{
+				removeFromOldParent = new Task(delegate
+				{
+				});
+			}
+			if (removeFromOldParent != null)
+			{
+				if (message.AttachData.ParentType == SpaceObjectType.Player)
+				{
+					newParent = Server.Instance.GetObject(message.AttachData.ParentGUID) as Player;
+					if (await (newParent as Player).PlayerInventory.AddItemToInventory(Item, message.AttachData.InventorySlotID) && oldParent is not Player)
 					{
-						ArtificialBody refObject = SpaceObject.GetParent<ArtificialBody>(oldParent);
-						if (refObject is SpaceObjectVessel vessel)
-						{
-							refObject = vessel.MainVessel;
-						}
-						newParent = new Pivot(this, refObject);
-						removeFromOldParent.RunSynchronously();
-						LocalPosition = dosm.AttachData.LocalPosition.ToVector3D();
-						LocalRotation = dosm.AttachData.LocalPosition.ToQuaternionD();
-						pivotPositionCorrection = Vector3D.Zero;
-						pivotVelocityCorrection = Vector3D.Zero;
-						foreach (Player pl in Server.Instance.AllPlayers)
-						{
-							if (pl.IsSubscribedTo(SpaceObject.GetParent<ArtificialBody>(oldParent).GUID))
-							{
-								pl.SubscribeTo(newParent);
-							}
-						}
+						await removeFromOldParent;
 					}
-					else if (dosm.AttachData.ParentType == SpaceObjectType.DynamicObject)
+				}
+				else if (message.AttachData.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station)
+				{
+					newParent = Server.Instance.GetObject(message.AttachData.ParentGUID) as SpaceObjectVessel;
+					if (message.AttachData.IsAttached)
 					{
-						newParent = Server.Instance.GetObject(dosm.AttachData.ParentGUID) as DynamicObject;
-						ItemSlot slot = null;
-						if ((newParent as DynamicObject).Item.Slots != null && (newParent as DynamicObject).Item.Slots.TryGetValue(dosm.AttachData.ItemSlotID, out slot) && slot != null && slot.CanFitItem(Item))
-						{
-							PickedUp();
-							removeFromOldParent.RunSynchronously();
-							slot.FitItem(Item);
-						}
-					}
-					else if (dosm.AttachData.ParentType != SpaceObjectType.Corpse)
-					{
-					}
-					if (Parent != newParent)
-					{
+						await removeFromOldParent;
 						Parent = newParent;
-					}
-					changeListener = true;
-				}
-				if (changeListener)
-				{
-					LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
-					if (Parent is SpaceObjectVessel)
-					{
-						Player senderPl = Server.Instance.GetPlayer(dosm.Sender);
-						if (senderPl != null && Parent == senderPl.Parent)
+						(newParent as SpaceObjectVessel).AttachPoints.TryGetValue(message.AttachData.APDetails.InSceneID, out var ap);
+						if (ap == null || !ap.CanFitItem(Item))
 						{
-							MasterClientID = dosm.Sender;
-							lastSenderTime = DateTime.UtcNow;
+							return;
+						}
+						if (Item != null && message.AttachData.APDetails != null)
+						{
+							Item.SetAttachPoint(message.AttachData.APDetails);
+						}
+						if (Item != null && Item.AttachPointType != 0 && Item is MachineryPart
+							{
+								AttachPointType: AttachPointType.MachineryPartSlot
+							} part)
+						{
+							(newParent as SpaceObjectVessel).FitMachineryPart(part.AttachPointID, part);
 						}
 					}
 					else
 					{
-						MasterClientID = dosm.Sender;
+						await removeFromOldParent;
+						LocalPosition = message.AttachData.LocalPosition.ToVector3D();
+						LocalRotation = message.AttachData.LocalPosition.ToQuaternionD();
+					}
+				}
+				else if (message.AttachData.ParentType is SpaceObjectType.PlayerPivot or SpaceObjectType.CorpsePivot or SpaceObjectType.DynamicObjectPivot)
+				{
+					ArtificialBody refObject = GetParent<ArtificialBody>(oldParent);
+					if (refObject is SpaceObjectVessel vessel)
+					{
+						refObject = vessel.MainVessel;
+					}
+					newParent = new Pivot(this, refObject);
+					await removeFromOldParent;
+					LocalPosition = message.AttachData.LocalPosition.ToVector3D();
+					LocalRotation = message.AttachData.LocalPosition.ToQuaternionD();
+					pivotPositionCorrection = Vector3D.Zero;
+					pivotVelocityCorrection = Vector3D.Zero;
+					foreach (Player pl in Server.Instance.AllPlayers)
+					{
+						if (pl.IsSubscribedTo(GetParent<ArtificialBody>(oldParent).Guid))
+						{
+							pl.SubscribeTo(newParent);
+						}
+					}
+				}
+				else if (message.AttachData.ParentType == SpaceObjectType.DynamicObject)
+				{
+					newParent = Server.Instance.GetObject(message.AttachData.ParentGUID) as DynamicObject;
+					ItemSlot slot = null;
+					if ((newParent as DynamicObject).Item.Slots != null && (newParent as DynamicObject).Item.Slots.TryGetValue(message.AttachData.ItemSlotID, out slot) && slot != null && slot.CanFitItem(Item))
+					{
+						PickedUp();
+						await removeFromOldParent;
+						slot.FitItem(Item);
+					}
+				}
+				else if (message.AttachData.ParentType != SpaceObjectType.Corpse)
+				{
+				}
+				if (Parent != newParent)
+				{
+					Parent = newParent;
+				}
+				changeListener = true;
+			}
+			if (changeListener)
+			{
+				LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
+				if (Parent is SpaceObjectVessel)
+				{
+					Player senderPl = Server.Instance.GetPlayer(message.Sender);
+					if (senderPl != null && Parent == senderPl.Parent)
+					{
+						MasterClientID = message.Sender;
 						lastSenderTime = DateTime.UtcNow;
 					}
 				}
+				else
+				{
+					MasterClientID = message.Sender;
+					lastSenderTime = DateTime.UtcNow;
+				}
 			}
 		}
-		catch (Exception ex)
-		{
-			Debug.Exception(ex);
-		}
-		if (!StatsChanged && dosm.AttachData == null)
+
+		if (!StatsChanged && message.AttachData == null)
 		{
 			return;
 		}
 		if (StatsChanged && Item != null)
 		{
-			dosm.Info.Stats = Item.StatsNew;
+			message.Info.Stats = Item.StatsNew;
 		}
 		else
 		{
-			dosm.Info.Stats = null;
+			message.Info.Stats = null;
 		}
-		if (dosm.AttachData != null)
+		if (message.AttachData != null)
 		{
-			float[] tmpVel = dosm.AttachData.Velocity;
-			float[] tmpTorque = dosm.AttachData.Torque;
-			float[] tmpThrowForce = dosm.AttachData.ThrowForce;
-			dosm.AttachData = GetCurrAttachData();
-			dosm.AttachData.Velocity = tmpVel;
-			dosm.AttachData.Torque = tmpTorque;
-			dosm.AttachData.ThrowForce = tmpThrowForce;
+			float[] tmpVel = message.AttachData.Velocity;
+			float[] tmpTorque = message.AttachData.Torque;
+			float[] tmpThrowForce = message.AttachData.ThrowForce;
+			message.AttachData = GetCurrAttachData();
+			message.AttachData.Velocity = tmpVel;
+			message.AttachData.Torque = tmpTorque;
+			message.AttachData.ThrowForce = tmpThrowForce;
 		}
 		List<SpaceObject> parents = Parent.GetParents(includeMe: true);
 		if (oldParent != null)
 		{
 			parents.AddRange(oldParent.GetParents(includeMe: true));
 		}
-		NetworkController.SendToClientsSubscribedTo(dosm, -1L, parents.ToArray());
+		await NetworkController.SendToClientsSubscribedTo(message, -1L, parents.ToArray());
 		if (DynamicObjects.Count > 0)
 		{
 			DynamicObjectsInfoMessage doim = new DynamicObjectsInfoMessage();
@@ -515,7 +520,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 				{
 					doim.Infos.Add(new DynamicObjectInfo
 					{
-						GUID = child.GUID,
+						GUID = child.Guid,
 						Stats = child.StatsNew
 					});
 					child.StatsChanged = false;
@@ -523,7 +528,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			}
 			if (doim.Infos.Count > 0)
 			{
-				NetworkController.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
+				await NetworkController.SendToClientsSubscribedTo(doim, -1L, parents.ToArray());
 			}
 		}
 		StatsChanged = false;
@@ -532,7 +537,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	public DynamicObjectAttachData GetCurrAttachData()
 	{
 		DynamicObjectAttachData dynamicObjectAttachData = new DynamicObjectAttachData();
-		dynamicObjectAttachData.ParentGUID = Parent is Player ? (Parent as Player).FakeGuid : Parent.GUID;
+		dynamicObjectAttachData.ParentGUID = Parent is Player ? (Parent as Player).FakeGuid : Parent.Guid;
 		dynamicObjectAttachData.ParentType = Parent.ObjectType;
 		dynamicObjectAttachData.IsAttached = IsAttached;
 		dynamicObjectAttachData.ItemSlotID = (short)(Item != null ? Item.ItemSlotID : 0);
@@ -546,11 +551,11 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		return dynamicObjectAttachData;
 	}
 
-	public DynamicObectMovementMessage GetDynamicObectMovementMessage()
+	public DynamicObjectMovementMessage GetDynamicObectMovementMessage()
 	{
-		return new DynamicObectMovementMessage
+		return new DynamicObjectMovementMessage
 		{
-			GUID = GUID,
+			GUID = Guid,
 			LocalPosition = LocalPosition.ToFloatArray(),
 			LocalRotation = LocalRotation.ToFloatArray(),
 			Velocity = velocity.ToFloatArray(),
@@ -564,7 +569,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		return playerGuid != MasterClientID && MasterClientID != 0;
 	}
 
-	public void DestroyDynamicObject()
+	public async Task DestroyDynamicObject()
 	{
 		if (Item != null)
 		{
@@ -575,12 +580,12 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			{
 				foreach (ItemSlot slot in Item.Slots.Values.Where((ItemSlot m) => m.Item != null))
 				{
-					slot.Item.DestroyItem();
+					await slot.Item.DestroyItem();
 				}
 			}
 		}
 		DisconnectFromNetworkController();
-		base.Destroy();
+		await base.Destroy();
 	}
 
 	public override SpawnObjectResponseData GetSpawnResponseData(Player pl)
@@ -593,7 +598,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		}
 		return new SpawnDynamicObjectResponseData
 		{
-			GUID = GUID,
+			GUID = Guid,
 			Details = det
 		};
 	}
@@ -616,7 +621,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	{
 		return new DynamicObjectDetails
 		{
-			GUID = GUID,
+			GUID = Guid,
 			ItemID = ItemID,
 			LocalPosition = LocalPosition.ToFloatArray(),
 			LocalRotation = LocalRotation.ToFloatArray(),
@@ -628,15 +633,15 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		};
 	}
 
-	public override void Destroy()
+	public override async Task Destroy()
 	{
-		DestroyDynamicObject();
-		base.Destroy();
+		await DestroyDynamicObject();
+		await base.Destroy();
 	}
 
 	public void FillPersistenceData(PersistenceObjectDataDynamicObject data)
 	{
-		data.GUID = GUID;
+		data.GUID = Guid;
 		data.ItemID = ItemID;
 		data.LocalPosition = LocalPosition.ToFloatArray();
 		data.LocalRotation = LocalRotation.ToFloatArray();
@@ -665,54 +670,49 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		return data;
 	}
 
-	public void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		PersistenceObjectDataDynamicObject data = persistenceData as PersistenceObjectDataDynamicObject;
+		ItemID = data.ItemID;
+		LocalPosition = data.LocalPosition.ToVector3D();
+		LocalRotation = data.LocalRotation.ToQuaternionD();
+		pickedUp = false;
+		RespawnTime = -1f;
+		SpawnMaxHealth = -1f;
+		SpawnMinHealth = -1f;
+		SpawnWearMultiplier = 1f;
+		if (data.RespawnTime.HasValue)
 		{
-			PersistenceObjectDataDynamicObject data = persistenceData as PersistenceObjectDataDynamicObject;
-			ItemID = data.ItemID;
-			LocalPosition = data.LocalPosition.ToVector3D();
-			LocalRotation = data.LocalRotation.ToQuaternionD();
-			pickedUp = false;
-			RespawnTime = -1f;
-			SpawnMaxHealth = -1f;
-			SpawnMinHealth = -1f;
-			SpawnWearMultiplier = 1f;
-			if (data.RespawnTime.HasValue)
-			{
-				RespawnTime = data.RespawnTime.Value;
-			}
-			if (data.MaxHealth.HasValue)
-			{
-				SpawnMaxHealth = data.MaxHealth.Value;
-			}
-			if (data.MinHealth.HasValue)
-			{
-				SpawnMinHealth = data.MinHealth.Value;
-			}
-			if (data.WearMultiplier.HasValue)
-			{
-				SpawnWearMultiplier = data.WearMultiplier.Value;
-			}
+			RespawnTime = data.RespawnTime.Value;
 		}
-		catch (Exception e)
+		if (data.MaxHealth.HasValue)
 		{
-			Debug.Exception(e);
+			SpawnMaxHealth = data.MaxHealth.Value;
 		}
+		if (data.MinHealth.HasValue)
+		{
+			SpawnMinHealth = data.MinHealth.Value;
+		}
+		if (data.WearMultiplier.HasValue)
+		{
+			SpawnWearMultiplier = data.WearMultiplier.Value;
+		}
+
+		return Task.CompletedTask;
 	}
 
-	public static bool SpawnDynamicObject(ItemType itemType, GenericItemSubType subType, MachineryPartType mpType, SpaceObject parent, int apId = -1, Vector3D? position = null, Vector3D? forward = null, Vector3D? up = null, int tier = 1, InventorySlot inventorySlot = null, ItemSlot itemSlot = null, bool refill = false)
+	public static async Task<bool> SpawnDynamicObject(ItemType itemType, GenericItemSubType subType, MachineryPartType mpType, SpaceObject parent, int apId = -1, Vector3D? position = null, Vector3D? forward = null, Vector3D? up = null, int tier = 1, InventorySlot inventorySlot = null, ItemSlot itemSlot = null, bool refill = false)
 	{
 		DynamicObjectData dod = null;
-		dod = itemType == ItemType.GenericItem ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is GenericItemData data && data.SubType == subType).First()) : itemType != ItemType.MachineryPart ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType).First()) : ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData != null && m.DefaultAuxData is MachineryPartData data && data.PartType == mpType).First());
+		dod = itemType == ItemType.GenericItem ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData is GenericItemData data && data.SubType == subType).First()) : itemType != ItemType.MachineryPart ? ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType).First()) : ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList.Values.Where((DynamicObjectData m) => m.ItemType == itemType && m.DefaultAuxData is MachineryPartData data && data.PartType == mpType).First());
 		if (dod == null)
 		{
 			return false;
 		}
-		return SpawnDynamicObject(dod, parent, apId, position, forward, up, tier, inventorySlot, itemSlot, refill);
+		return await SpawnDynamicObject(dod, parent, apId, position, forward, up, tier, inventorySlot, itemSlot, refill);
 	}
 
-	public static bool SpawnDynamicObject(DynamicObjectData data, SpaceObject parent, int apId = -1, Vector3D? position = null, Vector3D? forward = null, Vector3D? up = null, int tier = 1, InventorySlot inventorySlot = null, ItemSlot itemSlot = null, bool refill = false)
+	public static async Task<bool> SpawnDynamicObject(DynamicObjectData data, SpaceObject parent, int apId = -1, Vector3D? position = null, Vector3D? forward = null, Vector3D? up = null, int tier = 1, InventorySlot inventorySlot = null, ItemSlot itemSlot = null, bool refill = false)
 	{
 		DynamicObjectSceneData sceneData = new DynamicObjectSceneData
 		{
@@ -727,7 +727,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			sceneData.AuxData.Tier = tier;
 		}
-		DynamicObject dobj = new DynamicObject(sceneData, parent, -1L, ignoreSpawnSettings: true);
+		DynamicObject dobj = await CreateDynamicObjectAsync(sceneData, parent, -1L, ignoreSpawnSettings: true);
 		if (dobj.Item == null)
 		{
 			return true;
@@ -749,7 +749,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		{
 			if (inventorySlot.Item == null)
 			{
-				inventorySlot.Inventory.AddItemToInventory(dobj.Item, inventorySlot.SlotID);
+				await inventorySlot.Inventory.AddItemToInventory(dobj.Item, inventorySlot.SlotID);
 			}
 			else if (parent is Pivot pivot)
 			{
@@ -770,26 +770,26 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 				if (enumerator2.MoveNext())
 				{
 					CargoResourceData r = enumerator2.Current;
-					cargo.ChangeQuantityBy(ccd.ID, r.ResourceType, ccd.Capacity);
+					await cargo.ChangeQuantityByAsync(ccd.ID, r.ResourceType, ccd.Capacity);
 				}
 			}
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
-		NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
-		dobj.SendStatsToClient();
+		await NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent, dobj.Parent.Parent);
+		await dobj.SendStatsToClient();
 		return true;
 	}
 
-	public DynamicObject GetCopy()
+	public async Task<DynamicObject> GetCopy()
 	{
-		return new DynamicObject(new DynamicObjectSceneData
+		return await CreateDynamicObjectAsync(new DynamicObjectSceneData
 		{
 			ItemID = ItemID,
 			Position = Vector3D.Zero.ToFloatArray(),
 			Forward = Vector3D.Forward.ToFloatArray(),
 			Up = Vector3D.Up.ToFloatArray(),
 			AuxData = StaticData.DynamicObjectsDataList[ItemID].DefaultAuxData
-		}, this, -1L);
+		}, this, -1L);;
 	}
 }

@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenHellion;
+using OpenHellion.IO;
 using ZeroGravity;
 using ZeroGravity.Network;
 
@@ -23,7 +25,7 @@ public static class Program
 		Server.MainLoopEnded.WaitOne(10000);
 	}
 
-	private static void Main(string[] args)
+	private static async Task<int> Main(string[] args)
 	{
 		// Exit handlers.
 		AppDomain.CurrentDomain.ProcessExit += new EventHandler(ProcessExit);
@@ -38,12 +40,12 @@ public static class Program
 
 		Debug.Log("Starting server with args:", string.Join(" ", args));
 
-		bool shutdown = false;
 		for (int i = 0; i < args.Length; i++)
 		{
 			if (args[i].ToLower() == "-shutdown")
 			{
-				shutdown = true;
+				await ShutdownServerInstance();
+				return 0;
 			}
 			else if (args[i].ToLower() == "-scan")
 			{
@@ -57,35 +59,21 @@ public static class Program
 			}
 		}
 
-		if (shutdown)
-		{
-			ShutdownServerInstance();
-			return;
-		}
-
 		if (!File.Exists(Server.ConfigDir + "GameServer.ini"))
 		{
-			Debug.Info("GameServer.ini not found in folder " + Server.ConfigDir);
-			return;
+			Debug.LogInfo("GameServer.ini not found in folder " + Server.ConfigDir);
+			return -1;
 		}
 
 		CheckIniFields();
 
 		AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionHandler;
-		try
-		{
-			// Start the server.
-			Server server = new Server();
-			HiResTime.Start();
-			server.MainLoop();
-			HiResTime.Stop();
-		}
-		catch (Exception ex)
-		{
-			HiResTime.Stop();
-			Debug.UnformattedMessage("******************** MAIN EXCEPTION ********************");
-			Debug.Exception(ex);
-		}
+		// Start the server.
+		Server server = new Server();
+		HiResTime.Start();
+		await server.MainLoop();
+		HiResTime.Stop();
+		return 0;
 	}
 
 	private static void CheckIniFields()
@@ -96,7 +84,7 @@ public static class Program
 		}
 		catch
 		{
-			Debug.Error("Invalid 'game_port' field.");
+			Debug.LogError("Invalid 'game_port' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -105,7 +93,7 @@ public static class Program
 		}
 		catch
 		{
-			Debug.Error("Invalid 'status_port' field.");
+			Debug.LogError("Invalid 'status_port' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -114,7 +102,7 @@ public static class Program
 		}
 		catch
 		{
-			Debug.Error("Invalid 'auth_key' field.");
+			Debug.LogError("Invalid 'auth_key' field.");
 			Environment.Exit(0);
 		}
 		try
@@ -123,7 +111,7 @@ public static class Program
 		}
 		catch
 		{
-			Debug.Error("Invalid 'http_key' field.");
+			Debug.LogError("Invalid 'http_key' field.");
 			Environment.Exit(0);
 		}
 	}
@@ -193,20 +181,16 @@ public static class Program
 	{
 		try
 		{
-			Debug.Exception((Exception)args.ExceptionObject);
+			Debug.LogException((Exception)args.ExceptionObject);
 		}
 		catch
 		{
 			File.WriteAllText(Server.ConfigDir + "unhandled_exception.txt", ((Exception)args.ExceptionObject).Message + ", " + ((Exception)args.ExceptionObject).StackTrace);
 		}
-		finally
-		{
-			Environment.Exit(1);
-		}
 	}
 
 	// Sends a request to the status listener that we should shutdown.
-	private static void ShutdownServerInstance()
+	private static async Task ShutdownServerInstance()
 	{
 		int StatusPort = Server.Properties.GetProperty<int>("status_port");
 		if (StatusPort <= 0)
@@ -243,7 +227,7 @@ public static class Program
 			ns.ReadTimeout = 1000;
 			ns.WriteTimeout = 1000;
 			ServerShutDownMessage msg = new ServerShutDownMessage();
-			byte[] buffer = Serializer.Package(msg);
+			byte[] buffer = await ProtoSerialiser.Pack(msg);
 			ns.Write(buffer, 0, buffer.Length);
 			ns.Flush();
 			ns.Close();

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -9,7 +10,7 @@ internal class LogItem : Item
 {
 	private int logId;
 
-	private LogItemStats lis;
+	private LogItemStats itemStats = new();
 
 	public int LogID
 	{
@@ -20,24 +21,30 @@ internal class LogItem : Item
 		set
 		{
 			logId = value;
-			lis.LogID = value;
+			itemStats.LogID = value;
 		}
 	}
 
-	public override DynamicObjectStats StatsNew => lis;
+	public override DynamicObjectStats StatsNew => itemStats;
 
-	public LogItem(DynamicObjectAuxData data)
+	private LogItem()
 	{
-		lis = new LogItemStats();
+	}
+
+	public static async Task<LogItem> CreateAsync(DynamicObjectAuxData data)
+	{
+		LogItem item = new();
 		if (data != null)
 		{
-			SetData(data);
+			await item.SetData(data);
 		}
+
+		return item;
 	}
 
-	public override void SetData(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		base.SetData(data);
+		await base.SetData(data);
 		LogItemData i = data as LogItemData;
 		int tmpInt = i.logID;
 		if (tmpInt == -1)
@@ -47,9 +54,9 @@ internal class LogItem : Item
 		LogID = tmpInt;
 	}
 
-	public override bool ChangeStats(DynamicObjectStats stats)
+	public override Task<bool> ChangeStats(DynamicObjectStats stats)
 	{
-		return false;
+		return Task.FromResult(false);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -62,23 +69,16 @@ internal class LogItem : Item
 		return data;
 	}
 
-	public override void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public override async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		await base.LoadPersistenceData(persistenceData);
+		if (persistenceData is not PersistenceObjectDataLogItem data)
 		{
-			base.LoadPersistenceData(persistenceData);
-			if (persistenceData is not PersistenceObjectDataLogItem data)
-			{
-				Debug.Warning("PersistenceObjectDataLogItem data is null", base.GUID);
-			}
-			else
-			{
-				SetData(data.LogItemData);
-			}
+			Debug.LogWarning("PersistenceObjectDataLogItem data is null", GUID);
 		}
-		catch (Exception e)
+		else
 		{
-			Debug.Exception(e);
+			await SetData(data.LogItemData);
 		}
 	}
 }

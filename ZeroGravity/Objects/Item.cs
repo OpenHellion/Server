@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
@@ -86,7 +87,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 	}
 
-	public long GUID => DynamicObj.GUID;
+	public long GUID => DynamicObj.Guid;
 
 	public DynamicObject DynamicObj { get; private set; }
 
@@ -204,7 +205,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 	}
 
-	public abstract bool ChangeStats(DynamicObjectStats stats);
+	public abstract Task<bool> ChangeStats(DynamicObjectStats stats);
 
 	public virtual void SetInventorySlot(InventorySlot slot)
 	{
@@ -245,7 +246,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		else if (DynamicObj.Parent is SpaceObjectVessel)
 		{
-			AttachPointID = new VesselObjectID(DynamicObj.Parent.GUID, data.InSceneID);
+			AttachPointID = new VesselObjectID(DynamicObj.Parent.Guid, data.InSceneID);
 			AttachPointType apType = AttachPointType.None;
 			(DynamicObj.Parent as SpaceObjectVessel).AttachPointsTypes.TryGetValue(AttachPointID, out apType);
 			AttachPointType = apType;
@@ -260,9 +261,9 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 	}
 
-	internal Item GetCopy()
+	internal async Task<Item> GetCopy()
 	{
-		return DynamicObj.GetCopy().Item;
+		return (await DynamicObj.GetCopy()).Item;
 	}
 
 	private void AutoTransferResources()
@@ -287,48 +288,48 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 	}
 
-	public static Item Create(DynamicObject dobj, ItemType type, DynamicObjectAuxData data)
+	public static async Task<Item> Create(DynamicObject dobj, ItemType type, DynamicObjectAuxData data)
 	{
 		Item it = null;
 		if (ItemTypeRange.IsHelmet(type))
 		{
-			it = new Helmet(data);
+			it = await Helmet.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsJetpack(type))
 		{
-			it = new Jetpack(data);
+			it = await Jetpack.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsWeapon(type))
 		{
-			it = new Weapon(data);
+			it = await Weapon.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsOutfit(type))
 		{
-			it = new Outfit(data);
+			it = await Outfit.CreateOutfitAsync(data);
 		}
 		else if (ItemTypeRange.IsAmmo(type))
 		{
-			it = new Magazine(data);
+			it = await Magazine.CreateMagazineAsync(data);
 		}
 		else if (ItemTypeRange.IsMachineryPart(type))
 		{
-			it = new MachineryPart(data);
+			it = await MachineryPart.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsBattery(type))
 		{
-			it = new Battery(data);
+			it = await Battery.CreateBatteryAsync(data);
 		}
 		else if (ItemTypeRange.IsCanister(type))
 		{
-			it = new Canister(data);
+			it = await Canister.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsDrill(type))
 		{
-			it = new HandDrill(data);
+			it = await HandDrill.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsMelee(type))
 		{
-			it = new MeleeWeapon(data);
+			it = await MeleeWeapon.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsGlowStick(type))
 		{
@@ -336,7 +337,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		else if (ItemTypeRange.IsMedpack(type))
 		{
-			it = new Medpack(data);
+			it = await Medpack.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsHackingTool(type))
 		{
@@ -344,27 +345,27 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 		else if (ItemTypeRange.IsAsteroidScanningTool(type))
 		{
-			it = new HandheldAsteroidScanner(data);
+			it = await HandheldAsteroidScanner.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsLogItem(type))
 		{
-			it = new LogItem(data);
+			it = await LogItem.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsGenericItem(type))
 		{
-			it = new GenericItem(data);
+			it = await GenericItem.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsGrenade(type))
 		{
-			it = new Grenade(data);
+			it = await Grenade.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsPortableTurret(type))
 		{
-			it = new PortableTurret(data);
+			it = await PortableTurret.CreateAsync(data);
 		}
 		else if (ItemTypeRange.IsRepairTool(type))
 		{
-			it = new RepairTool(data);
+			it = await RepairTool.CreateAsync(data);
 		}
 		if (it != null)
 		{
@@ -375,11 +376,11 @@ public abstract class Item : IPersistantObject, IDamageable
 				data = ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList[it.DynamicObj.ItemID].DefaultAuxData);
 				if (data != null)
 				{
-					it.SetData(data);
+					await it.SetData(data);
 				}
 			}
 			List<ItemSlotData> slots = data.Slots;
-			if (slots != null && slots.Count > 0)
+			if (slots is { Count: > 0 })
 			{
 				foreach (ItemSlotData isd in data.Slots)
 				{
@@ -388,7 +389,7 @@ public abstract class Item : IPersistantObject, IDamageable
 						isl.Parent = dobj;
 						if (isd.SpawnItem.Type != 0 || isd.SpawnItem.SubType != 0 || isd.SpawnItem.PartType != 0)
 						{
-							DynamicObject.SpawnDynamicObject(isd.SpawnItem.Type, isd.SpawnItem.SubType, isd.SpawnItem.PartType, it.DynamicObj, -1, null, null, null, itemSlot: isl, tier: isd.SpawnItem.Tier);
+							await DynamicObject.SpawnDynamicObject(isd.SpawnItem.Type, isd.SpawnItem.SubType, isd.SpawnItem.PartType, it.DynamicObj, -1, null, null, null, itemSlot: isl, tier: isd.SpawnItem.Tier);
 						}
 					}
 				}
@@ -397,7 +398,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		return it;
 	}
 
-	public virtual void SetData(DynamicObjectAuxData data)
+	public virtual Task SetData(DynamicObjectAuxData data)
 	{
 		Tier = data.Tier;
 		TierMultipliers = data.TierMultipliers;
@@ -416,14 +417,17 @@ public abstract class Item : IPersistantObject, IDamageable
 		{
 			Slots = data.Slots.ToDictionary((ItemSlotData k) => k.ID, (ItemSlotData v) => new ItemSlot(v));
 		}
+
+		return Task.CompletedTask;
 	}
 
 	protected virtual void ChangeEquip(Inventory.EquipType equipType)
 	{
 	}
 
-	public virtual void SendAllStats()
+	public virtual Task SendAllStats()
 	{
+		return null;
 	}
 
 	public void FillPersistenceData(PersistenceObjectDataItem data)
@@ -455,71 +459,57 @@ public abstract class Item : IPersistantObject, IDamageable
 		return data;
 	}
 
-	public virtual void DestroyItem()
+	public virtual async Task DestroyItem()
 	{
-		DynamicObj.DestroyDynamicObject();
+		await DynamicObj.DestroyDynamicObject();
 	}
 
-	public virtual void LoadPersistenceData(PersistenceObjectData persistenceData)
+	public virtual async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
-		try
+		PersistenceObjectDataItem data = persistenceData as PersistenceObjectDataItem;
+		await DynamicObj.LoadPersistenceData(data);
+		Health = data.Health;
+		Armor = data.Armor;
+		AttachPointDetails apd = null;
+		if (data.AttachPointID is > 0)
 		{
-			PersistenceObjectDataItem data = persistenceData as PersistenceObjectDataItem;
-			DynamicObj.LoadPersistenceData(data);
-			Health = data.Health;
-			Armor = data.Armor;
-			AttachPointDetails apd = null;
-			if (data.AttachPointID.HasValue && data.AttachPointID.Value > 0)
+			apd = new AttachPointDetails
 			{
-				apd = new AttachPointDetails
-				{
-					InSceneID = data.AttachPointID.Value
-				};
-				try
-				{
-					SetAttachPoint(apd);
-				}
-				catch
-				{
-				}
+				InSceneID = data.AttachPointID.Value
+			};
+			try
+			{
+				SetAttachPoint(apd);
 			}
-			DynamicObj.APDetails = apd;
-			if (DynamicObj.Parent is DynamicObject parentDynObj && parentDynObj.Item != null)
+			catch
 			{
-				if (data.SlotID.HasValue && parentDynObj.Item is Outfit outfit && outfit.InventorySlots.TryGetValue(data.SlotID.Value, out var inventorySlot))
-				{
-					SetInventorySlot(inventorySlot);
-				}
-			}
-			if (DynamicObj.Parent is Player player && data.SlotID.HasValue)
-			{
-				try
-				{
-					player.PlayerInventory.AddItemToInventory(this, data.SlotID.Value);
-				}
-				catch (Exception ex)
-				{
-					Debug.Exception(ex);
-				}
-			}
-			if (DynamicObj.Parent is DynamicObject dynamicObject && data.ItemSlotID.HasValue && dynamicObject.Item.Slots != null && dynamicObject.Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
-			{
-				slot.Item = this;
-				ItemSlotID = slot.ID;
 			}
 		}
-		catch (Exception e)
+		DynamicObj.APDetails = apd;
+		if (DynamicObj.Parent is DynamicObject { Item: not null } parentDynObj)
 		{
-			Debug.Exception(e);
+			if (data.SlotID.HasValue && parentDynObj.Item is Outfit outfit && outfit.InventorySlots.TryGetValue(data.SlotID.Value, out var inventorySlot))
+			{
+				SetInventorySlot(inventorySlot);
+			}
+		}
+		if (DynamicObj.Parent is Player player && data.SlotID.HasValue)
+		{
+			await player.PlayerInventory.AddItemToInventory(this, data.SlotID.Value);
+		}
+		if (DynamicObj.Parent is DynamicObject dynamicObject && data.ItemSlotID.HasValue && dynamicObject.Item.Slots != null && dynamicObject.Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
+		{
+			slot.Item = this;
+			ItemSlotID = slot.ID;
 		}
 	}
 
-	public virtual void TakeDamage(TypeOfDamage type, float damage, bool forceTakeDamage = false)
+	public virtual async Task TakeDamage(TypeOfDamage type, float damage, bool forceTakeDamage = false)
 	{
-		TakeDamage(new Dictionary<TypeOfDamage, float> { { type, damage } }, forceTakeDamage);
+		await TakeDamage(new Dictionary<TypeOfDamage, float> { { type, damage } }, forceTakeDamage);
 	}
 
-	public virtual void TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false)
+	public virtual async Task TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false)
 	{
 		if (!forceTakeDamage && !Damageable)
 		{
@@ -538,7 +528,7 @@ public abstract class Item : IPersistantObject, IDamageable
 				StatsNew.Health = Health;
 				StatsNew.Damages = damages;
 			}
-			DynamicObj.SendStatsToClient();
+			await DynamicObj.SendStatsToClient();
 		}
 	}
 
@@ -579,7 +569,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		if (ingredientsData != null)
 		{
 			KeyValuePair<int, ItemIngredientsTierData>? kv = ingredientsData.IngredientsTiers.OrderBy((KeyValuePair<int, ItemIngredientsTierData> m) => m.Key).Reverse().FirstOrDefault((KeyValuePair<int, ItemIngredientsTierData> m) => m.Key <= tier);
-			if (kv.HasValue && kv.Value.Value.Recycle != null && kv.Value.Value.Recycle.Count > 0)
+			if (kv.HasValue && kv.Value.Value.Recycle is { Count: > 0 })
 			{
 				return kv.Value.Value.Recycle;
 			}
@@ -611,7 +601,7 @@ public abstract class Item : IPersistantObject, IDamageable
 		if (ingredientsData != null)
 		{
 			KeyValuePair<int, ItemIngredientsTierData>? kv = ingredientsData.IngredientsTiers.OrderBy((KeyValuePair<int, ItemIngredientsTierData> m) => m.Key).Reverse().FirstOrDefault((KeyValuePair<int, ItemIngredientsTierData> m) => m.Key <= tier);
-			if (kv.HasValue && kv.Value.Value.Craft != null && kv.Value.Value.Craft.Count > 0)
+			if (kv.HasValue && kv.Value.Value.Craft is { Count: > 0 })
 			{
 				return kv.Value.Value.Craft;
 			}

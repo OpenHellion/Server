@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -18,7 +19,7 @@ public class GeneratorSolar : Generator
 	{
 	}
 
-	public override void Update(double duration)
+	public override async Task Update(double duration)
 	{
 		if (ParentVessel.IsExposedToSunlight)
 		{
@@ -28,7 +29,7 @@ public class GeneratorSolar : Generator
 		{
 			secondaryPowerOutputFactor = 0f;
 		}
-		base.Update(duration);
+		await base.Update(duration);
 	}
 
 	public override void SetAuxData(SystemAuxData auxData)

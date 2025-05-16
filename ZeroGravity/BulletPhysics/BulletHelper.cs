@@ -19,7 +19,7 @@ public static class BulletHelper
 
 	public static void AffineTransformation(float scaling, ref Quaternion rotation, ref Vector3 translation, out BulletSharp.Math.Matrix result)
 	{
-		result = Scaling(scaling) * BulletSharp.Math.Matrix.RotationQuaternion(rotation) * BulletSharp.Math.Matrix.Translation(translation);
+		result = Scaling(scaling) * Matrix.RotationQuaternion(rotation) * Matrix.Translation(translation);
 	}
 
 	public static BulletSharp.Math.Matrix AffineTransformation(float scaling, Quaternion rotation, Vector3 translation)
@@ -36,7 +36,7 @@ public static class BulletHelper
 
 	public static void Scaling(float scale, out BulletSharp.Math.Matrix result)
 	{
-		result = BulletSharp.Math.Matrix.Identity;
+		result = Matrix.Identity;
 		result.M11 = result.M22 = result.M33 = scale;
 	}
 

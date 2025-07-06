@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -41,11 +42,11 @@ public static class SpawnManager
 
 	public static List<SpawnRule> timedSpawnRules = new List<SpawnRule>();
 
-	public static Dictionary<long, Tuple<SpawnRule, SpawnRuleScene, int>> SpawnedVessels = new Dictionary<long, Tuple<SpawnRule, SpawnRuleScene, int>>();
+	public static ConcurrentDictionary<long, Tuple<SpawnRule, SpawnRuleScene, int>> SpawnedVessels = new();
 
-	public static Dictionary<long, Tuple<SpawnRule, SpawnRuleLoot>> SpawnedDynamicObjects = new Dictionary<long, Tuple<SpawnRule, SpawnRuleLoot>>();
+	public static ConcurrentDictionary<long, Tuple<SpawnRule, SpawnRuleLoot>> SpawnedDynamicObjects = new();
 
-	private static Dictionary<ItemType, Dictionary<int, short>> itemTypeItemID = new Dictionary<ItemType, Dictionary<int, short>>();
+	private static readonly ConcurrentDictionary<ItemType, Dictionary<int, short>> itemTypeItemID = new();
 
 	private static void LoadData()
 	{
@@ -86,15 +87,11 @@ public static class SpawnManager
 
 	private static void AddItemTypeItemID(ItemType itemType, int itemSubType, short itemID)
 	{
-		if (itemTypeItemID == null)
-		{
-			itemTypeItemID = new Dictionary<ItemType, Dictionary<int, short>>();
-		}
 		if ((itemType != ItemType.GenericItem && itemType != ItemType.MachineryPart) || itemSubType != 0)
 		{
 			if (!itemTypeItemID.ContainsKey(itemType))
 			{
-				itemTypeItemID.Add(itemType, new Dictionary<int, short>());
+				itemTypeItemID.TryAdd(itemType, []);
 			}
 			if (!itemTypeItemID[itemType].ContainsKey(itemSubType))
 			{
@@ -384,7 +381,7 @@ public static class SpawnManager
 		if (!rule.IsOneTimeSpawnRule)
 		{
 			dobj.IsPartOfSpawnSystem = true;
-			SpawnedDynamicObjects.Add(dobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(rule, loot));
+			SpawnedDynamicObjects.TryAdd(dobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(rule, loot));
 		}
 		SpawnObjectsResponse res = new SpawnObjectsResponse();
 		res.Data.Add(dobj.GetSpawnResponseData(null));
@@ -667,7 +664,7 @@ public static class SpawnManager
 						if (Server.Instance.GetObject(p_dobj) is DynamicObject tmpDobj && tmpSr.AddDynamicObjectToRule(tmpDobj, tmpSr.LootPool[i]))
 						{
 							tmpDobj.IsPartOfSpawnSystem = true;
-							SpawnedDynamicObjects.Add(tmpDobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(tmpSr, tmpSr.LootPool[i]));
+							SpawnedDynamicObjects.TryAdd(tmpDobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(tmpSr, tmpSr.LootPool[i]));
 						}
 					}
 				}
@@ -731,7 +728,7 @@ public static class SpawnManager
 					}
 				}
 			}
-			SpawnedDynamicObjects.Remove(dobj2.Guid);
+			SpawnedDynamicObjects.TryRemove(dobj2.Guid, out _);
 		}
 		else
 		{
@@ -763,7 +760,7 @@ public static class SpawnManager
 			{
 				sr.RemoveSpaceObjectVessel(ves, SpawnedVessels[ves.Guid].Item2, SpawnedVessels[ves.Guid].Item3);
 			}
-			SpawnedVessels.Remove(ves.Guid);
+			SpawnedVessels.Remove(ves.Guid, out _);
 		}
 	}
 

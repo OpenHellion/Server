@@ -116,7 +116,7 @@ public class SolarSystem
 
 	public async Task SendMovementMessage()
 	{
-		Player[] players = Server.Instance.AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive).ToArray();
+		Player[] players = [.. Server.Instance.AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive)];
 		if (players.Length < 1)
 		{
 			return;
@@ -202,9 +202,9 @@ public class SolarSystem
 				bodyTransform.RotationVec = artificialBody.Rotation.ToFloatArray();
 			}
 
-			bodyTransform.CharactersMovement = new List<CharacterMovementMessage>();
-			bodyTransform.DynamicObjectsMovement = new List<DynamicObjectMovementMessage>();
-			bodyTransform.CorpsesMovement = new List<CorpseMovementMessage>();
+			bodyTransform.CharactersMovement = [];
+			bodyTransform.DynamicObjectsMovement = [];
+			bodyTransform.CorpsesMovement = [];
 
 			if (artificialBody is SpaceObjectVessel vessel)
 			{
@@ -317,7 +317,7 @@ public class SolarSystem
 
 		player.LastMovementMessageSolarSystemTime = CurrentTime;
 		player.UpdateArtificialBodyMovement.Clear();
-		await NetworkController.Send(player.Guid, movementMessage);
+		await NetworkController.SendAsync(player.Guid, movementMessage);
 	}
 
 	public void InitializeData()

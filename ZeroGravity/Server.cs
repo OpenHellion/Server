@@ -244,7 +244,7 @@ public class Server
 		{
 			foreach (GameScenes.SceneId scene in Enum.GetValues(typeof(GameScenes.SceneId)))
 			{
-				if (scene.ToString().ToLower().StartsWith(text.ToLower()))
+				if (scene.ToString().StartsWith(text, StringComparison.CurrentCultureIgnoreCase))
 				{
 					return scene;
 				}
@@ -842,7 +842,7 @@ public class Server
 
 	private async void LatencyTestListener(NetworkData data)
 	{
-		await NetworkController.Send(data.Sender, data);
+		await NetworkController.SendAsync(data.Sender, data);
 	}
 
 	private async Task Start()
@@ -1129,13 +1129,13 @@ public class Server
 				{
 					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
 					{
-						await NetworkController.Send(pl.Guid, message);
+						await NetworkController.SendAsync(pl.Guid, message);
 					}
 				}
 				return;
 			}
 		}
-		await NetworkController.SendToAll(message, message.Sender);
+		await NetworkController.SendToAllAsync(message, message.Sender);
 	}
 
 	private async Task ProcessConsoleCommand(string cmd, Player player)
@@ -1215,18 +1215,20 @@ public class Server
 				Vector3D spawnItemPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
 				if (parts[1].ToLower() == "corpse")
 				{
-					Corpse corpse = new Corpse(player);
-					corpse.LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
+					Corpse corpse = new Corpse(player)
+					{
+						LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward
+					};
 					await NetworkController.SendToClientsSubscribedTo(new SpawnObjectsResponse
 					{
-						Data = new List<SpawnObjectResponseData>
-						{
+						Data =
+						[
 							new SpawnCorpseResponseData
 							{
 								GUID = corpse.Guid,
 								Details = corpse.GetDetails()
 							}
-						}
+						]
 					}, -1L, player.Parent);
 					return;
 				}
@@ -1235,8 +1237,7 @@ public class Server
 				{
 					tier = 1;
 				}
-				List<InventorySlot> inventorySlots = new List<InventorySlot>();
-				inventorySlots.Add(player.PlayerInventory.OutfitSlot);
+				List<InventorySlot> inventorySlots = [player.PlayerInventory.OutfitSlot];
 				if (player.PlayerInventory.CurrOutfit != null)
 				{
 					inventorySlots.AddRange(player.PlayerInventory.CurrOutfit.InventorySlots.Values.Where((InventorySlot m) => m.SlotType == InventorySlot.Type.Equip));
@@ -1271,7 +1272,7 @@ public class Server
 				}
 				foreach (ItemType v in Enum.GetValues(typeof(ItemType)))
 				{
-					if (v.ToString().ToLower().Contains(parts[1]))
+					if (v.ToString().Contains(parts[1], StringComparison.CurrentCultureIgnoreCase))
 					{
 						InventorySlot slot4 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(v));
 						await DynamicObject.SpawnDynamicObject(v, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot4, refill: true);
@@ -1280,7 +1281,7 @@ public class Server
 				}
 				foreach (GenericItemSubType v4 in Enum.GetValues(typeof(GenericItemSubType)))
 				{
-					if (v4.ToString().ToLower().Contains(parts[1]))
+					if (v4.ToString().Contains(parts[1], StringComparison.CurrentCultureIgnoreCase))
 					{
 						InventorySlot slot5 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.GenericItem));
 						await DynamicObject.SpawnDynamicObject(ItemType.GenericItem, v4, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot5, refill: true);
@@ -1289,7 +1290,7 @@ public class Server
 				}
 				foreach (MachineryPartType v5 in Enum.GetValues(typeof(MachineryPartType)))
 				{
-					if (v5.ToString().ToLower().Contains(parts[1]))
+					if (v5.ToString().Contains(parts[1], StringComparison.CurrentCultureIgnoreCase))
 					{
 						InventorySlot slot6 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.MachineryPart));
 						await DynamicObject.SpawnDynamicObject(ItemType.MachineryPart, GenericItemSubType.None, v5, parent, -1, spawnItemPosition, null, null, tier, slot6, refill: true);
@@ -1299,7 +1300,7 @@ public class Server
 				{
 					foreach (GameScenes.SceneId v6 in Enum.GetValues(typeof(GameScenes.SceneId)))
 					{
-						if (v6.ToString().ToLower().Contains(parts[1]))
+						if (v6.ToString().Contains(parts[1], StringComparison.CurrentCultureIgnoreCase))
 						{
 							string tag = parts.Length == 3 ? parts[2] : "";
 							if (GameScenes.Ranges.IsShip(v6))
@@ -1317,7 +1318,7 @@ public class Server
 							}
 							if (GameScenes.Ranges.IsAsteroid(v6))
 							{
-								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid }, null, offset * 10.0, null, null, tag, checkPosition: false);
+								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, [parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid], null, offset * 10.0, null, null, tag, checkPosition: false);
 								asteroid.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
 							}
 							else
@@ -1345,7 +1346,7 @@ public class Server
 				double velocity = 50.0;
 				double radius2 = 10.0;
 				Vector3D offset3 = parent is not SpaceObjectVessel vessel ? player.LocalRotation * Vector3D.Forward * distance : QuaternionD.LookRotation(vessel.Forward, vessel.Up) * player.LocalRotation * Vector3D.Forward * distance;
-				Ship ship3 = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_CorridorModule, "", -1L, new List<long> { parent.Guid }, null, offset3, null, null, checkPosition: false);
+				Ship ship3 = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_CorridorModule, "", -1L, [parent.Guid], null, offset3, null, null, checkPosition: false);
 				Vector3D thrust2 = -offset3.Normalized * velocity;
 				Vector3D offset4 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * radius2 * 2.0;
 				ship3.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
@@ -1430,7 +1431,7 @@ public class Server
 					CelestialBodyData cbd = StaticData.SolarSystem.CelestialBodies.FirstOrDefault((CelestialBodyData m) => m.Name.ToLower() == parts[1].ToLower());
 					if (cbd == null)
 					{
-						cbd = StaticData.SolarSystem.CelestialBodies.FirstOrDefault((CelestialBodyData m) => m.Name.ToLower().Contains(parts[1].ToLower()));
+						cbd = StaticData.SolarSystem.CelestialBodies.FirstOrDefault((CelestialBodyData m) => m.Name.Contains(parts[1], StringComparison.CurrentCultureIgnoreCase));
 						if (cbd == null)
 						{
 							return;
@@ -1477,7 +1478,7 @@ public class Server
 				{
 					msg = msg + (msg == "" ? "" : "\r\n") + kv.Key + ": " + kv.Value;
 				}
-				await NetworkController.Send(player.Guid, new ConsoleMessage
+				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
 				{
 					Text = msg
 				});
@@ -1510,7 +1511,7 @@ public class Server
 				{
 					player.Stats.GodMode = parts[1] != "0";
 				}
-				await NetworkController.Send(player.Guid, new ConsoleMessage
+				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
 				{
 					Text = "God mode: " + (player.Stats.GodMode ? "ON" : "OFF")
 				});
@@ -1528,7 +1529,7 @@ public class Server
 				{
 					SpaceObjectVessel v2 = (from m in SolarSystem.GetArtificialBodies()
 						where m is SpaceObjectVessel
-						select m as SpaceObjectVessel).FirstOrDefault((SpaceObjectVessel m) => m.FullName.Replace(' ', '_').ToLower().Contains(parts[1].ToLower()));
+						select m as SpaceObjectVessel).FirstOrDefault((SpaceObjectVessel m) => m.FullName.Replace(' ', '_').Contains(parts[1], StringComparison.CurrentCultureIgnoreCase));
 					if (v2 != null)
 					{
 						target = v2.MainVessel;
@@ -1606,7 +1607,7 @@ public class Server
 					if (!found)
 					{
 						vessel.MarkForDestruction = true;
-						SpawnManager.SpawnedVessels.Remove(vessel.Guid);
+						SpawnManager.SpawnedVessels.TryRemove(vessel.Guid, out _);
 					}
 				}
 				return;
@@ -1625,7 +1626,7 @@ public class Server
 				foreach (Player pl in _players.Values)
 				{
 					pl.Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
-					await NetworkController.Send(pl.Guid, new UpdateBlueprintsMessage
+					await NetworkController.SendAsync(pl.Guid, new UpdateBlueprintsMessage
 					{
 						Blueprints = pl.Blueprints
 					});
@@ -1665,7 +1666,7 @@ public class Server
 					}
 					msg2 = "Near " + pivot.Orbit.Parent.CelestialBody;
 				}
-				await NetworkController.Send(player.Guid, new ConsoleMessage
+				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
 				{
 					Text = msg2
 				});
@@ -1676,8 +1677,7 @@ public class Server
 				{
 					return;
 				}
-				List<SpaceObjectVessel> list = new List<SpaceObjectVessel>();
-				list.Add(vessel.MainVessel);
+				List<SpaceObjectVessel> list = [vessel.MainVessel];
 				{
 					foreach (SpaceObjectVessel vessel2 in list.Concat(vessel.MainVessel.AllDockedVessels))
 					{
@@ -1767,7 +1767,7 @@ public class Server
 			if (pl == null)
 			{
 				Debug.LogError("Player spawn request error, player is null", request.Sender);
-				return null;
+				return new PlayerSpawnResponse() { Status = NetworkData.MessageStatus.Failure };
 			}
 
 			pl.MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
@@ -1916,7 +1916,7 @@ public class Server
 		catch (Exception ex)
 		{
 			Debug.LogException(ex);
-			return null;
+			return new PlayerSpawnResponse() { Status = NetworkData.MessageStatus.Failure };
 		}
 	}
 
@@ -1943,7 +1943,7 @@ public class Server
 			}
 		}
 
-		await NetworkController.Send(request.Sender, response);
+		await NetworkController.SendAsync(request.Sender, response);
 	}
 
 	private async Task UpdateDynamicObjectsRespawnTimers(double deltaTime)
@@ -2016,7 +2016,7 @@ public class Server
 
 		if (!VesselsDataUpdate.IsEmpty)
 		{
-			await NetworkController.SendToAll(new UpdateVesselDataMessage
+			await NetworkController.SendToAllAsync(new UpdateVesselDataMessage
 			{
 				VesselsDataUpdate = VesselsDataUpdate.Values.ToList()
 			});
@@ -2378,7 +2378,7 @@ public class Server
 			if (so != null)
 			{
 				player.SubscribeTo(so);
-				await NetworkController.Send(message.Sender, so.GetInitializeMessage());
+				await NetworkController.SendAsync(message.Sender, so.GetInitializeMessage());
 				if (so is ArtificialBody)
 				{
 					player.UpdateArtificialBodyMovement.Add(so.Guid);
@@ -2503,7 +2503,7 @@ public class Server
 			}
 		}
 
-		await NetworkController.Send(req.Sender, res);
+		await NetworkController.SendAsync(req.Sender, res);
 	}
 
 	public Task<NetworkData> AvailableSpawnPointsRequestListener(NetworkData data)
@@ -2660,7 +2660,7 @@ public class Server
 		{
 			if ((RestartTime - currentTime).TotalSeconds >= _timeToRestart - 2.0)
 			{
-				await NetworkController.SendToAll(SendSystemMessage(SystemMessagesTypes.RestartServerTime, null), -1L);
+				await NetworkController.SendToAllAsync(SendSystemMessage(SystemMessagesTypes.RestartServerTime, null), -1L);
 			}
 			if (_timeToRestart == 1800.0)
 			{

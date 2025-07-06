@@ -157,7 +157,7 @@ public class ManeuverCourse
 			{
 				await parentShip.FTL.GoOffLine(autoRestart: false);
 			}
-			await NetworkController.SendToAll(new ManeuverCourseResponse
+			await NetworkController.SendToAllAsync(new ManeuverCourseResponse
 			{
 				IsValid = false,
 				IsFinished = true,

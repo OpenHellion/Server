@@ -10,6 +10,7 @@ using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
 using ZeroGravity.Spawn;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace ZeroGravity.Objects;
 
@@ -415,12 +416,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			return;
 		}
 		bool sendShipStatsMsg = false;
-		ShipStatsMessage retMsg = new ShipStatsMessage();
-		retMsg.GUID = Guid;
-		retMsg.Temperature = Temperature;
-		retMsg.Health = Health;
-		retMsg.Armor = Armor;
-		retMsg.VesselObjects = new VesselObjects();
+		ShipStatsMessage retMsg = new ShipStatsMessage
+		{
+			GUID = Guid,
+			Temperature = Temperature,
+			Health = Health,
+			Armor = Armor,
+			VesselObjects = new VesselObjects()
+		};
 		Player pl = Server.Instance.GetPlayer(message.Sender);
 		bool requestEngine = EngineOnLine;
 		bool requestRCS = message.Thrust != null || message.Rotation != null || message.AutoStabilize != null || (message.TargetStabilizationGUID.HasValue && message.Thrust == null);
@@ -591,13 +594,19 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (message.VesselObjects.SceneTriggerExecutors != null)
 		{
-			List<SceneTriggerExecutorDetails> SceneTriggerExecutorsChanged = new List<SceneTriggerExecutorDetails>();
-			foreach (SceneTriggerExecutorDetails stDetails2 in message.VesselObjects.SceneTriggerExecutors)
+			List<SceneTriggerExecutorDetails> SceneTriggerExecutorsChanged = [];
+			foreach (SceneTriggerExecutorDetails executorDetails in message.VesselObjects.SceneTriggerExecutors)
 			{
-				SceneTriggerExecutor ste = SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == stDetails2.InSceneID);
-				if (ste != null && stDetails2 != null)
+				if (executorDetails == null) return;
+
+				SceneTriggerExecutor executor = SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == executorDetails.InSceneID);
+				if (executor != null)
 				{
-					SceneTriggerExecutorsChanged.Add(ste.ChangeState(message.Sender, stDetails2));
+					SceneTriggerExecutorsChanged.Add(executor.ChangeState(message.Sender, executorDetails));
+				}
+				else
+				{
+					Debug.LogWarningFormat("Could not find scene trigger executor requested by client in state. Id: {0}.", executorDetails.InSceneID);
 				}
 			}
 			if (SceneTriggerExecutorsChanged.Count > 0)
@@ -1766,14 +1775,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			response.Time = (float)(RespawnTimeForShip - timePassedSinceRequest);
 			foreach (Player p3 in MainVessel.VesselCrew)
 			{
-				await NetworkController.Send(p3.Guid, response);
+				await NetworkController.SendAsync(p3.Guid, response);
 			}
 			{
 				foreach (Ship shp3 in MainVessel.AllDockedVessels.Cast<Ship>())
 				{
 					foreach (Player pl3 in shp3.VesselCrew)
 					{
-						await NetworkController.Send(pl3.Guid, response);
+						await NetworkController.SendAsync(pl3.Guid, response);
 					}
 				}
 				return;
@@ -1790,14 +1799,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
 			foreach (Player p2 in MainVessel.VesselCrew)
 			{
-				await NetworkController.Send(p2.Guid, response);
+				await NetworkController.SendAsync(p2.Guid, response);
 			}
 			{
 				foreach (Ship shp2 in MainVessel.AllDockedVessels.Cast<Ship>())
 				{
 					foreach (Player pl2 in shp2.VesselCrew)
 					{
-						await NetworkController.Send(pl2.Guid, response);
+						await NetworkController.SendAsync(pl2.Guid, response);
 					}
 				}
 				return;
@@ -1806,13 +1815,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		response.Message = RescueShipMessages.AnotherShipInRange;
 		foreach (Player p in MainVessel.VesselCrew)
 		{
-			await NetworkController.Send(p.Guid, response);
+			await NetworkController.SendAsync(p.Guid, response);
 		}
 		foreach (Ship shp in MainVessel.AllDockedVessels.Cast<Ship>())
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				await NetworkController.Send(pl.Guid, response);
+				await NetworkController.SendAsync(pl.Guid, response);
 			}
 		}
 	}
@@ -1846,13 +1855,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		vrr.Message = RescueShipMessages.ShipArrived;
 		foreach (Player p in MainVessel.VesselCrew)
 		{
-			await NetworkController.Send(p.Guid, vrr);
+			await NetworkController.SendAsync(p.Guid, vrr);
 		}
 		foreach (Ship shp in MainVessel.AllDockedVessels.Cast<Ship>())
 		{
 			foreach (Player pl in shp.VesselCrew)
 			{
-				await NetworkController.Send(pl.Guid, vrr);
+				await NetworkController.SendAsync(pl.Guid, vrr);
 			}
 		}
 	}
@@ -2016,7 +2025,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				if (craftingResources is { Count: > 0 })
 				{
 					pl.Blueprints.Add(cit);
-					await NetworkController.Send(pl.Guid, new UpdateBlueprintsMessage
+					await NetworkController.SendAsync(pl.Guid, new UpdateBlueprintsMessage
 					{
 						Blueprints = pl.Blueprints
 					});

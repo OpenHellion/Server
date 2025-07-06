@@ -83,7 +83,7 @@ public abstract class SpaceObject
 
 		if (this is SpaceObjectVessel)
 		{
-			await NetworkController.SendToAll(message);
+			await NetworkController.SendToAllAsync(message);
 		}
 		else
 		{

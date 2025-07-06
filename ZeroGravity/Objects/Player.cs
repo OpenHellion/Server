@@ -143,7 +143,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			return _playerReady;
 		}
-		set
+		private set
 		{
 			if (_playerReady = value)
 			{
@@ -390,7 +390,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				PlayerStatsMessage psm = new PlayerStatsMessage();
 				psm.Health = (int)Stats.HealthPoints;
 				psm.GUID = FakeGuid;
-				await NetworkController.Send(Guid, psm);
+				await NetworkController.SendAsync(Guid, psm);
 			}
 		}
 		else
@@ -406,7 +406,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		sending.ShotData = psm.ShotData;
 		sending.HitGUID = psm.HitGUID;
 		sending.GUID = psm.GUID;
-		await NetworkController.SendToAll(sending, psm.Sender);
+		await NetworkController.SendToAllAsync(sending, psm.Sender);
 	}
 
 	protected async void PlayerShootingListener(NetworkData data)
@@ -522,8 +522,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				}
 			}
 		}
-		await NetworkController.Send(Guid, res);
-		await NetworkController.SendCharacterSpawnToOtherPlayers(this);
+		await NetworkController.SendAsync(Guid, res);
+		await NetworkController.SendCharacterSpawnToOtherPlayersAsync(this);
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		foreach (SpaceObjectVessel ves in from m in _subscribedToSpaceObjects
 			select Server.Instance.GetObject(m) into m
@@ -538,7 +538,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					sted.IsImmediate = true;
 				}
 			}
-			await NetworkController.Send(Guid, new ShipStatsMessage
+			await NetworkController.SendAsync(Guid, new ShipStatsMessage
 			{
 				GUID = ves.Guid,
 				VesselObjects = vesselObjects
@@ -572,7 +572,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				where m.AuthorizedPersonel.FirstOrDefault((AuthorizedPerson n) => n.PlayerId == PlayerId) != null
 				select m.Guid).ToArray()
 		};
-		await NetworkController.Send(Guid, avr);
+		await NetworkController.SendAsync(Guid, avr);
 	}
 
 	private async void QuestTriggerMessageListener(NetworkData data)
@@ -624,7 +624,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 						}
 					}
 					tasks.Add(
-						NetworkController.Send(message.Sender, new QuestStatsMessage
+						NetworkController.SendAsync(message.Sender, new QuestStatsMessage
 						{
 							QuestDetails = aaq.GetDetails()
 						}
@@ -632,7 +632,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				}
 			}
 		}
-		await NetworkController.Send(message.Sender, new QuestStatsMessage
+		await NetworkController.SendAsync(message.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
@@ -672,12 +672,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					await aaqt.UpdateDependentTriggers(aaq);
 				}
 			}
-			tasks.Add(NetworkController.Send(message.Sender, new QuestStatsMessage
+			tasks.Add(NetworkController.SendAsync(message.Sender, new QuestStatsMessage
 				{
 					QuestDetails = aaq.GetDetails()
 				}));
 		}
-		await NetworkController.Send(message.Sender, new QuestStatsMessage
+		await NetworkController.SendAsync(message.Sender, new QuestStatsMessage
 		{
 			QuestDetails = quest.GetDetails()
 		});
@@ -701,7 +701,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				LockedToTriggerID = message.TriggerID;
 				IsPilotingVessel = message.IsPilotingVessel;
-				await NetworkController.Send(message.Sender, message);
+				await NetworkController.SendAsync(message.Sender, message);
 			}
 		}
 	}
@@ -1346,7 +1346,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		isOutsideRoom = false;
 		if (NetworkController.IsPlayerConnected(Guid))
 		{
-			await NetworkController.Send(Guid, new KillPlayerMessage
+			await NetworkController.SendAsync(Guid, new KillPlayerMessage
 			{
 				GUID = FakeGuid,
 				CauseOfDeath = causeOfDeath,

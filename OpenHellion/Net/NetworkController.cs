@@ -26,7 +26,7 @@ public static class NetworkController
 		EventSystem.AddListener<LogOutRequest>(LogOutRequestListener);
 	}
 
-	public static async Task SendCharacterSpawnToOtherPlayers(Player spawnedPlayer)
+	public static async Task SendCharacterSpawnToOtherPlayersAsync(Player spawnedPlayer)
 	{
 		if (!IsPlayerConnected(spawnedPlayer.Guid))
 		{
@@ -38,7 +38,7 @@ public static class NetworkController
 		{
 			if (player != null && player != spawnedPlayer && player.IsAlive && player.EnvironmentReady && player.IsSubscribedTo(spawnedPlayer, checkParent: true))
 			{
-				await Send(player.Guid, res);
+				await SendAsync(player.Guid, res).ConfigureAwait(false);
 			}
 		}
 	}
@@ -190,7 +190,7 @@ public static class NetworkController
 
 	private static async void LogOutRequestListener(NetworkData data)
 	{
-		await _transport.PrioritySendInternal(data.Sender, new LogOutResponse
+		await _transport.PrioritySendAsyncInternal(data.Sender, new LogOutResponse
 		{
 			Sender = 0L,
 			Status = NetworkData.MessageStatus.Success,
@@ -217,9 +217,9 @@ public static class NetworkController
 	/// </summary>
 	/// <param name="guid">Guid of client.</param>
 	/// <param name="data">Data to send.</param>
-	public static async Task Send(long guid, NetworkData data)
+	public static Task SendAsync(long guid, NetworkData data)
 	{
-		await _transport.SendInternal(guid, data);
+		return _transport.SendAsyncInternal(guid, data);
 	}
 
 	/// <summary>
@@ -236,9 +236,11 @@ public static class NetworkController
 	/// 	Send a message to all clients.<br />
 	/// 	You can choose to skip one player.
 	/// </summary>
-	public static async Task SendToAll(NetworkData data, long skipPlayerGuid = -1L)
+	/// <param name="data">The data to send.</param>
+	/// <param name="skipPlayerGuid">Guid of a player to skip.</param>
+	public static Task SendToAllAsync(NetworkData data, long skipPlayerGuid = -1L)
 	{
-		await _transport.SendToAllInternal(data, skipPlayerGuid);
+		return _transport.SendToAllAsyncInternal(data, skipPlayerGuid);
 	}
 
 	/// <summary>
@@ -257,7 +259,7 @@ public static class NetworkController
 			{
 				if (spaceObjects.Any((SpaceObject m) => m != null && player.IsSubscribedTo(m, checkParent: false)))
 				{
-					await Send(player.Guid, data);
+					await SendAsync(player.Guid, data).ConfigureAwait(false);
 				}
 			}
 			else if (!player.EnvironmentReady && data is ShipStatsMessage message && player.IsSubscribedTo(message.GUID))

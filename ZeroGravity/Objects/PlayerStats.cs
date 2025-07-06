@@ -171,7 +171,7 @@ public class PlayerStats
 		{
 			psm.GUID = pl.FakeGuid;
 			psm.Health = (int)HealthPoints;
-			await NetworkController.Send(pl.Guid, psm);
+			await NetworkController.SendAsync(pl.Guid, psm);
 			psm = new PlayerStatsMessage();
 			acummulatedDamage = 0f;
 		}
@@ -188,7 +188,7 @@ public class PlayerStats
 				GUID = pl.FakeGuid,
 				Health = (int)HealthPoints
 			};
-			await NetworkController.Send(pl.Guid, psm);
+			await NetworkController.SendAsync(pl.Guid, psm);
 		}
 	}
 

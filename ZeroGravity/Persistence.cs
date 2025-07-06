@@ -162,7 +162,8 @@ public class Persistence
 			filename = string.Format(PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 		}
 
-		JsonSerialiser.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), JsonSerialiser.Formatting.None);
+		// TODO: FIX
+		// JsonSerialiser.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), JsonSerialiser.Formatting.None);
 		Debug.Log("Saved world...");
 	}
 

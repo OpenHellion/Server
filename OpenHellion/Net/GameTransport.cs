@@ -19,6 +19,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -93,38 +94,50 @@ internal sealed class GameTransport
 	internal async Task AcceptConnections(CancellationToken token)
 	{
 		Debug.Log("Started looking for connections.");
-		while (!token.IsCancellationRequested)
+		while (true)
 		{
+			token.ThrowIfCancellationRequested();
+			await Task.Delay(5, token);
 			try
 			{
-				Socket handler = await _server.AcceptAsync(token).ConfigureAwait(false);
+				Socket handler = await _server.AcceptAsync(token);
 				if (_connections.Count >= _maxConnections())
 				{
 					Debug.LogWarning("Maximum number of players exceeded.");
 					return;
 				}
 
-				Debug.LogFormat("Received connection from {0}", handler.RemoteEndPoint.ToString());
+				Debug.LogFormat("Received connection from {0}.", handler.RemoteEndPoint.ToString());
 
-				var stream = new NetworkStream(handler);
+				var stream = new NetworkStream(handler, true);
 				long guid = await _onConnected(stream, _connections.Keys.ToArray());
 
 				// TODO: There may be a chance someone could get -1 as guid.
 				if (guid is -1)
 				{
-					Debug.LogWarning("Got connection with guid of -1");
-					await handler.DisconnectAsync(false, CancellationToken.None);
-					await stream.DisposeAsync();
-					handler.Dispose();
+					Debug.LogWarning("Got connection with guid of -1.");
+					try
+					{
+						handler.Shutdown(SocketShutdown.Both);
+					}
+					finally
+					{
+						stream.Close();
+					}
 					return;
 				}
 
 				if (_connections.ContainsKey(guid))
 				{
 					Debug.LogWarning("Got connection with guid already logged in.");
-					await handler.DisconnectAsync(false, CancellationToken.None);
-					await stream.DisposeAsync();
-					handler.Dispose();
+					try
+					{
+						handler.Shutdown(SocketShutdown.Both);
+					}
+					finally
+					{
+						stream.Close();
+					}
 					return;
 				}
 
@@ -133,7 +146,7 @@ internal sealed class GameTransport
 				{
 					socket = handler,
 					stream = stream,
-					cancellationToken = cancelToken,
+					cancellationToken = cancelToken
 				};
 
 				new Thread(() => ListenerThread(guid, connection))
@@ -148,10 +161,6 @@ internal sealed class GameTransport
 			{
 				break;
 			}
-			catch (ObjectDisposedException)
-			{
-				break;
-			}
 		}
 
 		Debug.Log("Stopped looking for connections.");
@@ -161,46 +170,48 @@ internal sealed class GameTransport
 	{
 		Debug.Log("Started network listener for client", guid);
 
-		while (!data.cancellationToken.IsCancellationRequested)
+		while (true)
 		{
+			await Task.Delay(1);
 			try
 			{
 				if (data.stream.DataAvailable)
 				{
-					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream).ConfigureAwait(false);
-					networkData.Sender = guid;
-					Debug.LogFormat("Received data from client: {0}. Message type: {1}.", guid, networkData.GetType());
+					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream);
+					if (networkData != null)
+					{
+						networkData.Sender = guid;
+#if DEBUG
+						if (networkData.GetType() != typeof(CharacterMovementMessage))
+							Debug.LogFormat("Received data from client: {0}. Message type: {1}.", guid, networkData.GetType());
+#endif
 
-					if (networkData.SyncRequest)
-					{
-						NetworkData res = await EventSystem.InvokeSyncRequest(networkData);
-						res.ConversationGuid = networkData.ConversationGuid;
-						res.SyncResponse = true;
-						await SendInternal(guid, res).ConfigureAwait(false);
-					}
-					else if (networkData.SyncResponse)
-					{
-						data.syncResponseReceivedEvent(networkData);
-					}
-					else if (DateTime.Now <= networkData.ExpirationUtc) // If message hasn't expired
-					{
-						EventSystem.Invoke(networkData);
+						if (networkData.SyncRequest)
+						{
+							NetworkData res = await EventSystem.InvokeSyncRequest(networkData);
+							res.ConversationGuid = networkData.ConversationGuid;
+							res.SyncResponse = true;
+							await SendAsyncInternal(guid, res).ConfigureAwait(false);
+						}
+						else if (networkData.SyncResponse)
+						{
+							data.syncResponseReceivedEvent(networkData);
+						}
+						else if (DateTime.Now <= networkData.ExpirationUtc) // If message hasn't expired
+						{
+							EventSystem.Invoke(networkData);
+						}
 					}
 				}
 			}
-			catch (SocketException)
+			catch (IOException)
 			{
 				Debug.Log("Socket terminated, disconnecting client.");
 				DisconnectInternal(guid);
 				break;
 			}
-			catch (ProtoException)
+			catch (ObjectDisposedException)
 			{
-				Debug.LogWarning("Protobuf encountered an error when reading from stream.");
-			}
-			catch (TaskCanceledException)
-			{
-				Debug.Log("Socket task cancelled.");
 				break;
 			}
 		}
@@ -211,39 +222,25 @@ internal sealed class GameTransport
 	/// </summary>
 	/// <param name="guid">Guid of client to send to.</param>
 	/// <param name="data">The data to send.</param>
-	internal async Task SendInternal(long guid, NetworkData data)
+	internal async Task SendAsyncInternal(long guid, NetworkData data)
 	{
 		try
 		{
 			if (_connections.TryGetValue(guid, out var handler))
 			{
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
-				var packedData = await ProtoSerialiser.Pack(data).ConfigureAwait(false);
+				var packedData = await ProtoSerialiser.Pack(data);
 				await handler.stream.WriteAsync(packedData).ConfigureAwait(false);
-				Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
-			}
-			else
-			{
-				Debug.Log("Tried to send data to non-existent client, disconnecting client.");
-				DisconnectInternal(guid);
+#if DEBUG
+				if (data.GetType() != typeof(UpdateVesselDataMessage))
+					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
+#endif
 			}
 		}
 		catch (IOException)
 		{
 			Debug.Log("Socket terminated, disconnecting client.");
 			DisconnectInternal(guid);
-		}
-		catch (ProtoException)
-		{
-			Debug.LogWarning("Protobuf encountered an error when reading from stream.");
-		}
-		catch (ArgumentNullException)
-		{
-			Debug.LogErrorFormat("Serialized data buffer is null. Type: {0}. Data:\n{1}", data.GetType().ToString(), data);
-		}
-		catch (ObjectDisposedException)
-		{
-			// Ignored
 		}
 	}
 
@@ -260,7 +257,7 @@ internal sealed class GameTransport
 			{
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				data.SyncRequest = true;
-				var packedData = await ProtoSerialiser.Pack(data).ConfigureAwait(false);
+				var packedData = await ProtoSerialiser.Pack(data);
 
 				NetworkData response = null;
 				CancellationTokenSource responseCancel = new();
@@ -275,8 +272,10 @@ internal sealed class GameTransport
 				connectionData.syncResponseReceivedEvent += responseHandler;
 
 				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
-				Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
-
+#if DEBUG
+				if (data.GetType() != typeof(UpdateVesselDataMessage))
+					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
+#endif
 				await Task.Delay(TIMEOUT_MS, responseCancel.Token);
 				connectionData.syncResponseReceivedEvent -= responseHandler;
 
@@ -289,89 +288,69 @@ internal sealed class GameTransport
 					throw new TimeoutException("A response to a synchronous request was not received within the timeout window.");
 				}
 			}
-			else
-			{
-				Debug.Log("Tried to send data to non-existent client, disconnecting client.");
-				DisconnectInternal(guid);
-			}
 		}
 		catch (IOException)
 		{
 			Debug.Log("Socket terminated, disconnecting client.");
 			DisconnectInternal(guid);
-		}
-		catch (ProtoException)
-		{
-			Debug.LogWarning("Protobuf encountered an error when reading from stream.");
-		}
-		catch (ArgumentNullException)
-		{
-			Debug.LogErrorFormat("Serialized data buffer is null. Type: {0}. Data:\n{1}", data.GetType().ToString(), data);
 		}
 
 		return null;
 	}
 
 	// Request to send to all clients.
-	internal async Task SendToAllInternal(NetworkData data, long skipPlayerGuid = -1L)
+	internal async Task SendToAllAsyncInternal(NetworkData data, long skipPlayerGuid = -1L)
 	{
 		if (_connections.Count == 0) return;
-		try
-		{
-			data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
-			var packedData = await ProtoSerialiser.Pack(data).ConfigureAwait(false);
+		data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+		var packedData = await ProtoSerialiser.Pack(data);
 
-			await Parallel.ForEachAsync(_connections, async (connection, _) =>
+		await Parallel.ForEachAsync(_connections, async (connection, _) =>
+		{
+			try
 			{
-				try
-				{
-					if (connection.Key == skipPlayerGuid) return;
-					await connection.Value.stream.WriteAsync(packedData, _mainCancellationToken.Token).ConfigureAwait(false);
-				}
-				catch (IOException)
-				{
-					Debug.Log("Socket terminated, disconnecting client.");
-					DisconnectInternal(connection.Key);
-				}
-				catch (ProtoException)
-				{
-					Debug.LogWarning("Protobuf encountered an error when reading from stream.");
-				}
-			});
+				if (connection.Key == skipPlayerGuid) return;
+				await connection.Value.stream.WriteAsync(packedData, _mainCancellationToken.Token).ConfigureAwait(false);
+			}
+			catch (IOException)
+			{
+				Debug.Log("Socket terminated, disconnecting client.");
+				DisconnectInternal(connection.Key);
+			}
+		});
 
+#if DEBUG
+		if (data.GetType() != typeof(UpdateVesselDataMessage))
 			Debug.LogFormat("Sent of type {0} with size of {1} KB to all clients.", data.GetType(), (float)packedData.Length / 1000);
-		}
-		catch (ArgumentNullException)
-		{
-			Debug.LogErrorFormat("Serialized data buffer is null. Type: {0}. Data:\n{1}", data.GetType().ToString(), data);
-		}
+#endif
 	}
 
-	internal async Task PrioritySendInternal(long guid, NetworkData data)
+	internal async Task PrioritySendAsyncInternal(long guid, NetworkData data)
 	{
 		try
 		{
 			if (_connections.TryGetValue(guid, out var handler))
 			{
+
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
-				var packedData = await ProtoSerialiser.Pack(data).ConfigureAwait(false);
+				var packedData = await ProtoSerialiser.Pack(data);
 				await handler.stream.FlushAsync().ConfigureAwait(false);
 				await handler.stream.WriteAsync(packedData).ConfigureAwait(false);
-				Debug.LogErrorFormat("Serialized data buffer is null. Type: {0}. Data:\n{1}", data.GetType().ToString(), data);
+#if DEBUG
+				if (data.GetType() != typeof(UpdateVesselDataMessage))
+					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
+#endif
+			}
+			else
+			{
+				Debug.LogWarning("Priority send to disconnected client.");
 			}
 		}
 		catch (IOException)
 		{
 			Debug.Log("Socket terminated, disconnecting client.");
+			Debugger.Break();
 			DisconnectInternal(guid);
-		}
-		catch (ProtoException)
-		{
-			Debug.LogWarning("Protobuf encountered an error when reading from stream.");
-		}
-		catch (ArgumentNullException)
-		{
-			Debug.LogErrorFormat("Serialized data buffer is null. Type: {0}. Data:\n{1}", data.GetType().ToString(), data);
 		}
 	}
 
@@ -391,12 +370,17 @@ internal sealed class GameTransport
 		_onDisconnected(guid);
 		if (_connections.TryGetValue(guid, out ConnectionData connection))
 		{
+			try
+			{
+				connection.socket.Shutdown(SocketShutdown.Both);
+			}
+			finally
+			{
+				connection.stream.Close();
+			}
 			connection.cancellationToken.Cancel();
-			connection.stream.Close();
-			connection.socket.Close();
 			_connections.Remove(guid);
 		}
-		Debug.Log("Disconnected a client.");
 	}
 
 	// Disconnects all clients.

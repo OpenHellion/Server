@@ -255,7 +255,7 @@ public class SpawnRule
 						}
 						firstVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(firstVessel);
-						SpawnManager.SpawnedVessels.Add(firstVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
+						SpawnManager.SpawnedVessels.TryAdd(firstVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
 						await firstVessel.SetHealthAsync(MathHelper.RandomRange(firstVessel.MaxHealth * sc.HealthMin, firstVessel.MaxHealth * sc.HealthMax));
 						sc.Count--;
 						totalScenes.Min++;
@@ -281,7 +281,7 @@ public class SpawnRule
 						currVessel.StabilizeToTarget(firstVessel, forceStabilize: true);
 						currVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(currVessel);
-						SpawnManager.SpawnedVessels.Add(currVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
+						SpawnManager.SpawnedVessels.TryAdd(currVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, sc, nextClusterIndex));
 						await currVessel.SetHealthAsync(MathHelper.RandomRange(currVessel.MaxHealth * sc.HealthMin, currVessel.MaxHealth * sc.HealthMax));
 						sc.Count--;
 						totalScenes.Min++;
@@ -387,14 +387,14 @@ public class SpawnRule
 				mainVessel.IsPartOfSpawnSystem = true;
 				mainVessel.VesselData.SpawnRuleID = (GetHashCode() << 10) + count++;
 				SpawnedVessels.Add(mainVessel);
-				SpawnManager.SpawnedVessels.Add(mainVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
+				SpawnManager.SpawnedVessels.TryAdd(mainVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
 				foreach (SpaceObjectVessel vessel in mainVessel.AllDockedVessels)
 				{
 					vessel.IsPrefabStationVessel = true;
 					vessel.IsAlwaysVisible = IsVisibleOnRadar;
 					vessel.IsPartOfSpawnSystem = true;
 					SpawnedVessels.Add(vessel);
-					SpawnManager.SpawnedVessels.Add(vessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
+					SpawnManager.SpawnedVessels.TryAdd(vessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
 				}
 			}
 			await DistributeLoot(SpawnedVessels);

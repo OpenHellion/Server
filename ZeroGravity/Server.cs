@@ -1999,7 +1999,6 @@ public class Server
 
 	private async Task UpdateData(double deltaTime)
 	{
-		EventSystem.InvokeQueuedData();
 		SolarSystem.UpdateTime(deltaTime);
 		await SolarSystem.UpdatePositions();
 		PhysicsController.Update();

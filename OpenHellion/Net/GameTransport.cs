@@ -42,13 +42,15 @@ namespace OpenHellion.Net;
 /// </remarks>
 internal sealed class GameTransport
 {
-	private const int TIMEOUT_MS = 2000;
+	private const int TIMEOUT_MS = 4000;
+
+	private const int MAX_MESSAGE_SIZE = 16000000;
 
 	private readonly Dictionary<long, ConnectionData> _connections = new();
 
 	private Socket _server;
 
-	private readonly Func<NetworkStream, long[], Task<long>> _onConnected;
+	private readonly Func<NetworkStream, long[], int, Task<long>> _onConnected;
 
 	private readonly Action<long> _onDisconnected;
 
@@ -72,7 +74,7 @@ internal sealed class GameTransport
 		internal Action<NetworkData> syncResponseReceivedEvent;
 	}
 
-	internal GameTransport(Func<NetworkStream, long[], Task<long>> onConnected, Action<long> onDisconnected, Func<int> maxConnections)
+	internal GameTransport(Func<NetworkStream, long[], int, Task<long>> onConnected, Action<long> onDisconnected, Func<int> maxConnections)
 	{
 		_onConnected = onConnected;
 		_onDisconnected = onDisconnected;
@@ -110,7 +112,7 @@ internal sealed class GameTransport
 				Debug.LogFormat("Received connection from {0}.", handler.RemoteEndPoint.ToString());
 
 				var stream = new NetworkStream(handler, true);
-				long guid = await _onConnected(stream, _connections.Keys.ToArray());
+				long guid = await _onConnected(stream, _connections.Keys.ToArray(), MAX_MESSAGE_SIZE);
 
 				// TODO: There may be a chance someone could get -1 as guid.
 				if (guid is -1)
@@ -172,12 +174,11 @@ internal sealed class GameTransport
 
 		while (true)
 		{
-			await Task.Delay(1);
 			try
 			{
 				if (data.stream.DataAvailable)
 				{
-					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream);
+					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream, MAX_MESSAGE_SIZE, data.cancellationToken.Token);
 					if (networkData != null)
 					{
 						networkData.Sender = guid;
@@ -197,9 +198,13 @@ internal sealed class GameTransport
 						{
 							data.syncResponseReceivedEvent(networkData);
 						}
-						else if (DateTime.Now <= networkData.ExpirationUtc) // If message hasn't expired
+						else if (DateTime.UtcNow <= networkData.ExpirationUtc) // If message hasn't expired
 						{
 							EventSystem.Invoke(networkData);
+						}
+						else
+						{
+							Debug.LogWarningFormat("Received expired message from client {0}: {1}.", guid, networkData.GetType());
 						}
 					}
 				}
@@ -214,6 +219,10 @@ internal sealed class GameTransport
 			{
 				break;
 			}
+			catch (ArgumentException ex)
+			{
+				Debug.LogException(ex);
+			}
 		}
 	}
 
@@ -226,11 +235,11 @@ internal sealed class GameTransport
 	{
 		try
 		{
-			if (_connections.TryGetValue(guid, out var handler))
+			if (_connections.TryGetValue(guid, out var connectionData))
 			{
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				var packedData = await ProtoSerialiser.Pack(data);
-				await handler.stream.WriteAsync(packedData).ConfigureAwait(false);
+				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
 #if DEBUG
 				if (data.GetType() != typeof(UpdateVesselDataMessage))
 					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);

@@ -10,6 +10,8 @@ namespace OpenHellion.Net;
 
 public class StatusConnection
 {
+	private const int MAX_MESSAGE_SIZE = 100000;
+
 	private readonly Socket _socket;
 
 	private Thread _listeningThread;
@@ -37,7 +39,7 @@ public class StatusConnection
 	{
 		try
 		{
-			NetworkData data = await ProtoSerialiser.Unpack(new NetworkStream(_socket));
+			NetworkData data = await ProtoSerialiser.Unpack(new NetworkStream(_socket), MAX_MESSAGE_SIZE);
 			switch (data)
 			{
 				case null:

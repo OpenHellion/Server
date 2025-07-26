@@ -58,11 +58,11 @@ public static class NetworkController
 		}
 	}
 
-	private static async Task<long> OnClientConnected(NetworkStream stream, long[] otherConnections)
+	private static async Task<long> OnClientConnected(NetworkStream stream, long[] otherConnections, int maxMessageSize)
 	{
 		try
 		{
-			var loginData = await ProtoSerialiser.Unpack(stream) as LogInRequest;
+			var loginData = await ProtoSerialiser.Unpack(stream, maxMessageSize) as LogInRequest;
 			if (loginData is null)
 			{
 				Debug.LogError("Connected client did not send loginrequest on connect.", loginData.ToString());
@@ -70,7 +70,6 @@ public static class NetworkController
 			}
 
 			Debug.Log("Received login request for player with id", loginData.PlayerId);
-#if !DEBUG
 			if (loginData.ClientHash != Server.CombinedHash)
 			{
 				Debug.LogInfo("Client/server hash mismatch.", loginData.ClientHash, Server.CombinedHash);
@@ -84,6 +83,7 @@ public static class NetworkController
 				return -1;
 			}
 
+#if !DEBUG
 			// Also has the added benefit of blocking players from joining non-nakama servers.
 			if (loginData.ServerID != ServerId)
 			{

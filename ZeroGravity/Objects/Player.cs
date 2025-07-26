@@ -499,25 +499,25 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				vessel = vessel.DockedToMainVessel;
 			}
-			foreach (DynamicObject obj4 in vessel.DynamicObjects.Values)
+			foreach (DynamicObject dynamicObject in vessel.DynamicObjects.Values)
 			{
-				res.Data.Add(obj4.GetSpawnResponseData(this));
+				res.Data.Add(dynamicObject.GetSpawnResponseData(this));
 			}
-			foreach (Corpse obj3 in vessel.Corpses.Values)
+			foreach (Corpse corpse in vessel.Corpses.Values)
 			{
-				res.Data.Add(obj3.GetSpawnResponseData(this));
+				res.Data.Add(corpse.GetSpawnResponseData(this));
 			}
 			if (vessel.AllDockedVessels.Count > 0)
 			{
 				foreach (SpaceObjectVessel child in vessel.AllDockedVessels)
 				{
-					foreach (DynamicObject obj2 in child.DynamicObjects.Values)
+					foreach (DynamicObject childDynamicObject in child.DynamicObjects.Values)
 					{
-						res.Data.Add(obj2.GetSpawnResponseData(this));
+						res.Data.Add(childDynamicObject.GetSpawnResponseData(this));
 					}
-					foreach (Corpse obj in child.Corpses.Values)
+					foreach (Corpse childCorpse in child.Corpses.Values)
 					{
-						res.Data.Add(obj.GetSpawnResponseData(this));
+						res.Data.Add(childCorpse.GetSpawnResponseData(this));
 					}
 				}
 			}

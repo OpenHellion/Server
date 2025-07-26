@@ -1288,13 +1288,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		Vector3D shipVel = Vector3D.Zero;
 		Vector3D shipForward = Vector3D.Forward;
 		Vector3D shipUp = Vector3D.Up;
-		OrbitParameters orbit = null;
-		Ship newShip = new Ship(shipID < 0 ? GUIDFactory.NextVesselGUID() : shipID, initializeOrbit: false, shipPos, shipVel, shipForward, shipUp);
-		newShip.IsDebrisFragment = isDebrisFragment;
+		Ship newShip = new Ship(shipID < 0 ? GUIDFactory.NextVesselGUID() : shipID, initializeOrbit: false, shipPos, shipVel, shipForward, shipUp)
+		{
+			IsDebrisFragment = isDebrisFragment
+		};
 		await newShip.CreateShipData(registration, vesselTag, sceneID, loadDynamicObjects: true, health);
 		newShip.DistributionManager = new DistributionManager(newShip);
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(newShip);
-		Server.Instance.SolarSystem.GetSpawnPosition(SpaceObjectType.Ship, newShip.Radius, checkPosition, out shipPos, out shipVel, out shipForward, out shipUp, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out orbit);
+		Server.Instance.SolarSystem.GetSpawnPosition(SpaceObjectType.Ship, newShip.Radius, checkPosition, out shipPos, out shipVel, out shipForward, out shipUp, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out OrbitParameters orbit);
 		newShip.InitializeOrbit(shipPos, shipVel, shipForward, shipUp, orbit);
 		if (registration.IsNullOrEmpty())
 		{

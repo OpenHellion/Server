@@ -10,17 +10,8 @@ namespace OpenHellion.Net;
 public class EventSystem
 {
 
-	private static readonly List<Type> _invokeImmediatelyDataTypes = new List<Type>();
-
 	private static readonly ConcurrentDictionary<Type, Action<NetworkData>> _networkDataListeners = new ConcurrentDictionary<Type, Action<NetworkData>>();
 	private static readonly ConcurrentDictionary<Type, Func<NetworkData, Task<NetworkData>>> _syncRequestListeners = new();
-
-	private static readonly ConcurrentQueue<NetworkData> _networkBuffer = new ConcurrentQueue<NetworkData>();
-
-	public EventSystem()
-	{
-		_invokeImmediatelyDataTypes.Add(typeof(PlayerHitMessage));
-	}
 
 	/// <summary>
 	/// 	Add listener for custom events.
@@ -81,14 +72,7 @@ public class EventSystem
 	{
 		if (_networkDataListeners.ContainsKey(data.GetType()) && _networkDataListeners[data.GetType()] != null)
 		{
-			if (_invokeImmediatelyDataTypes.Contains(data.GetType()) || Environment.CurrentManagedThreadId == Server.MainThreadId)
-			{
-				_networkDataListeners[data.GetType()](data);
-			}
-			else
-			{
-				_networkBuffer.Enqueue(data);
-			}
+			_networkDataListeners[data.GetType()](data);
 		}
 		else
 		{
@@ -106,20 +90,6 @@ public class EventSystem
 		{
 			Debug.LogWarningFormat("Got sync request with type {0} with no registered listener.", data.GetType());
 			return null;
-		}
-	}
-
-	/// <summary>
-	/// 	Execute code for requests stored in queue.
-	/// </summary>
-	internal static void InvokeQueuedData()
-	{
-		while (_networkBuffer.Count > 0)
-		{
-			if (_networkBuffer.TryDequeue(out var data2) && _networkDataListeners.TryGetValue(data2.GetType(), out var networkDataDelegate))
-			{
-				networkDataDelegate(data2);
-			}
 		}
 	}
 }

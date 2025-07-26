@@ -75,6 +75,11 @@ public class SceneTriggerExecutor : IPersistantObject
 		}
 	}
 
+	/// <summary>
+	/// 	Populates the executor with states and sets the default state.
+	/// </summary>
+	/// <param name="states">A list of states to populate.</param>
+	/// <param name="defaultStateID">StateID of the default state.</param>
 	public void SetStates(List<SceneTriggerExecutorStateData> states, int defaultStateID)
 	{
 		foreach (SceneTriggerExecutorStateData st in states)
@@ -93,64 +98,73 @@ public class SceneTriggerExecutor : IPersistantObject
 		}
 	}
 
-	public SceneTriggerExecutorDetails ChangeState(long sender, SceneTriggerExecutorDetails details)
+	/// <summary>
+	/// 	Changes this executor's state if provided data is valid.
+	/// </summary>
+	/// <param name="sender">The GUID of the player that activated the trigger.</param>
+	/// <param name="data">Data to fill the new state.</param>
+	public SceneTriggerExecutorDetails ChangeState(long sender, SceneTriggerExecutorDetails data)
 	{
 		Player pl = null;
 		try
 		{
 			pl = Server.Instance.GetPlayer(sender);
-			details.PlayerThatActivated = pl.FakeGuid;
+			data.PlayerThatActivated = pl.FakeGuid;
 		}
 		catch
 		{
-			details.PlayerThatActivated = 0L;
+			data.PlayerThatActivated = 0L;
 		}
-		if (details.ProximityTriggerID.HasValue)
+
+		if (data.ProximityTriggerID.HasValue)
 		{
-			if (ProximityTriggers == null || !ProximityTriggers.ContainsKey(details.ProximityTriggerID.Value))
+			if (ProximityTriggers == null || !ProximityTriggers.TryGetValue(data.ProximityTriggerID.Value, out SceneTriggerProximity value))
 			{
-				details.IsFail = true;
-				return details;
+				data.IsFail = true;
+				Debug.LogWarning($"SceneTriggerExecutor.ChangeState failed for player {sender} in scene {InSceneID} with state {StateID} to new state {data.NewStateID}. Proximity trigger not found.");
+				return data;
 			}
-			bool containsGUID = ProximityTriggers[details.ProximityTriggerID.Value].ObjectsInTrigger.Contains(sender);
-			if (details.ProximityIsEnter.Value)
+			bool containsGUID = value.ObjectsInTrigger.Contains(sender);
+			if (data.ProximityIsEnter.Value)
 			{
 				if (!containsGUID)
 				{
-					ProximityTriggers[details.ProximityTriggerID.Value].ObjectsInTrigger.Add(sender);
+					value.ObjectsInTrigger.Add(sender);
 				}
-				if (ProximityTriggers[details.ProximityTriggerID.Value].ObjectsInTrigger.Count == 0)
+				if (value.ObjectsInTrigger.Count == 0)
 				{
-					details.IsFail = true;
+					data.IsFail = true;
 				}
 			}
 			else
 			{
 				if (containsGUID)
 				{
-					ProximityTriggers[details.ProximityTriggerID.Value].ObjectsInTrigger.Remove(sender);
+					value.ObjectsInTrigger.Remove(sender);
 				}
-				if (ProximityTriggers[details.ProximityTriggerID.Value].ObjectsInTrigger.Count > 0)
+				if (value.ObjectsInTrigger.Count > 0)
 				{
-					details.IsFail = true;
+					data.IsFail = true;
 				}
 			}
 		}
-		if (StateID == details.NewStateID && (!details.IsImmediate.HasValue || !details.IsImmediate.Value))
+
+		if (StateID == data.NewStateID && (!data.IsImmediate.HasValue || !data.IsImmediate.Value))
 		{
-			details.IsFail = true;
+			data.IsFail = true;
 		}
-		if (!States.ContainsKey(details.NewStateID))
+		if (!States.ContainsKey(data.NewStateID))
 		{
-			details.IsFail = true;
+			data.IsFail = true;
 		}
 		if (SpawnPoint != null && ((SpawnPoint.Type == SpawnPointType.WithAuthorization && SpawnPoint.State == SpawnPointState.Locked) || (SpawnPoint.Player != null && SpawnPoint.Player != pl) || SpawnPoint.Player == null))
 		{
-			details.IsFail = true;
+			data.IsFail = true;
 		}
-		if (!details.IsFail)
+
+		if (!data.IsFail)
 		{
-			StateID = details.NewStateID;
+			StateID = data.NewStateID;
 			if (SpawnPoint is { Player: not null })
 			{
 				if (StateID == SpawnPoint.ExecutorStateID || (SpawnPoint.ExecutorOccupiedStateIDs != null && SpawnPoint.ExecutorOccupiedStateIDs.Contains(StateID)))
@@ -178,12 +192,17 @@ public class SceneTriggerExecutor : IPersistantObject
 				PlayerThatActivated = 0L;
 			}
 		}
-		return details;
+		else
+		{
+			Debug.LogWarning($"SceneTriggerExecutor.ChangeState failed for player {sender} in scene {InSceneID} with state {StateID} to new state {data.NewStateID}. IsFail: {data.IsFail}");
+		}
+
+		return data;
 	}
 
 	public SceneTriggerExecutorDetails RemovePlayerFromExecutor(Player pl)
 	{
-		if (PlayerThatActivated != pl.FakeGuid || !States.ContainsKey(_stateID) || States[_stateID].PlayerDisconnectToStateID == 0 || !States.ContainsKey(States[_stateID].PlayerDisconnectToStateID))
+		if (PlayerThatActivated != pl.FakeGuid || !States.TryGetValue(_stateID, out SceneTriggerExecutorState value) || value.PlayerDisconnectToStateID == 0 || !States.ContainsKey(value.PlayerDisconnectToStateID))
 		{
 			return null;
 		}
@@ -192,8 +211,8 @@ public class SceneTriggerExecutor : IPersistantObject
 			InSceneID = InSceneID,
 			IsFail = false,
 			CurrentStateID = StateID,
-			NewStateID = States[_stateID].PlayerDisconnectToStateID,
-			IsImmediate = States[_stateID].PlayerDisconnectToStateImmediate,
+			NewStateID = value.PlayerDisconnectToStateID,
+			IsImmediate = value.PlayerDisconnectToStateImmediate,
 			PlayerThatActivated = 0L
 		};
 	}

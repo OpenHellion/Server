@@ -1,7 +1,9 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ProtoBuf;
 using ZeroGravity.Network;
@@ -52,10 +54,8 @@ public static class ProtoSerialiser
 	/// <summary>
 	/// 	For deserialisation of data not sent through network.
 	/// </summary>
-	/// <exception cref="ArgumentNullException" />
 	private static NetworkData Deserialize(Stream ms)
 	{
-		ArgumentNullException.ThrowIfNull(ms);
 		NetworkData networkData;
 		try
 		{
@@ -85,14 +85,15 @@ public static class ProtoSerialiser
 	}
 
 	/// <summary>
-	/// 	Unpack data from network.
+	/// 	Unpack data sent by the server.
+	/// 	Reads the size of the message, then reads the message itself.
 	/// </summary>
-	/// <param name="stream">The stream which data is sent. Usually a NetworkStream.</param>
-	/// <returns>NetworkData</returns>
-	/// <exception cref="ProtoException" />
-	/// <exception cref="ZeroDataException" />
-	/// <exception cref="ArgumentNullException" />
-	public static async Task<NetworkData> Unpack(Stream stream)
+	/// <param name="stream">The stream to read from.</param>
+	/// <param name="maxMessageSize">Max number of bytes to accept.</param>
+	/// <returns></returns>
+	/// <exception cref="ArgumentException">If message is too large.</exception>
+	/// <exception cref="ZeroDataException">If message is empty.</exception>
+	public static async Task<NetworkData> Unpack(Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
 	{
 		int dataRead = 0;
 		int readSize;
@@ -100,7 +101,7 @@ public static class ProtoSerialiser
 		byte[] dataLengthBuffer = new byte[4];
 		do
 		{
-			readSize = await stream.ReadAsync(dataLengthBuffer.AsMemory(dataRead, dataLengthBuffer.Length - dataRead));
+			readSize = await stream.ReadAsync(dataLengthBuffer.AsMemory(dataRead, dataLengthBuffer.Length - dataRead), cancellationToken);
 			if (readSize == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
@@ -109,10 +110,12 @@ public static class ProtoSerialiser
 			dataRead += readSize;
 		} while (dataRead < dataLengthBuffer.Length);
 
-		uint dataLength = BitConverter.ToUInt32(dataLengthBuffer, 0);
-		if (dataLength > 1000000)
+		uint dataLength = BinaryPrimitives.ReadUInt32LittleEndian(dataLengthBuffer);
+		if (dataLength > maxMessageSize)
 		{
-			Debug.Log("Received message with a payload of over 1MB.");
+				await SkipAsync(stream, dataLength, cancellationToken);
+
+				throw new ArgumentException($"Message too large. Declared {dataLength}, maximum allowed is {maxMessageSize}.");
 		}
 
 		// Read following contents.
@@ -120,7 +123,7 @@ public static class ProtoSerialiser
 		dataRead = 0;
 		do
 		{
-			readSize = await stream.ReadAsync(buffer.AsMemory(dataRead, buffer.Length - dataRead));
+			readSize = await stream.ReadAsync(buffer.AsMemory(dataRead, buffer.Length - dataRead), cancellationToken);
 			if (readSize == 0)
 			{
 				throw new ZeroDataException("Received zero data message.");
@@ -139,20 +142,17 @@ public static class ProtoSerialiser
 	/// </summary>
 	/// <param name="data">NetworkData to serialise.</param>
 	/// <returns>Data as a binary array.</returns>
-	/// <exception cref="ProtoException" />
-	/// <exception cref="ArgumentNullException" />
-	public static async Task<byte[]> Pack(NetworkData data)
+	public static async Task<byte[]> Pack(NetworkData data, CancellationToken cancellationToken = default)
 	{
-		ArgumentNullException.ThrowIfNull(data);
-
 		await using MemoryStream ms = new MemoryStream();
 
 		try
 		{
 			Serializer.Serialize(ms, data);
 		}
-		catch
+		catch (Exception ex)
 		{
+			Debug.LogException(ex);
 			return null;
 		}
 
@@ -169,10 +169,47 @@ public static class ProtoSerialiser
 		}
 
 		await using MemoryStream outMs = new MemoryStream();
-		await outMs.WriteAsync(BitConverter.GetBytes((uint)ms.Length).AsMemory(0, 4));
-		await outMs.WriteAsync(ms.ToArray().AsMemory(0, (int)ms.Length));
-		await outMs.FlushAsync();
+		await outMs.WriteAsync(BitConverter.GetBytes((uint)ms.Length).AsMemory(0, 4), cancellationToken);
+		await outMs.WriteAsync(ms.ToArray().AsMemory(0, (int)ms.Length), cancellationToken);
+		await outMs.FlushAsync(cancellationToken);
 		return outMs.ToArray();
+	}
+
+	/// <summary>
+	/// 	Skips a specified number of bytes in the stream asynchronously.
+	/// </summary>
+	/// <param name="stream">Stream to skip on.</param>
+	/// <param name="bytesToSkip">Bytes to skip.</param>
+	/// <param name="cancellationToken"></param>
+	/// <exception cref="EndOfStreamException">Stream ended unexpectedly.</exception>
+	public static async Task SkipAsync(Stream stream, long bytesToSkip, CancellationToken cancellationToken = default)
+	{
+		if (bytesToSkip <= 0) return;
+
+		// If the stream supports seeking, do it in one go
+		if (stream.CanSeek)
+		{
+			long toSkip = Math.Min(stream.Length - stream.Position, bytesToSkip);
+			stream.Seek(toSkip, SeekOrigin.Current);
+			return;
+		}
+
+		// Otherwise, read-and-discard in chunks
+		const int discardBufferSize = 8192;
+		byte[] discardBuffer = new byte[discardBufferSize];
+		long remaining = bytesToSkip;
+		while (remaining > 0)
+		{
+			int chunk = (int)Math.Min(discardBufferSize, remaining);
+			int read = await stream.ReadAsync(discardBuffer.AsMemory(0, chunk), cancellationToken);
+			if (read == 0)
+			{
+				// Stream ended prematurely
+				throw new EndOfStreamException(
+					$"Stream ended while skipping {bytesToSkip} bytes (skipped {bytesToSkip - remaining}).");
+			}
+			remaining -= read;
+		}
 	}
 
 	private static void ProcessStatistics(NetworkData data, Stream ms,

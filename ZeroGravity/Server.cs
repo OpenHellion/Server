@@ -1761,7 +1761,6 @@ public class Server
 	{
 		try
 		{
-			Debug.Log("Parsing PlayerSpawnRequest.");
 			var request = data as PlayerSpawnRequest;
 			Player pl = GetPlayer(request.Sender);
 			if (pl == null)
@@ -1781,7 +1780,7 @@ public class Server
 			else
 			{
 				spawnSuccess = await AddPlayerToShipAsync(pl, request.SpawnSetupType, request.SpawnPointParentId);
-				Debug.LogFormat("Adding player ({2}) to ship with id {0}, with setup type {1}. Success? {3}.", request.SpawnPointParentId, request.SpawnSetupType, pl.Guid, spawnSuccess);
+				Debug.LogInfoFormat("Adding player ({2}) to ship with id {0}, with setup type {1}. Success? {3}.", request.SpawnPointParentId, request.SpawnSetupType, pl.Guid, spawnSuccess);
 			}
 
 			if (spawnSuccess)
@@ -1909,8 +1908,6 @@ public class Server
 				spawnResponse.Status = NetworkData.MessageStatus.Failure;
 			}
 			await SolarSystem.SendMovementMessageToPlayer(pl);
-
-			Debug.Log("Spawn Request handled");
 			return spawnResponse;
 		}
 		catch (Exception ex)
@@ -1927,11 +1924,16 @@ public class Server
 	private async void SpawnObjectsRequestListener(NetworkData data)
 	{
 		var request = data as SpawnObjectsRequest;
+		if (request.GUIDs == null || request.GUIDs.Count == 0)
+		{
+			return;
+		}
 		Player pl = GetPlayer(request.Sender);
 		if (pl == null)
 		{
 			return;
 		}
+
 		var response = new SpawnObjectsResponse();
 
 		foreach (long guid in request.GUIDs)

@@ -1673,8 +1673,8 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				});
 			}
 		}
-		ss.DockingPorts = new List<SceneDockingPortDetails>();
-		if (DockingPorts is { Length: > 0 })
+		ss.DockingPorts = [];
+		if (DockingPorts != null && DockingPorts.Length > 0)
 		{
 			foreach (VesselDockingPort port in DockingPorts)
 			{

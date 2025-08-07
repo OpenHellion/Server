@@ -69,7 +69,7 @@ public static class NetworkController
 				return -1;
 			}
 
-			Debug.Log("Received login request for player with id", loginData.PlayerId);
+			Debug.LogInfoFormat("Received login request for player {0} with id {1}.", loginData.CharacterData.Name, loginData.PlayerId);
 			if (loginData.ClientHash != Server.CombinedHash)
 			{
 				Debug.LogInfo("Client/server hash mismatch.", loginData.ClientHash, Server.CombinedHash);
@@ -135,7 +135,6 @@ public static class NetworkController
 				player.Initialize = true;
 			}
 
-			Debug.Log("Connecting player", player.Name, player.Guid);
 			player.ConnectToNetworkController();
 
 			var loginResponse = new LogInResponse
@@ -170,8 +169,6 @@ public static class NetworkController
 
 			var packedData = await ProtoSerialiser.Pack(loginResponse);
 			await stream.WriteAsync(packedData).ConfigureAwait(false);
-			Debug.Log("Sent login response.");
-
 			return guid;
 		}
 		catch (SocketException)

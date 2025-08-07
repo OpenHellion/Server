@@ -157,7 +157,7 @@ internal sealed class GameTransport
 				}.Start();
 
 				_connections.Add(guid, connection);
-				Debug.Log("New connection", _connections.Count);
+				Debug.LogFormat("Storing new connection with id: {0}.", _connections.Count);
 			}
 			catch (TaskCanceledException)
 			{
@@ -182,10 +182,6 @@ internal sealed class GameTransport
 					if (networkData != null)
 					{
 						networkData.Sender = guid;
-#if DEBUG
-						if (networkData.GetType() != typeof(CharacterMovementMessage))
-							Debug.LogFormat("Received data from client: {0}. Message type: {1}.", guid, networkData.GetType());
-#endif
 
 						if (networkData.SyncRequest)
 						{
@@ -240,10 +236,6 @@ internal sealed class GameTransport
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				var packedData = await ProtoSerialiser.Pack(data);
 				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
-#if DEBUG
-				if (data.GetType() != typeof(UpdateVesselDataMessage))
-					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
-#endif
 			}
 		}
 		catch (IOException)
@@ -281,10 +273,7 @@ internal sealed class GameTransport
 				connectionData.syncResponseReceivedEvent += responseHandler;
 
 				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
-#if DEBUG
-				if (data.GetType() != typeof(UpdateVesselDataMessage))
-					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
-#endif
+
 				await Task.Delay(TIMEOUT_MS, responseCancel.Token);
 				connectionData.syncResponseReceivedEvent -= responseHandler;
 
@@ -327,11 +316,6 @@ internal sealed class GameTransport
 				DisconnectInternal(connection.Key);
 			}
 		});
-
-#if DEBUG
-		if (data.GetType() != typeof(UpdateVesselDataMessage))
-			Debug.LogFormat("Sent of type {0} with size of {1} KB to all clients.", data.GetType(), (float)packedData.Length / 1000);
-#endif
 	}
 
 	internal async Task PrioritySendAsyncInternal(long guid, NetworkData data)
@@ -345,10 +329,6 @@ internal sealed class GameTransport
 				var packedData = await ProtoSerialiser.Pack(data);
 				await handler.stream.FlushAsync().ConfigureAwait(false);
 				await handler.stream.WriteAsync(packedData).ConfigureAwait(false);
-#if DEBUG
-				if (data.GetType() != typeof(UpdateVesselDataMessage))
-					Debug.LogFormat("Sent of type {0} with size of {1} KB to client {2}.", data.GetType(), (float)packedData.Length / 1000, guid);
-#endif
 			}
 			else
 			{

@@ -9,6 +9,11 @@ public class VesselObjectID
 
 	public int InSceneID;
 
+	// Used by ProtoBuf for deserialisation.
+	public VesselObjectID()
+	{
+	}
+
 	public VesselObjectID(long vesselGUID, int inSceneID)
 	{
 		VesselGUID = vesselGUID;

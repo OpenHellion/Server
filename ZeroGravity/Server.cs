@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BulletSharp;
+using OpenHellion;
 using OpenHellion.IO;
 using OpenHellion.Net;
 using OpenHellion.Net.Message.MainServer;
@@ -424,6 +425,8 @@ public class Server
 	public const double SpawnPointInviteTimer = 300.0;
 
 	private static string _loadPersistenceFromFile;
+
+	private ConsoleReader _consoleReader;
 
 	public ImmutableList<SpaceObjectVessel> AllVessels => [.. _vessels.Values];
 
@@ -2178,6 +2181,9 @@ public class Server
 		}
 		SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, UpdateShipSystemsTimer);
 		_mainLoopStarted = true;
+
+		_consoleReader = new();
+		_ = Task.Run(() => _consoleReader.ReadLoopAsync(this, Program.CancelToken.Token));
 
 		new Thread(StartMainLoopWatcher).Start();
 		while (IsRunning)

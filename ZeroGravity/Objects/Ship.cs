@@ -152,7 +152,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		EventSystem.AddListener<VesselRequest>(VesselRequestListener);
 		EventSystem.AddListener<VesselSecurityRequest>(VesselSecurityRequestListener);
 		EventSystem.AddListener<RoomPressureMessage>(RoomPressureMessageListener);
-		EventSystem.AddListener<VesselRequest>(RecycleItemMessageListener);
+		EventSystem.AddListener<RecycleItemMessage>(RecycleItemMessageListener);
 	}
 
 	public void ResetRotationAndThrust()
@@ -1453,7 +1453,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		EventSystem.RemoveListener<VesselRequest>(VesselRequestListener);
 		EventSystem.RemoveListener<VesselSecurityRequest>(VesselSecurityRequestListener);
 		EventSystem.RemoveListener<RoomPressureMessage>(RoomPressureMessageListener);
-		EventSystem.RemoveListener<VesselRequest>(RecycleItemMessageListener);
+		EventSystem.RemoveListener<RecycleItemMessage>(RecycleItemMessageListener);
 	}
 
 	~Ship()

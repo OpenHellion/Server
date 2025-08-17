@@ -427,7 +427,7 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public virtual Task SendAllStats()
 	{
-		return null;
+		return Task.CompletedTask;
 	}
 
 	public void FillPersistenceData(PersistenceObjectDataItem data)

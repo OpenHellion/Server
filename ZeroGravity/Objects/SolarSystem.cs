@@ -123,10 +123,6 @@ public class SolarSystem
 		}
 
 		await Parallel.ForEachAsync(players, async (pl, ct) => await SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
-		foreach (Player player in Server.Instance.AllPlayers)
-		{
-			player.TransformData = null;
-		}
 	}
 
 	/// <summary>

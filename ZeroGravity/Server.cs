@@ -1101,7 +1101,7 @@ public class Server
 	{
 		var message = data as HurtPlayerMessage;
 		Player pl = GetPlayer(message.Sender);
-		await pl.Stats.TakeDamage(message.Duration, message.Damage);
+		await pl.TakeDamage(message.Duration, message.Damage);
 	}
 
 	private async void ConsoleMessageListener(NetworkData data)
@@ -1512,11 +1512,11 @@ public class Server
 			{
 				if (parts.Length == 2)
 				{
-					player.Stats.GodMode = parts[1] != "0";
+					player.GodMode = parts[1] != "0";
 				}
 				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
 				{
-					Text = "God mode: " + (player.Stats.GodMode ? "ON" : "OFF")
+					Text = "God mode: " + (player.GodMode ? "ON" : "OFF")
 				});
 				return;
 			}
@@ -1903,7 +1903,7 @@ public class Server
 				spawnResponse.Quests = [.. pl.Quests.Select((Quest m) => m.GetDetails())];
 				spawnResponse.Blueprints = pl.Blueprints;
 				spawnResponse.NavMapDetails = pl.NavMapDetails;
-				spawnResponse.Health = pl.Health;
+				spawnResponse.Health = (int)pl.Health;
 				spawnResponse.IsAdmin = pl.IsAdmin;
 			}
 			else
@@ -2776,7 +2776,7 @@ public class Server
 				{
 					if (tmpSp is Player player)
 					{
-						await player.Stats.TakeDamage(HurtType.Explosion, item.ExplosionDamage);
+						await player.TakeDamage(HurtType.Explosion, item.ExplosionDamage);
 					}
 					if (tmpSp is DynamicObject { Item: not null } dynamicObject)
 					{

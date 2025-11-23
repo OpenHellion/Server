@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -13,6 +14,28 @@ namespace ZeroGravity.Objects;
 
 public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 {
+	public enum HitBoxType
+	{
+		None = -1,
+		Head,
+		Torso,
+		Arms,
+		Legs,
+		Abdomen
+	}
+
+	public float MaxHealth = 100f;
+
+	private double _lastMeleeTime;
+
+	private float _acummulatedDamage;
+
+	private readonly Timer _healTimer;
+
+	private float _amountToHeal;
+
+	private float _amountToHealStep;
+
 	public double LastMovementMessageSolarSystemTime = -1.0;
 
 	public List<long> UpdateArtificialBodyMovement = new List<long>();
@@ -39,10 +62,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public float FreeLookY;
 
-	public float CameraY;
-
-	public Vector3D ZeroGOrientation;
-
 	public long FakeGuid;
 
 	public CharacterAnimationData AnimationData;
@@ -64,18 +83,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public Dictionary<byte, RagdollItemData> RagdollData;
 
 	private sbyte[] _jetpackDirection;
-
-	public CharacterTransformData TransformData;
-
-	public const float NoAirMaxDamage = 1f;
-
-	public const float NoPressureMaxDamage = 2f;
-
-	public const float TemperatureMaxDamage = 0.5f;
-
-	public double updateItemTimer;
-
-	public const float timeToUpdateItems = 0.3f;
 
 	private Vector3D _pivotPositionCorrection = Vector3D.Zero;
 
@@ -156,8 +163,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	public PlayerStats Stats { get; private set; }
-
 	public ShipSpawnPoint CurrentSpawnPoint { get; private set; }
 
 	public ShipSpawnPoint AuthorizedSpawnPoint { get; private set; }
@@ -196,17 +201,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public Item ItemInHands => PlayerInventory.HandsSlot.Item;
 
-	public int Health
-	{
-		get
-		{
-			return (int)Stats.HealthPoints;
-		}
-		set
-		{
-			Stats.HealthPoints = MathHelper.Clamp(value, 0, 100);
-		}
-	}
+	public float Health { get; private set; }
 
 	public override SpaceObject Parent
 	{
@@ -228,7 +223,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	public bool GodMode => Stats.GodMode;
+	public bool GodMode { get; set; }
 
 	public bool IsPilotingVessel { get; private set; }
 
@@ -268,7 +263,16 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public Player(long guid, Vector3D localPosition, QuaternionD localRotation)
 		: base(guid, localPosition, localRotation)
-	{}
+	{
+		_healTimer = new Timer(100.0)
+		{
+			Enabled = false
+		};
+		_healTimer.Elapsed += async delegate
+		{
+			await HealOverTimeStep();
+		};
+	}
 
 	public static async Task<Player> CreatePlayerAsync(long guid, Vector3D localPosition, QuaternionD localRotation, string name, string playerId, Gender gender, byte headType, byte hairType, bool addToServerList = true, Player clone = null)
 	{
@@ -280,9 +284,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			Gender = gender,
 			HeadType = headType,
 			HairType = hairType,
-			Stats = new PlayerStats()
 		};
-		player.Stats.pl = player;
 		player.PlayerInventory = new Inventory(player);
 		player.Quests = await Quest.CreateQuestsAsync(StaticData.QuestsData, player);
 		if (addToServerList)
@@ -316,7 +318,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		EventSystem.AddListener<CharacterMovementMessage>(UpdateMovementListener);
 		EventSystem.AddListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
 		EventSystem.AddListener<PlayerShootingMessage>(PlayerShootingListener);
-		EventSystem.AddListener<PlayerHitMessage>(PlayerHitListener);
 		EventSystem.AddListener<PlayerStatsMessage>(PlayerStatsMessageListener);
 		EventSystem.AddListener<PlayerDrillingMessage>(PlayerDrillingListener);
 		EventSystem.AddListener<PlayerRoomMessage>(PlayerRoomMessageListener);
@@ -335,7 +336,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		EventSystem.RemoveListener<CharacterMovementMessage>(UpdateMovementListener);
 		EventSystem.RemoveListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
 		EventSystem.RemoveListener<PlayerShootingMessage>(PlayerShootingListener);
-		EventSystem.RemoveListener<PlayerHitMessage>(PlayerHitListener);
 		EventSystem.RemoveListener<PlayerStatsMessage>(PlayerStatsMessageListener);
 		EventSystem.RemoveListener<PlayerDrillingMessage>(PlayerDrillingListener);
 		EventSystem.RemoveListener<PlayerRoomMessage>(PlayerRoomMessageListener);
@@ -376,29 +376,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	protected async void PlayerHitListener(NetworkData data)
-	{
-		var message = data as PlayerHitMessage;
-		if (message.Sender != Guid)
-		{
-			return;
-		}
-		if (message.HitSuccessfull || MathHelper.RandomNextDouble() > 0.699999988079071)
-		{
-			if (await Stats.TakeHitDamage(message.HitIndentifier) > 0f)
-			{
-				PlayerStatsMessage psm = new PlayerStatsMessage();
-				psm.Health = (int)Stats.HealthPoints;
-				psm.GUID = FakeGuid;
-				await NetworkController.SendAsync(Guid, psm);
-			}
-		}
-		else
-		{
-			Stats.UnqueueHit(message.HitIndentifier);
-		}
-	}
-
 	private static async Task PassTroughtShootMessage(PlayerShootingMessage psm)
 	{
 		PlayerShootingMessage sending = new PlayerShootingMessage();
@@ -424,10 +401,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		bool rateValid = false;
 		if (message.ShotData.IsMeleeAttack)
 		{
-			if (Server.Instance.SolarSystem.CurrentTime - Stats.lastMeleeTime > 1.0)
+			if (Server.Instance.SolarSystem.CurrentTime - _lastMeleeTime > 1.0)
 			{
 				rateValid = true;
-				Stats.lastMeleeTime = Server.Instance.SolarSystem.CurrentTime;
+				_lastMeleeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
 		}
 		else if (wep != null && await wep.CanShoot())
@@ -458,7 +435,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		if (Server.Instance.GetObject(message.HitGUID) is Player hitPlayer)
 		{
 			await NetworkController.SendToClientsSubscribedTo(message, Guid, Parent, hitPlayer.Parent);
-			float realDamage = await hitPlayer.Stats.TakeHitDamage(hitPlayer.Stats.QueueHit((PlayerStats.HitBoxType)message.ShotData.colliderType, damage, message.ShotData.Orientation.ToVector3D(), message.ShotData.IsMeleeAttack));
+			await hitPlayer.TakeHitDamage(damage, (HitBoxType)message.ShotData.colliderType, message.ShotData.IsMeleeAttack, message.ShotData.Orientation.ToVector3D());
 		}
 	}
 
@@ -717,11 +694,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		LocalPosition += locPos;
 		LocalRotation *= locRot;
-		if (TransformData != null)
-		{
-			TransformData.LocalPosition = LocalPosition.ToFloatArray();
-			TransformData.LocalRotation = LocalRotation.ToFloatArray();
-		}
 	}
 
 	private async void UpdateMovementListener(NetworkData data)
@@ -734,24 +706,26 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		MouseLook = message.TransformData.MouseLook;
 		FreeLookX = message.TransformData.FreeLookX;
 		FreeLookY = message.TransformData.FreeLookY;
-		CharacterAnimationData tmp = new CharacterAnimationData();
-		tmp.VelocityForward = message.AnimationData.VelocityForward;
-		tmp.VelocityRight = message.AnimationData.VelocityRight;
-		tmp.ZeroGForward = message.AnimationData.ZeroGForward;
-		tmp.ZeroGRight = message.AnimationData.ZeroGRight;
-		tmp.PlayerStance = message.AnimationData.PlayerStance;
-		tmp.InteractType = message.AnimationData.InteractType;
-		tmp.TurningDirection = message.AnimationData.TurningDirection;
-		tmp.EquipOrDeEquip = message.AnimationData.EquipOrDeEquip;
-		tmp.EquipItemId = message.AnimationData.EquipItemId;
-		tmp.EmoteType = message.AnimationData.EmoteType;
-		tmp.ReloadItemType = message.AnimationData.ReloadItemType;
-		tmp.MeleeAttackType = message.AnimationData.MeleeAttackType;
-		tmp.LadderDirection = message.AnimationData.LadderDirection;
-		tmp.PlayerStanceFloat = message.AnimationData.PlayerStanceFloat;
-		tmp.GetUpType = message.AnimationData.GetUpType;
-		tmp.FireMode = message.AnimationData.FireMode;
-		tmp.AirTime = message.AnimationData.AirTime;
+		CharacterAnimationData tmp = new CharacterAnimationData
+		{
+			VelocityForward = message.AnimationData.VelocityForward,
+			VelocityRight = message.AnimationData.VelocityRight,
+			ZeroGForward = message.AnimationData.ZeroGForward,
+			ZeroGRight = message.AnimationData.ZeroGRight,
+			PlayerStance = message.AnimationData.PlayerStance,
+			InteractType = message.AnimationData.InteractType,
+			TurningDirection = message.AnimationData.TurningDirection,
+			EquipOrDeEquip = message.AnimationData.EquipOrDeEquip,
+			EquipItemId = message.AnimationData.EquipItemId,
+			EmoteType = message.AnimationData.EmoteType,
+			ReloadItemType = message.AnimationData.ReloadItemType,
+			MeleeAttackType = message.AnimationData.MeleeAttackType,
+			LadderDirection = message.AnimationData.LadderDirection,
+			PlayerStanceFloat = message.AnimationData.PlayerStanceFloat,
+			GetUpType = message.AnimationData.GetUpType,
+			FireMode = message.AnimationData.FireMode,
+			AirTime = message.AnimationData.AirTime
+		};
 		AnimationData = tmp;
 		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && message.ParentType == SpaceObjectType.PlayerPivot && !message.PivotReset)
 		{
@@ -762,12 +736,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			_pivotPositionCorrection = Vector3D.Zero;
 			return;
 		}
-		TransformData = message.TransformData;
 		LocalPosition = message.TransformData.LocalPosition.ToVector3D();
 		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && !message.PivotReset)
 		{
 			LocalPosition -= _pivotPositionCorrection;
-			TransformData.LocalPosition = LocalPosition.ToFloatArray();
 		}
 		LocalRotation = message.TransformData.LocalRotation.ToQuaternionD();
 		if (message.DockUndockMsg.HasValue && _dockUndockWaitForMsg)
@@ -778,43 +750,44 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			LocalPosition += _dockUndockPositionCorrection.Value;
 			LocalRotation *= _dockUndockRotationCorrection.Value;
-			TransformData.LocalPosition = LocalPosition.ToFloatArray();
-			TransformData.LocalRotation = LocalRotation.ToFloatArray();
 		}
 		LocalVelocity = message.TransformData.LocalVelocity.ToVector3D();
 		_gravity = message.Gravity;
 		if (message.ImpactVelocity.HasValue)
 		{
-			await Stats.DoCollisionDamage(message.ImpactVelocity.Value);
+			await DoCollisionDamage(message.ImpactVelocity.Value);
 			_collisionImpactVelocity = message.ImpactVelocity.Value;
 		}
 		else
 		{
 			_collisionImpactVelocity = 0f;
 		}
+
 		if (message.RagdollData != null)
 		{
 			RagdollData = new Dictionary<byte, RagdollItemData>(message.RagdollData);
 		}
-		else if (RagdollData != null)
+		else
 		{
-			RagdollData.Clear();
+			RagdollData?.Clear();
 			RagdollData = null;
 		}
+
 		if (message.JetpackDirection != null)
 		{
-			_jetpackDirection = new sbyte[4]
-			{
+			_jetpackDirection =
+			[
 				message.JetpackDirection[0],
 				message.JetpackDirection[1],
 				message.JetpackDirection[2],
 				message.JetpackDirection[3]
-			};
+			];
 		}
 		else if (_jetpackDirection != null)
 		{
 			_jetpackDirection = null;
 		}
+
 		if (Parent is SpaceObjectVessel && message.ParentType == SpaceObjectType.PlayerPivot)
 		{
 			_pivotPositionCorrection = Vector3D.Zero;
@@ -836,7 +809,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		else if (Parent is SpaceObjectVessel && Parent.Guid != message.ParentGUID)
 		{
-			SpaceObjectVessel parVessel = Parent as SpaceObjectVessel;
+
 			if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(message.ParentGUID))
 			{
 				Parent = Server.Instance.GetVessel(message.ParentGUID);
@@ -865,26 +838,28 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			Pivot pivot = Parent as Pivot;
 			SpaceObjectVessel nearestVessel = message.NearestVesselGUID > 0 ? Server.Instance.GetVessel(message.NearestVesselGUID) : null;
 			SpaceObjectVessel refVessel = nearestVessel.MainVessel;
+
 			if (refVessel.StabilizeToTargetObj != null)
 			{
 				refVessel = refVessel.StabilizeToTargetObj;
 			}
-			Vector3D playerGlobalPos = pivot.Position + LocalPosition;
+
+			// Stick to vessel if requested or if within 50m. If not, and if far enough away, reset pivot to zero local position.
 			if (nearestVessel is { IsDebrisFragment: false } && (pivot.Position - refVessel.Position).IsNotEpsilonZero() && (message.StickToVessel || message.NearestVesselDistance <= 50f))
 			{
 				Vector3D oldPivotPos = pivot.Position;
 				Vector3D oldPivotVel = pivot.Velocity;
 				pivot.Orbit.CopyDataFrom(refVessel.Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
-				pivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
+				pivot.Orbit.SetLastChangeTime(Server.Instance.SolarSystem.CurrentTime);
 				_pivotPositionCorrection += pivot.Position - oldPivotPos;
 				_pivotVelocityCorrection = pivot.Velocity - oldPivotVel;
 				UpdateArtificialBodyMovement.Add(pivot.Guid);
 				UpdateArtificialBodyMovement.Add(refVessel.Guid);
 			}
 			else if ((nearestVessel == null || (message.NearestVesselDistance > 50f && (nearestVessel.FTL is not
-			         {
-				         Status: SystemStatus.OnLine
-			         } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !message.StickToVessel)
+					 {
+						 Status: SystemStatus.OnLine
+					 } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !message.StickToVessel)
 			{
 				_pivotPositionCorrection = LocalPosition;
 				pivot.AdjustPositionAndVelocity(_pivotPositionCorrection, _pivotVelocityCorrection);
@@ -894,7 +869,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			{
 				_lastPivotResetTime = Server.Instance.RunTime.TotalSeconds;
 				LocalPosition -= _pivotPositionCorrection;
-				TransformData.LocalPosition = (TransformData.LocalPosition.ToVector3D() - _pivotPositionCorrection).ToFloatArray();
 			}
 		}
 		PlayerReady = true;
@@ -941,7 +915,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (!Initialize && (suffocateDamage > float.Epsilon || pressureDamage > float.Epsilon || exposureDamage > float.Epsilon))
 		{
-			await Stats.TakeDamage((float)deltaTime, new PlayerDamage
+			await TakeDamage((float)deltaTime, new PlayerDamage
 			{
 				HurtType = HurtType.Suffocate,
 				Amount = suffocateDamage
@@ -960,11 +934,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			await CurrentJetpack.ConsumeResources(CurrentJetpack.PropellantConsumption * (float)deltaTime);
 		}
 		if (CurrentHelmet == null && CurrentJetpack == null && ItemInHands == null)
-		{
-			return;
-		}
-		updateItemTimer += deltaTime;
-		if (!(updateItemTimer >= 0.30000001192092896))
 		{
 			return;
 		}
@@ -1018,7 +987,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			await NetworkController.SendToClientsSubscribedTo(doim, -1L, Parent);
 		}
-		updateItemTimer = 0.0;
 	}
 
 	public void SubscribeTo(SpaceObject spaceObject)
@@ -1116,49 +1084,52 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public CharacterMovementMessage GetCharacterMovementMessage()
 	{
-		if (TransformData == null)
-		{
-			return null;
-		}
-		CharacterMovementMessage mm = new CharacterMovementMessage();
-		mm.GUID = FakeGuid;
+		CharacterMovementMessage message = new CharacterMovementMessage();
+		message.GUID = FakeGuid;
 		if (Parent != null)
 		{
-			mm.ParentGUID = Parent.Guid;
-			mm.ParentType = Parent.ObjectType;
+			message.ParentGUID = Parent.Guid;
+			message.ParentType = Parent.ObjectType;
 		}
 		else
 		{
-			mm.ParentGUID = -1L;
-			mm.ParentType = SpaceObjectType.None;
+			message.ParentGUID = -1L;
+			message.ParentType = SpaceObjectType.None;
 		}
-		mm.TransformData = TransformData;
-		mm.Gravity = _gravity;
-		mm.AnimationData = new CharacterAnimationData();
-		mm.AnimationData.VelocityForward = AnimationData.VelocityForward;
-		mm.AnimationData.VelocityRight = AnimationData.VelocityRight;
-		mm.AnimationData.ZeroGForward = AnimationData.ZeroGForward;
-		mm.AnimationData.ZeroGRight = AnimationData.ZeroGRight;
-		mm.AnimationData.PlayerStance = AnimationData.PlayerStance;
-		mm.AnimationData.InteractType = AnimationData.InteractType;
-		mm.AnimationData.TurningDirection = AnimationData.TurningDirection;
-		mm.AnimationData.EquipOrDeEquip = AnimationData.EquipOrDeEquip;
-		mm.AnimationData.EquipItemId = AnimationData.EquipItemId;
-		mm.AnimationData.EmoteType = AnimationData.EmoteType;
-		mm.AnimationData.ReloadItemType = AnimationData.ReloadItemType;
-		mm.AnimationData.MeleeAttackType = AnimationData.MeleeAttackType;
-		mm.AnimationData.LadderDirection = AnimationData.LadderDirection;
-		mm.AnimationData.PlayerStanceFloat = AnimationData.PlayerStanceFloat;
-		mm.AnimationData.GetUpType = AnimationData.GetUpType;
-		mm.AnimationData.FireMode = AnimationData.FireMode;
-		mm.AnimationData.AirTime = AnimationData.AirTime;
+		message.TransformData = new CharacterTransformData
+		{
+			LocalPosition = LocalPosition.ToFloatArray(),
+			LocalRotation = LocalRotation.ToFloatArray(),
+			MouseLook = MouseLook,
+			FreeLookX = FreeLookX,
+			FreeLookY = FreeLookY
+		};
+		message.Gravity = _gravity;
+		message.AnimationData = new CharacterAnimationData();
+		message.AnimationData.VelocityForward = AnimationData.VelocityForward;
+		message.AnimationData.VelocityRight = AnimationData.VelocityRight;
+		message.AnimationData.ZeroGForward = AnimationData.ZeroGForward;
+		message.AnimationData.ZeroGRight = AnimationData.ZeroGRight;
+		message.AnimationData.PlayerStance = AnimationData.PlayerStance;
+		message.AnimationData.InteractType = AnimationData.InteractType;
+		message.AnimationData.TurningDirection = AnimationData.TurningDirection;
+		message.AnimationData.EquipOrDeEquip = AnimationData.EquipOrDeEquip;
+		message.AnimationData.EquipItemId = AnimationData.EquipItemId;
+		message.AnimationData.EmoteType = AnimationData.EmoteType;
+		message.AnimationData.ReloadItemType = AnimationData.ReloadItemType;
+		message.AnimationData.MeleeAttackType = AnimationData.MeleeAttackType;
+		message.AnimationData.LadderDirection = AnimationData.LadderDirection;
+		message.AnimationData.PlayerStanceFloat = AnimationData.PlayerStanceFloat;
+		message.AnimationData.GetUpType = AnimationData.GetUpType;
+		message.AnimationData.FireMode = AnimationData.FireMode;
+		message.AnimationData.AirTime = AnimationData.AirTime;
 		if (RagdollData is { Count: > 0 })
 		{
-			mm.RagdollData = new Dictionary<byte, RagdollItemData>(RagdollData);
+			message.RagdollData = new Dictionary<byte, RagdollItemData>(RagdollData);
 		}
 		if (_jetpackDirection != null)
 		{
-			mm.JetpackDirection = new sbyte[4]
+			message.JetpackDirection = new sbyte[4]
 			{
 				_jetpackDirection[0],
 				_jetpackDirection[1],
@@ -1166,14 +1137,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				_jetpackDirection[3]
 			};
 		}
-		mm.PivotReset = _pivotPositionCorrection.IsNotEpsilonZero();
-		mm.PivotPositionCorrection = _pivotPositionCorrection.ToFloatArray();
-		mm.PivotVelocityCorrection = _pivotVelocityCorrection.ToFloatArray();
+		message.PivotReset = _pivotPositionCorrection.IsNotEpsilonZero();
+		message.PivotPositionCorrection = _pivotPositionCorrection.ToFloatArray();
+		message.PivotVelocityCorrection = _pivotVelocityCorrection.ToFloatArray();
 		if (_collisionImpactVelocity > 0f)
 		{
-			mm.ImpactVelocity = _collisionImpactVelocity;
+			message.ImpactVelocity = _collisionImpactVelocity;
 		}
-		return mm;
+		return message;
 	}
 
 	public override SpawnObjectResponseData GetSpawnResponseData(Player pl)
@@ -1452,8 +1423,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		data.Gender = Gender;
 		data.HeadType = HeadType;
 		data.HairType = HairType;
-		data.HealthPoints = Stats.HealthPoints;
-		data.MaxHealthPoints = Stats.MaxHealthPoints;
+		data.Health = Health;
+		data.MaxHealth = MaxHealth;
 		data.AnimationData = ObjectCopier.DeepCopy(AnimationData);
 		data.AnimationStatsMask = AnimationStatsMask;
 		data.Gravity = _gravity;
@@ -1500,8 +1471,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		Gender = data.Gender;
 		HeadType = data.HeadType;
 		HairType = data.HairType;
-		Stats.MaxHealthPoints = data.MaxHealthPoints;
-		Stats.HealthPoints = data.HealthPoints;
+		MaxHealth = data.MaxHealth;
+		Health = data.Health;
 		AnimationData = ObjectCopier.DeepCopy(data.AnimationData);
 		AnimationStatsMask = data.AnimationStatsMask;
 		_gravity = data.Gravity;
@@ -1601,5 +1572,186 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			NavMapDetails = message.NavMapDetails;
 		}
+	}
+
+	public Task TakeDamage(HurtType hurtType, float amount)
+	{
+		return TakeDamage(1f, new PlayerDamage
+		{
+			HurtType = hurtType,
+			Amount = amount
+		});
+	}
+
+	public Task TakeDamage(float deltaTime, params PlayerDamage[] damages)
+	{
+		return TakeDamage(null, deltaTime, damages);
+	}
+
+	public async Task TakeDamage(Vector3D? shotDirection, float deltaTime, params PlayerDamage[] damages)
+	{
+		if (GodMode || CurrentSpawnPoint is { Executor: not null, IsPlayerInSpawnPoint: true })
+		{
+			return;
+		}
+		float amount = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType is HurtType.Suffocate or HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
+		float hurt = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType != HurtType.Suffocate && m.HurtType != HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
+		amount = PlayerInventory.CurrOutfit == null ? amount + hurt : amount + MathHelper.Clamp(hurt - PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue);
+		if (amount <= float.Epsilon)
+		{
+			return;
+		}
+		HurtType causeOfDeath = damages.OrderBy((PlayerDamage m) => m.Amount).Reverse().FirstOrDefault()?.HurtType ?? HurtType.None;
+		Health = MathHelper.Clamp(Health - amount, 0f, MaxHealth);
+		if (Health <= float.Epsilon)
+		{
+			await KillPlayer(causeOfDeath);
+			return;
+		}
+		_acummulatedDamage += amount;
+		PlayerStatsMessage message = new PlayerStatsMessage();
+		foreach (PlayerDamage dmg in damages.Where((PlayerDamage m) => m.Amount > 0f))
+		{
+			PlayerDamage pd = message.DamageList.FirstOrDefault((PlayerDamage m) => m.HurtType == dmg.HurtType);
+			if (pd == null)
+			{
+				message.DamageList.Add(dmg);
+			}
+			else
+			{
+				pd.Amount += dmg.Amount;
+			}
+		}
+		message.ShotDirection = shotDirection.HasValue ? shotDirection.Value.ToFloatArray() : null;
+		if (_acummulatedDamage > 1f)
+		{
+			message.GUID = FakeGuid;
+			message.Health = (int)Health;
+			await NetworkController.SendAsync(Guid, message);
+			_acummulatedDamage = 0f;
+		}
+	}
+
+	public async Task Heal(float amount)
+	{
+		amount = amount > 0f ? amount : 0f;
+		if (amount <= float.Epsilon || Health == MaxHealth)
+		{
+			return;
+		}
+		Health = MathHelper.Clamp(Health + amount, 0f, MaxHealth);
+		PlayerStatsMessage message = new PlayerStatsMessage
+		{
+			GUID = FakeGuid,
+			Health = (int)Health
+		};
+		await NetworkController.SendAsync(Guid, message);
+	}
+
+	private async Task HealOverTimeStep()
+	{
+		_amountToHeal -= _amountToHealStep;
+		if (_amountToHeal <= 0f)
+		{
+			await Heal(_amountToHealStep);
+			_healTimer.Enabled = false;
+		}
+		else
+		{
+			await Heal(_amountToHealStep);
+		}
+	}
+
+	public void HealOverTime(float amountOverSec, float duration)
+	{
+		if (_healTimer.Enabled)
+		{
+			_amountToHeal += amountOverSec * duration;
+			_amountToHealStep = (_amountToHealStep + amountOverSec * 0.1f) * 0.5f;
+		}
+		else
+		{
+			_amountToHeal = amountOverSec * duration;
+			_amountToHealStep = amountOverSec * 0.1f;
+			_healTimer.Enabled = true;
+		}
+	}
+
+	public Task DoCollisionDamage(float speed)
+	{
+		double threshold = 6.5;
+		float hp = 0f;
+		if (speed >= threshold)
+		{
+			hp = (float)((speed - threshold) * (speed - threshold) / 10.0 + speed) * (PlayerInventory.CurrOutfit != null ? PlayerInventory.CurrOutfit.CollisionResistance : 1f);
+		}
+		return TakeDamage(HurtType.Impact, hp);
+	}
+
+	public async Task<float> TakeHitDamage(float damage, HitBoxType hitType, bool isMelee, Vector3D? direction = null, float duration = 1f)
+	{
+		Outfit outfit = PlayerInventory.CurrOutfit;
+		Helmet helmet = CurrentHelmet;
+		float resistanceMulti = 1f;
+		float reductionValue = 0f;
+		float bodyDmgMulti = 1f;
+		switch (hitType)
+		{
+		case HitBoxType.None:
+			resistanceMulti = 0f;
+			Debug.LogError("UNKNOWN HITBOX TYPE", Guid);
+			break;
+		case HitBoxType.Head:
+			bodyDmgMulti = 10f;
+			resistanceMulti = helmet?.DamageResistance ?? 1f;
+			reductionValue = helmet?.DamageReduction ?? 0f;
+			break;
+		case HitBoxType.Torso:
+			bodyDmgMulti = 5f;
+			if (outfit != null)
+			{
+				resistanceMulti = outfit.DamageResistanceTorso;
+				reductionValue = outfit.DamageReductionTorso;
+			}
+			break;
+		case HitBoxType.Arms:
+			bodyDmgMulti = 1f;
+			if (outfit != null)
+			{
+				resistanceMulti = outfit.DamageResistanceArms;
+				reductionValue = outfit.DamageReductionArms;
+			}
+			break;
+		case HitBoxType.Legs:
+			bodyDmgMulti = 1f;
+			if (outfit != null)
+			{
+				resistanceMulti = outfit.DamageResistanceLegs;
+				reductionValue = outfit.DamageReductionLegs;
+			}
+			break;
+		case HitBoxType.Abdomen:
+			bodyDmgMulti = 2f;
+			if (outfit != null)
+			{
+				resistanceMulti = outfit.DamageResistanceAbdomen;
+				reductionValue = outfit.DamageReductionAbdomen;
+			}
+			break;
+		default:
+			Debug.LogError($"UNKNOWN HITBOX TYPE: {hitType}. damage={damage:F2}, isMelee={isMelee}, duration={duration:F2}, player={Guid}, health={Health}/{MaxHealth}, outfit={(outfit != null ? outfit.GetType().Name : "null")}, helmet={(helmet != null ? helmet.GetType().Name : "null")}");
+			break;
+		}
+		if (isMelee)
+		{
+			bodyDmgMulti = 1f;
+		}
+		float amount = (damage - reductionValue * duration) * resistanceMulti * bodyDmgMulti;
+		await TakeDamage(direction, duration, new PlayerDamage
+		{
+			HurtType = HurtType.Shot,
+			Amount = amount
+		});
+		return amount;
 	}
 }

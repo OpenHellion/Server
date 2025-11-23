@@ -726,8 +726,11 @@ public class OrbitParameters
 		}
 		if (eccentricity < 1.0)
 		{
-			for (timeSincePeriapsis = solarSystemTime - solarSystemTimeAtPeriapsis; timeSincePeriapsis < 0.0 - orbitalPeriod; timeSincePeriapsis += orbitalPeriod)
+			timeSincePeriapsis = solarSystemTime - solarSystemTimeAtPeriapsis;
+			if (orbitalPeriod > 0)
 			{
+				double n = System.Math.Ceiling(( -orbitalPeriod - timeSincePeriapsis) / orbitalPeriod);
+				timeSincePeriapsis += n * orbitalPeriod;
 			}
 			if (timeSincePeriapsis > orbitalPeriod)
 			{

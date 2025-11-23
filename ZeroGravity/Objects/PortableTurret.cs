@@ -128,7 +128,7 @@ internal class PortableTurret : Item
 	{
 		if (targetPlayer is { IsAlive: true })
 		{
-			await targetPlayer.Stats.TakeHitDamage(Damage * TierMultiplier * (float)deltaTime, PlayerStats.HitBoxType.Torso, isMelee: false, null, (float)deltaTime);
+			await targetPlayer.TakeHitDamage(Damage * TierMultiplier * (float)deltaTime, Player.HitBoxType.Torso, isMelee: false, null, (float)deltaTime);
 		}
 		else
 		{

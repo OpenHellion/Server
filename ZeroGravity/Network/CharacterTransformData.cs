@@ -11,8 +11,6 @@ public class CharacterTransformData
 
 	public float[] LocalVelocity;
 
-	public float Timestamp;
-
 	public float FreeLookX;
 
 	public float FreeLookY;

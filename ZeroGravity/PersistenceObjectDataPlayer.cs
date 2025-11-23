@@ -33,9 +33,9 @@ public class PersistenceObjectDataPlayer : PersistenceObjectData
 
 	public byte HairType;
 
-	public float HealthPoints;
+	public float Health;
 
-	public float MaxHealthPoints;
+	public float MaxHealth;
 
 	public CharacterAnimationData AnimationData;
 

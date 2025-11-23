@@ -74,7 +74,7 @@ class ConsoleReader
 									if (server.GetObject(shipId) is Ship ship)
 									{
 										JsonSerialiser.SerializeToFile(ship.GetPersistenceData(), "ship_" + shipId + ".json", JsonSerialiser.Formatting.Indented);
-										Console.WriteLine($"Player data saved to ship_{shipId}.json");
+										Console.WriteLine($"Ship data saved to ship_{shipId}.json");
 									}
 									else
 									{

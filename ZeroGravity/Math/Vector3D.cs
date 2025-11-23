@@ -4,8 +4,6 @@ namespace ZeroGravity.Math;
 
 public struct Vector3D
 {
-	private const double epsilon = 1E-06;
-
 	public double X;
 
 	public double Y;
@@ -40,10 +38,10 @@ public struct Vector3D
 		{
 			return index switch
 			{
-				0 => X, 
-				1 => Y, 
-				2 => Z, 
-				_ => throw new IndexOutOfRangeException("Invalid Vector3 index!"), 
+				0 => X,
+				1 => Y,
+				2 => Z,
+				_ => throw new IndexOutOfRangeException("Invalid Vector3 index!"),
 			};
 		}
 		set
@@ -109,16 +107,6 @@ public struct Vector3D
 		return lhs.X * rhs.X + lhs.Y * rhs.Y + lhs.Z * rhs.Z;
 	}
 
-	private static void Internal_OrthoNormalize2(ref Vector3D a, ref Vector3D b)
-	{
-		INTERNAL_CALL_Internal_OrthoNormalize2(ref a, ref b);
-	}
-
-	private static void Internal_OrthoNormalize3(ref Vector3D a, ref Vector3D b, ref Vector3D c)
-	{
-		INTERNAL_CALL_Internal_OrthoNormalize3(ref a, ref b, ref c);
-	}
-
 	public static Vector3D Lerp(Vector3D a, Vector3D b, double t)
 	{
 		t = MathHelper.Clamp(t, 0.0, 1.0);
@@ -163,12 +151,22 @@ public struct Vector3D
 
 	public static void OrthoNormalize(ref Vector3D normal, ref Vector3D tangent)
 	{
-		Internal_OrthoNormalize2(ref normal, ref tangent);
+		normal.Normalize();
+		double dot0 = Dot(normal, tangent);
+		tangent -= dot0 * normal;
+		tangent.Normalize();
 	}
 
 	public static void OrthoNormalize(ref Vector3D normal, ref Vector3D tangent, ref Vector3D binormal)
 	{
-		Internal_OrthoNormalize3(ref normal, ref tangent, ref binormal);
+		normal.Normalize();
+		double dot0 = Dot(normal, tangent);
+		tangent -= dot0 * normal;
+		tangent.Normalize();
+		double dot1 = Dot(tangent, binormal);
+		dot0 = Dot(normal, binormal);
+		binormal -= dot0 * normal + dot1 * tangent;
+		binormal.Normalize();
 	}
 
 	public static Vector3D Project(Vector3D vector, Vector3D onNormal)
@@ -191,27 +189,9 @@ public struct Vector3D
 		return -2.0 * Dot(inNormal, inDirection) * inNormal + inDirection;
 	}
 
-	public static Vector3D RotateTowards(Vector3D current, Vector3D target, double maxRadiansDelta, double maxMagnitudeDelta)
-	{
-		INTERNAL_CALL_RotateTowards(ref current, ref target, maxRadiansDelta, maxMagnitudeDelta, out var result);
-		return result;
-	}
-
 	public static Vector3D Scale(Vector3D a, Vector3D b)
 	{
 		return new Vector3D(a.X * b.X, a.Y * b.Y, a.Z * b.Z);
-	}
-
-	public static Vector3D Slerp(Vector3D a, Vector3D b, double t)
-	{
-		INTERNAL_CALL_Slerp(ref a, ref b, t, out var result);
-		return result;
-	}
-
-	public static Vector3D SlerpUnclamped(Vector3D a, Vector3D b, double t)
-	{
-		INTERNAL_CALL_SlerpUnclamped(ref a, ref b, t, out var result);
-		return result;
 	}
 
 	public static Vector3D SmoothDamp(Vector3D current, Vector3D target, ref Vector3D currentVelocity, double smoothTime, double deltaTime)
@@ -330,43 +310,5 @@ public struct Vector3D
 	public static Vector3D operator -(Vector3D a)
 	{
 		return new Vector3D(0.0 - a.X, 0.0 - a.Y, 0.0 - a.Z);
-	}
-
-	private static void INTERNAL_CALL_Internal_OrthoNormalize2(ref Vector3D a, ref Vector3D b)
-	{
-		a.Normalize();
-		double dot0 = Dot(a, b);
-		b -= dot0 * a;
-		b.Normalize();
-	}
-
-	private static void INTERNAL_CALL_Internal_OrthoNormalize3(ref Vector3D a, ref Vector3D b, ref Vector3D c)
-	{
-		a.Normalize();
-		double dot0 = Dot(a, b);
-		b -= dot0 * a;
-		b.Normalize();
-		double dot1 = Dot(b, c);
-		dot0 = Dot(a, c);
-		c -= dot0 * a + dot1 * b;
-		c.Normalize();
-	}
-
-	private static void INTERNAL_CALL_RotateTowards(ref Vector3D current, ref Vector3D target, double maxRadiansDelta, double maxMagnitudeDelta, out Vector3D value)
-	{
-		value = Zero;
-		throw new Exception("INTERNAL_CALL_RotateTowards IS NOT IMPLEMENTED");
-	}
-
-	private static void INTERNAL_CALL_Slerp(ref Vector3D a, ref Vector3D b, double t, out Vector3D value)
-	{
-		value = Zero;
-		throw new Exception("INTERNAL_CALL_Slerp IS NOT IMPLEMENTED");
-	}
-
-	private static void INTERNAL_CALL_SlerpUnclamped(ref Vector3D a, ref Vector3D b, double t, out Vector3D value)
-	{
-		value = Zero;
-		throw new Exception("INTERNAL_CALL_SlerpUnclamped IS NOT IMPLEMENTED");
 	}
 }

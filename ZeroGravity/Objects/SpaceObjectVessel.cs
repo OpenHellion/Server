@@ -974,7 +974,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				float ratio = MathHelper.Clamp((radius - dist) / radius, 0f, 1f);
 				if (pivot.Child is Player player)
 				{
-					await player.Stats.TakeDamage(HurtType.Explosion, ratio * baseDamage);
+					await player.TakeDamage(HurtType.Explosion, ratio * baseDamage);
 				}
 				Vector3D thrust = (pos - Position).Normalized * 10.0 * ratio;
 				pivot.Orbit.InitFromStateVectors(pivot.Orbit.Parent, pivot.Orbit.Position, pivot.Orbit.Velocity + thrust, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);

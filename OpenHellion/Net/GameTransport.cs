@@ -235,7 +235,7 @@ internal sealed class GameTransport
 			{
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				var packedData = await ProtoSerialiser.Pack(data);
-				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
+				await connectionData.stream.WriteAsync(packedData, connectionData.cancellationToken.Token).ConfigureAwait(false);
 			}
 		}
 		catch (IOException)
@@ -272,7 +272,7 @@ internal sealed class GameTransport
 				}
 				connectionData.syncResponseReceivedEvent += responseHandler;
 
-				await connectionData.stream.WriteAsync(packedData).ConfigureAwait(false);
+				await connectionData.stream.WriteAsync(packedData, connectionData.cancellationToken.Token).ConfigureAwait(false);
 
 				await Task.Delay(TIMEOUT_MS, responseCancel.Token);
 				connectionData.syncResponseReceivedEvent -= responseHandler;

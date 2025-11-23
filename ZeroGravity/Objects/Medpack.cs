@@ -47,7 +47,7 @@ public class Medpack : Item
 		{
 			if (DynamicObj.Parent is Player)
 			{
-				(DynamicObj.Parent as Player).Stats.HealOverTime(RegenRate, MaxHp / RegenRate);
+				(DynamicObj.Parent as Player).HealOverTime(RegenRate, MaxHp / RegenRate);
 			}
 			await DynamicObj.SendStatsToClient();
 			destroyTimer = new Timer(2500.0);

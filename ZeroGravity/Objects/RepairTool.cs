@@ -25,8 +25,6 @@ internal class RepairTool : Item, ICargo
 
 	private RepairToolStats _StatsNew = new RepairToolStats();
 
-	private float maxFuel => FuelCompartment.Capacity;
-
 	private float currentFuel => FuelCompartment.Resources.Count > 0 ? FuelCompartment.Resources[0].Quantity : 0f;
 
 	public float FreeSpace => FuelCompartment.Capacity - FuelCompartment.Resources.Sum((CargoResourceData m) => m.Quantity);

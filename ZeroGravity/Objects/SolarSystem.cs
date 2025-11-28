@@ -94,7 +94,7 @@ public class SolarSystem
 		{
 			body.Update();
 		}
-		List<ArtificialBody> artificialBodies = new List<ArtificialBody>(_artificialBodies.Values);
+		List<ArtificialBody> artificialBodies = [.. _artificialBodies.Values];
 		await Parallel.ForEachAsync(artificialBodies, async (ab, ct) =>
 		{
 			await ab.Update();
@@ -103,26 +103,14 @@ public class SolarSystem
 		{
 			await ab.AfterUpdate();
 		});
-		if (!CheckDestroyMarkedBodies)
+		if (CheckDestroyMarkedBodies)
 		{
-			return;
+			foreach (ArtificialBody ab2 in artificialBodies.Where((ArtificialBody m) => m.MarkForDestruction))
+			{
+				await Server.Instance.DestroyArtificialBody(ab2);
+			}
+			CheckDestroyMarkedBodies = false;
 		}
-		foreach (ArtificialBody ab2 in artificialBodies.Where((ArtificialBody m) => m.MarkForDestruction))
-		{
-			await Server.Instance.DestroyArtificialBody(ab2);
-		}
-		CheckDestroyMarkedBodies = false;
-	}
-
-	public async Task SendMovementMessage()
-	{
-		Player[] players = [.. Server.Instance.AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive)];
-		if (players.Length < 1)
-		{
-			return;
-		}
-
-		await Parallel.ForEachAsync(players, async (pl, ct) => await SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
 	}
 
 	/// <summary>

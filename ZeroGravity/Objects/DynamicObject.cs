@@ -289,17 +289,6 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	{
 	}
 
-	private string GetUnknownAttachMessage(DynamicObjectAttachData data)
-	{
-		DynamicObjectAttachData curr = GetCurrAttachData();
-		return string.Format("Current: {0}, {1}, {10}, {2}, {3}, {4}\r\nNew: {5}, {6}, {7}, {8}, {9}", curr.ParentGUID, curr.ParentType, curr.IsAttached, curr.InventorySlotID, curr.APDetails != null ? curr.APDetails.InSceneID : 0, data.ParentGUID, data.ParentType, data.IsAttached, data.InventorySlotID, data.APDetails != null ? data.APDetails.InSceneID : 0, Parent is Ship ? (Parent as Ship).SceneID : GameScenes.SceneId.None);
-	}
-
-	private bool CanBePickedUp(Player player, DynamicObject parentDObj)
-	{
-		return parentDObj.Parent == player || (parentDObj.Item is Outfit && parentDObj.Parent is not Player);
-	}
-
 	private async void DynamicObjectStatsMessageListener(NetworkData data)
 	{
 		var message = data as DynamicObjectStatsMessage;

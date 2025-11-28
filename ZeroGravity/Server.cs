@@ -2015,7 +2015,13 @@ public class Server
 		if (_movementMessageTimer >= MovementMessageSendInterval)
 		{
 			_movementMessageTimer = 0.0;
-			await SolarSystem.SendMovementMessage();
+			Player[] players = [.. AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive)];
+			if (players.Length < 1)
+			{
+				return;
+			}
+
+			await Parallel.ForEachAsync(players, async (pl, ct) => await SolarSystem.SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
 		}
 
 		if (!VesselsDataUpdate.IsEmpty)
@@ -2026,32 +2032,6 @@ public class Server
 			});
 			VesselsDataUpdate.Clear();
 		}
-	}
-
-	public async Task RemoveWorldObjects()
-	{
-		Debug.LogInfo("REMOVING ALL WORLD OBJECTS");
-		NetworkController.DisconnectAllClients();
-		_players.Clear();
-		_spaceObjects.Clear();
-		ArtificialBody[] artificialBodies = Instance.SolarSystem.GetArtificialBodies();
-		await Parallel.ForEachAsync(artificialBodies, async (ab, ct) =>
-		{
-			if (ab is Ship ship)
-			{
-				await ship.Destroy();
-			}
-			else if (ab is Asteroid asteroid)
-			{
-				await asteroid.Destroy();
-			}
-			else
-			{
-				Instance.SolarSystem.RemoveArtificialBody(ab);
-			}
-		});
-		_vessels.Clear();
-		WorldInitialized = false;
 	}
 
 	public async Task DestroyArtificialBody(ArtificialBody ab, bool destroyChildren = true, bool vesselExploded = false)
@@ -2337,38 +2317,6 @@ public class Server
 		}
 		Process.Start(fileName, arguments);
 		Process.GetCurrentProcess().Kill();
-	}
-
-	private void ToggleLockDoor(Ship ship, short inSceneId, bool isLocked)
-	{
-		VesselDockingPort port = ship.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == inSceneId);
-		if (port == null)
-		{
-			throw new KeyNotFoundException("Could not find door with id: " + inSceneId);
-		}
-		int[] doorsIDs = port.DoorsIDs;
-		for (int i = 0; i < doorsIDs.Length; i++)
-		{
-			short id = (short)doorsIDs[i];
-			Door d = ship.Doors.Find((Door m) => m.ID.InSceneID == id);
-			if (d != null)
-			{
-				d.IsLocked = isLocked;
-			}
-		}
-	}
-
-	private void OpenDoor(Ship ship, short inSceneId, int newState)
-	{
-		ship.SceneTriggerExecutors.Find((SceneTriggerExecutor m) => m.InSceneID == inSceneId)?.ChangeState(0L, new SceneTriggerExecutorDetails
-		{
-			InSceneID = inSceneId,
-			NewStateID = newState,
-			CurrentStateID = 1,
-			IsImmediate = true,
-			IsFail = false,
-			PlayerThatActivated = 0L
-		});
 	}
 
 	private async void SubscribeToSpaceObjectListener(NetworkData data)

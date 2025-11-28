@@ -199,16 +199,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		await CurrentCourse.SendCourseStartResponse();
 	}
 
-	private Vector3D getClampedVector(float[] vec)
-	{
-		Vector3D retVal = vec.ToVector3D();
-		if (retVal.SqrMagnitude > 1.0)
-		{
-			return retVal.Normalized;
-		}
-		return retVal;
-	}
-
 	public bool CalculateEngineThrust(double timeDelta)
 	{
 		double currPerc = engineThrustPercentage;

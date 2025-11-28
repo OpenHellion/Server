@@ -706,7 +706,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		MouseLook = message.TransformData.MouseLook;
 		FreeLookX = message.TransformData.FreeLookX;
 		FreeLookY = message.TransformData.FreeLookY;
-		CharacterAnimationData tmp = new CharacterAnimationData
+		AnimationData = new CharacterAnimationData
 		{
 			VelocityForward = message.AnimationData.VelocityForward,
 			VelocityRight = message.AnimationData.VelocityRight,
@@ -726,7 +726,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			FireMode = message.AnimationData.FireMode,
 			AirTime = message.AnimationData.AirTime
 		};
-		AnimationData = tmp;
 		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && message.ParentType == SpaceObjectType.PlayerPivot && !message.PivotReset)
 		{
 			return;

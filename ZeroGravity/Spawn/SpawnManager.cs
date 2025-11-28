@@ -515,12 +515,6 @@ public static class SpawnManager
 		Debug.LogInfo(dbgString + "\n");
 	}
 
-	private static void GenerateSampleData(bool force)
-	{
-		SpawnSerialization.GenerateLootSampleData(force);
-		SpawnSerialization.GenerateSpawnRuleSampleData(force);
-	}
-
 	public static async Task Initialize(bool isPersistenceInitialize = false)
 	{
 		Debug.Log("Initialising spawn rules...");

@@ -4,8 +4,6 @@ namespace ZeroGravity.Math;
 
 public struct QuaternionD
 {
-	private const double epsilon = 1E-06;
-
 	public double X;
 
 	public double Y;
@@ -20,11 +18,11 @@ public struct QuaternionD
 		{
 			return index switch
 			{
-				0 => X, 
-				1 => Y, 
-				2 => Z, 
-				3 => W, 
-				_ => throw new IndexOutOfRangeException("Invalid Quaternion index!"), 
+				0 => X,
+				1 => Y,
+				2 => Z,
+				3 => W,
+				_ => throw new IndexOutOfRangeException("Invalid Quaternion index!"),
 			};
 		}
 		set

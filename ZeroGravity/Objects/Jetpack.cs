@@ -31,21 +31,11 @@ public class Jetpack : Item, ICargo
 		PropellantCapacity = PropellantCompartment.Capacity
 	};
 
-	public bool HasFuel => currentFuel > float.Epsilon;
-
 	public bool HasOxygen => currentOxygen > float.Epsilon;
-
-	private float maxFuel => PropellantCompartment.Capacity;
-
-	private float currentFuel => PropellantCompartment.Resources.Count > 0 ? PropellantCompartment.Resources[0].Quantity : 0f;
-
-	private float maxOxygen => OxygenCompartment.Capacity;
 
 	private float currentOxygen => OxygenCompartment.Resources.Count > 0 ? OxygenCompartment.Resources[0].Quantity : 0f;
 
 	public List<CargoCompartmentData> Compartments => _Compartments;
-
-	public float ChargeAmount => 1f;
 
 	private Jetpack()
 	{

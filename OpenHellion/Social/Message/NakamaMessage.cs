@@ -1,6 +1,6 @@
-// NakamaResponse.cs
+// NakamaMessage.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,22 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Newtonsoft.Json;
+
 using OpenHellion.IO;
 
-namespace OpenHellion.Net.Message.MainServer;
+namespace OpenHellion.Social.Message;
 
-[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class NakamaResponse
+public abstract class NakamaMessage
 {
-	[JsonProperty("error")]
-	public object Error;
-
-	[JsonProperty("message")]
-	public string Message;
-
-	[JsonProperty("code")]
-	public int Code;
+	public abstract string GetDestination();
 
 	public override string ToString()
 	{

@@ -1,6 +1,6 @@
-// MainServerConnection.cs
+// SocialServerConnection.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,14 +23,14 @@ using System.Text;
 using System.Threading.Tasks;
 using OpenHellion.Exceptions;
 using OpenHellion.IO;
-using OpenHellion.Net.Message.MainServer;
+using OpenHellion.Social.Message;
 
-namespace OpenHellion.Net;
+namespace OpenHellion.Social;
 
 /// <summary>
 /// 	Handles connections to the main server. This is the Nakama repository located at: https://github.com/OpenHellion/Nakama
 /// </summary>
-public static class MainServerConnection
+public static class SocialServerConnection
 {
 	public static string IpAddress = "127.0.0.1";
 	public static ushort Port = 7350;

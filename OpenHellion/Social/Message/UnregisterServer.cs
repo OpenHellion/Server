@@ -1,6 +1,6 @@
-// StatusCode.cs
+﻿// UnregisterServer.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,25 +15,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace OpenHellion.Net;
+using System;
+using Newtonsoft.Json;
 
-public enum StatusCode
+namespace OpenHellion.Social.Message;
+
+[Serializable]
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+public class UnregisterServer : NakamaMessage
 {
-	Ok = 0,
-	Canceled = 1,
-	Unknown = 2,
-	InvalidArgument = 3,
-	DeadlineExceeded = 4,
-	NotFound = 5,
-	AlreadyExists = 6,
-	PermissionDenied = 7,
-	ResourceExhausted = 8,
-	FailedPrecondition = 9,
-	Aborted = 10,
-	OutOfRange = 11,
-	Unimplemented = 12,
-	Internal = 13,
-	Unavailable = 14,
-	DataLoss = 15,
-	Unauthenticated = 16,
+	public string ServerId;
+
+	public int GamePort;
+
+	public int StatusPort;
+
+	public override string GetDestination()
+	{
+		return "unregister_server";
+	}
 }

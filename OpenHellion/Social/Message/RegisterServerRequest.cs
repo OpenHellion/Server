@@ -1,6 +1,6 @@
-// NakamaMessage.cs
+// RegisterServerRequest.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,17 +15,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System;
+using Newtonsoft.Json;
 
-using OpenHellion.IO;
+namespace OpenHellion.Social.Message;
 
-namespace OpenHellion.Net.Message.MainServer;
-
-public abstract class NakamaMessage
+[Serializable]
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+public class RegisterServerRequest : NakamaMessage
 {
-	public abstract string GetDestination();
+	public string AuthToken;
 
-	public override string ToString()
+	public string Location;
+
+	public int GamePort;
+
+	public int StatusPort;
+
+	public uint Hash;
+
+	public override string GetDestination()
 	{
-		return JsonSerialiser.Serialize(this, JsonSerialiser.Formatting.None);
+		return "register_server";
 	}
 }

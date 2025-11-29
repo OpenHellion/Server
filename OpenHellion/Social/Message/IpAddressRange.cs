@@ -1,6 +1,6 @@
 // IpAddressRange.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 using System;
 using Newtonsoft.Json;
 
-namespace OpenHellion.Net.Message.MainServer;
+namespace OpenHellion.Social.Message;
 
 [Serializable]
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]

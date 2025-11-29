@@ -1,6 +1,6 @@
-// RegisterServerResponse.cs
+// StatusCode.cs
 //
-// Copyright (C) 2023, OpenHellion contributors
+// Copyright (C) 2025, OpenHellion contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,16 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using System;
-using Newtonsoft.Json;
+namespace OpenHellion.Social;
 
-namespace OpenHellion.Net.Message.MainServer;
-
-[Serializable]
-[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class RegisterServerResponse : NakamaResponse
+public enum StatusCode
 {
-	public string ServerId;
-
-	public IpAddressRange[] AdminIpAddressRanges;
+	Ok = 0,
+	Canceled = 1,
+	Unknown = 2,
+	InvalidArgument = 3,
+	DeadlineExceeded = 4,
+	NotFound = 5,
+	AlreadyExists = 6,
+	PermissionDenied = 7,
+	ResourceExhausted = 8,
+	FailedPrecondition = 9,
+	Aborted = 10,
+	OutOfRange = 11,
+	Unimplemented = 12,
+	Internal = 13,
+	Unavailable = 14,
+	DataLoss = 15,
+	Unauthenticated = 16,
 }

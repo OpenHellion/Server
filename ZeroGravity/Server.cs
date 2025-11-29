@@ -12,7 +12,8 @@ using BulletSharp;
 using OpenHellion;
 using OpenHellion.IO;
 using OpenHellion.Net;
-using OpenHellion.Net.Message.MainServer;
+using OpenHellion.Social;
+using OpenHellion.Social.Message;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -665,9 +666,9 @@ public class Server
 		Properties.GetProperty("server_tick_count", ref _numberOfTicks);
 		Properties.GetProperty("game_port", ref GamePort);
 		Properties.GetProperty("status_port", ref StatusPort);
-		Properties.GetProperty("http_key", ref MainServerConnection.HttpKey);
-		Properties.GetProperty("main_server_ip", ref MainServerConnection.IpAddress);
-		Properties.GetProperty("main_server_port", ref MainServerConnection.Port);
+		Properties.GetProperty("http_key", ref SocialServerConnection.HttpKey);
+		Properties.GetProperty("main_server_ip", ref SocialServerConnection.IpAddress);
+		Properties.GetProperty("main_server_port", ref SocialServerConnection.Port);
 		string admins = "";
 		Properties.GetProperty("server_admins", ref admins);
 		string[] adminsArray = admins.Split(',');
@@ -872,7 +873,7 @@ public class Server
 
 		try
 		{
-			RegisterServerResponse response = await MainServerConnection.Send<RegisterServerResponse>(new RegisterServerRequest
+			RegisterServerResponse response = await SocialServerConnection.Send<RegisterServerResponse>(new RegisterServerRequest
 			{
 				AuthToken = Properties.GetProperty<string>("auth_key"),
 				Location = RegionInfo.CurrentRegion.EnglishName,
@@ -2242,7 +2243,7 @@ public class Server
 		{
 			try
 			{
-				await MainServerConnection.Send(new UnregisterServer()
+				await SocialServerConnection.Send(new UnregisterServer()
 				{
 					GamePort = GamePort,
 					StatusPort = StatusPort,

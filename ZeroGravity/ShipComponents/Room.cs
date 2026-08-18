@@ -304,6 +304,11 @@ public class Room : IPersistantObject, IResourceUser
 
 	public void AddAirConsumer(IAirConsumer consumer)
 	{
+		if (consumer == null)
+		{
+			Debug.LogError("Tried to add a null air consumer to room", ID.InSceneID);
+			return;
+		}
 		AirConsumers.Add(consumer);
 		if (CompoundRoom != null)
 		{

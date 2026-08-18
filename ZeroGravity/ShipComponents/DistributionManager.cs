@@ -1577,7 +1577,7 @@ public class DistributionManager
 			quantityLoss = 0f;
 			if (duration > 0f)
 			{
-				foreach (IAirConsumer cons in cav.AirConsumers.Where((IAirConsumer m) => m is not AirConsumerFire))
+				foreach (IAirConsumer cons in cav.AirConsumers.Where((IAirConsumer m) => m is not null and not AirConsumerFire))
 				{
 					qualityLoss += cav.AirPressure > 0f ? cons.AirQualityDegradationRate / cav.Volume / cav.AirPressure * duration : 0f;
 					quantityLoss += cons.AirQuantityDecreaseRate * duration;

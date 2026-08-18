@@ -1640,52 +1640,52 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (data.ResourceTanks != null)
 		{
-			await Parallel.ForEachAsync(data.ResourceTanks, async (rtd, ct) =>
+			foreach (var rtd in data.ResourceTanks)
 			{
 				await DistributionManager.GetResourceContainer(new VesselObjectID(Guid, rtd.InSceneID))?.LoadPersistenceData(rtd);
-			});
+			}
 		}
 		if (data.Generators != null)
 		{
-			await Parallel.ForEachAsync(data.Generators, async (vc, ct) =>
+			foreach (var vc in data.Generators)
 			{
 				await DistributionManager.GetGenerator(new VesselObjectID(Guid, vc.InSceneID))?.LoadPersistenceData(vc);
-			});
+			}
 		}
 		if (data.SubSystems != null)
 		{
-			await Parallel.ForEachAsync(data.SubSystems, async (subSystem, ct) =>
+			foreach (var subSystem in data.SubSystems)
 			{
 				await DistributionManager.GetSubSystem(new VesselObjectID(Guid, subSystem.InSceneID))?.LoadPersistenceData(subSystem);
-			});
+			}
 		}
 		if (data.Rooms != null)
 		{
-			await Parallel.ForEachAsync(data.Rooms, async (room, ct) =>
+			foreach (var room in data.Rooms)
 			{
 				await DistributionManager.GetRoom(new VesselObjectID(Guid, room.InSceneID))?.LoadPersistenceData(room);
-			});
+			}
 		}
 		if (data.Doors != null)
 		{
-			await Parallel.ForEachAsync(data.Doors, async (door, ct) =>
+			foreach (var door in data.Doors)
 			{
 				await Doors.Find((Door x) => x.ID.InSceneID == door.InSceneID)?.LoadPersistenceData(door);
-			});
+			}
 		}
 		if (data.DockingPorts != null)
 		{
-			await Parallel.ForEachAsync(data.DockingPorts, async (dp, ct) =>
+			foreach (var dp in data.DockingPorts)
 			{
-				await DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == dp.InSceneID)?.LoadPersistenceData(dp);
-			});
+				await DockingPorts.FirstOrDefault((VesselDockingPort m) => m.ID.InSceneID == dp.InSceneID)?.LoadPersistenceData(dp);
+			}
 		}
 		if (data.Executors != null)
 		{
-			await Parallel.ForEachAsync(data.Executors, async (executor, ct) =>
+			foreach (var executor in data.Executors)
 			{
 				await SceneTriggerExecutors.Find(x => x.InSceneID == executor.InSceneID)?.LoadPersistenceData(executor);
-			});
+			}
 		}
 		if (data.NameTags != null)
 		{
@@ -1700,10 +1700,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (data.RepairPoints is { Count: > 0 })
 		{
-			await Parallel.ForEachAsync(data.RepairPoints, async (rp, ct) =>
+			foreach (var rp in data.RepairPoints)
 			{
 				await RepairPoints.Find((VesselRepairPoint x) => x.ID.InSceneID == rp.InSceneID)?.LoadPersistenceData(rp);
-			});
+			}
 		}
 		await MainDistributionManager.UpdateSystems();
 		if (data.OrbitData != null)
@@ -1712,25 +1712,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		Server.Instance.Add(this);
 		SetPhysicsParameters();
-		if (data.DockedToShipGUID.HasValue)
-		{
-			Ship dockToShip = Server.Instance.GetVessel(data.DockedToShipGUID.Value) as Ship;
-
-			VesselDockingPort myPort = DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedPortID.Value);
-			VesselDockingPort dockedToPort = dockToShip.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedToPortID.Value);
-
-			System.Diagnostics.Debug.Assert(myPort != null);
-			System.Diagnostics.Debug.Assert(dockedToPort != null);
-
-			await DockToVessel(myPort, dockedToPort, dockToShip, disableStabilization: false, useCurrentSolarSystemTime: true, buildingStation: true);
-		}
-		if (data.StabilizeToTargetGUID.HasValue)
-		{
-			SpaceObjectVessel ab = Server.Instance.GetObject(data.StabilizeToTargetGUID.Value) as SpaceObjectVessel;
-			StabilizeToTarget(ab, forceStabilize: true);
-			StabilizeToTargetRelPosition = data.StabilizeToTargetPosition.ToVector3D();
-			await UpdateStabilization();
-		}
 		if (data.timePassedSinceShipCall > 0.0)
 		{
 			LoadShipRequestPersistance(data.timePassedSinceShipCall);
@@ -1747,6 +1728,43 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		if (data.CourseInProgress != null)
 		{
 			CurrentCourse = await ManeuverCourse.ParsePersistenceData(data.CourseInProgress, this);
+		}
+	}
+
+	/// <summary>
+	/// 	Restores docking and stabilisation, which both refer to other vessels by GUID.
+	/// 	Must run after every vessel has been created, and one vessel at a time: docking rewrites
+	/// 	the shared docked-vessels tree, so doing it concurrently corrupts that tree into cycles.
+	/// </summary>
+	public async Task LoadDockingPersistenceData(PersistenceObjectData persistenceData)
+	{
+		PersistenceObjectDataShip data = persistenceData as PersistenceObjectDataShip;
+		if (data.DockedToShipGUID.HasValue)
+		{
+			if (Server.Instance.GetVessel(data.DockedToShipGUID.Value) is not Ship dockToShip)
+			{
+				Debug.LogError("Could not find vessel to dock to", Guid, data.DockedToShipGUID.Value);
+			}
+			else
+			{
+				VesselDockingPort myPort = DockingPorts.FirstOrDefault((VesselDockingPort m) => m.ID.InSceneID == data.DockedPortID.Value);
+				VesselDockingPort dockedToPort = dockToShip.DockingPorts.FirstOrDefault((VesselDockingPort m) => m.ID.InSceneID == data.DockedToPortID.Value);
+				if (myPort == null || dockedToPort == null)
+				{
+					Debug.LogError("Could not find docking port", Guid, data.DockedPortID, data.DockedToPortID);
+				}
+				else
+				{
+					await DockToVessel(myPort, dockedToPort, dockToShip, disableStabilization: false, useCurrentSolarSystemTime: true, buildingStation: true);
+				}
+			}
+		}
+		if (data.StabilizeToTargetGUID.HasValue)
+		{
+			SpaceObjectVessel ab = Server.Instance.GetObject(data.StabilizeToTargetGUID.Value) as SpaceObjectVessel;
+			StabilizeToTarget(ab, forceStabilize: true);
+			StabilizeToTargetRelPosition = data.StabilizeToTargetPosition.ToVector3D();
+			await UpdateStabilization();
 		}
 	}
 

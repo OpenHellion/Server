@@ -292,18 +292,30 @@ public class BulletPhysicsController
 	{
 		try
 		{
-			lock (_dynamicsWorld)
+			// Walk up the docking tree iteratively, remembering where we have been. A vessel loaded
+			// from persistence can end up in a docking cycle (A docked to B, B docked back to A), and
+			// following it recursively overflows the stack and takes the whole server down.
+			HashSet<SpaceObjectVessel> visited = [];
+			while (ship != null && visited.Add(ship))
 			{
-				if (ship.RigidBody != null && _dynamicsWorld.CollisionObjectArray.Contains(ship.RigidBody))
+				lock (_dynamicsWorld)
 				{
-					_dynamicsWorld.RemoveRigidBody(ship.RigidBody);
-					ship.RigidBody = null;
+					if (ship.RigidBody != null && _dynamicsWorld.CollisionObjectArray.Contains(ship.RigidBody))
+					{
+						_dynamicsWorld.RemoveRigidBody(ship.RigidBody);
+						ship.RigidBody = null;
+						return true;
+					}
+				}
+				if (!ship.IsDocked)
+				{
 					return true;
 				}
+				ship = ship.DockedToMainVessel as Ship;
 			}
-			if (ship.IsDocked)
+			if (ship != null)
 			{
-				return RemoveRigidBody(ship.DockedToMainVessel as Ship);
+				Debug.LogError("Cycle in docking tree while removing rigid body", ship.Guid);
 			}
 			return true;
 		}

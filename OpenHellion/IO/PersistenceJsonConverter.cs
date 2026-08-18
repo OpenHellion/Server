@@ -7,6 +7,11 @@ namespace OpenHellion.IO;
 
 public class PersistenceJsonConverter : JsonConverter
 {
+	// This converter only resolves the concrete type when reading. Writing is left to the default
+	// serialiser, which stores the type in PersistenceData.__ObjectType. Serialising here would
+	// re-enter this converter through the same JsonSerializer and recurse until the stack overflows.
+	public override bool CanWrite => false;
+
 	public override bool CanConvert(Type objectType)
 	{
 		return objectType == typeof(PersistenceData) || objectType == typeof(PersistenceObjectData);
@@ -24,6 +29,6 @@ public class PersistenceJsonConverter : JsonConverter
 
 	public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
 	{
-		serializer.Serialize(writer, value);
+		throw new NotSupportedException("PersistenceJsonConverter is read-only.");
 	}
 }

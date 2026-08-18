@@ -162,8 +162,18 @@ public class Persistence
 			filename = string.Format(PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 		}
 
-		// TODO: FIX
-		// JsonSerialiser.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), JsonSerialiser.Formatting.None);
+		// Save to the same directory that Load and the cleanup above scan, so that saves are
+		// found again when the server is started with a custom config directory.
+		string savePath = Path.Combine(d.FullName, filename);
+		try
+		{
+			JsonSerialiser.SerializeToFile(per, savePath, JsonSerialiser.Formatting.None);
+		}
+		catch (Exception ex)
+		{
+			Debug.LogError("Failed to save world", savePath, ex.Message);
+			return;
+		}
 		Debug.Log("Saved world...");
 	}
 
@@ -249,28 +259,42 @@ public class Persistence
 			Server.Instance.SolarSystem.CalculatePositionsAfterTime(persistence.SolarSystemTime);
 			if (persistence.Asteroids != null)
 			{
-				await Parallel.ForEachAsync(persistence.Asteroids, async (asteroidData, ct) =>
+				// Loading is deliberately sequential: the game code it drives mutates shared state
+				// (rooms, docking trees, air consumers) through plain List<T>, which is not thread safe.
+				foreach (var asteroidData in persistence.Asteroids)
 				{
 					Asteroid ast = new Asteroid(asteroidData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
 					await ast.LoadPersistenceData(asteroidData);
-				});
+				}
 			}
 			if (persistence.Ships != null)
 			{
-				await Parallel.ForEachAsync(persistence.Ships, async (shipData, ct) =>
+				foreach (var shipData in persistence.Ships)
 				{
 					Ship sh = new Ship(shipData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
 					await sh.LoadPersistenceData(shipData);
-				});
+				}
+
+				// Second pass, after every vessel exists and one at a time. Docking refers to another
+				// vessel by GUID, so it cannot run while the vessels are still being created, and it
+				// rewrites the shared docked-vessels tree, so running it in parallel corrupts that tree
+				// into cycles that later overflow the stack when it is walked.
+				foreach (PersistenceObjectData shipData in persistence.Ships)
+				{
+					if (Server.Instance.GetVessel(shipData.GUID) is Ship sh)
+					{
+						await sh.LoadDockingPersistenceData(shipData);
+					}
+				}
 			}
 			if (persistence.Players != null)
 			{
-				await Parallel.ForEachAsync(persistence.Players, async (data, ct) =>
+				foreach (var data in persistence.Players)
 				{
 					var playerData = data as PersistenceObjectDataPlayer;
 					Player player = await Player.CreatePlayerAsync(playerData.GUID, Vector3D.Zero, QuaternionD.Identity, "PersistenceLoad", "", playerData.Gender, playerData.HeadType, playerData.HairType, addToServerList: false);
 					await player.LoadPersistenceData(playerData);
-				});
+				}
 			}
 			if (persistence.RespawnObjects != null)
 			{
@@ -288,12 +312,12 @@ public class Persistence
 			}
 			if (persistence.ArenaControllers != null)
 			{
-				await Parallel.ForEachAsync(persistence.ArenaControllers, async (data, ct) =>
+				foreach (var data in persistence.ArenaControllers)
 				{
 					var arenaControllerData = data as PersistenceArenaControllerData;
 					DeathMatchArenaController arenaController = new DeathMatchArenaController();
 					await arenaController.LoadPersistenceData(arenaControllerData);
-				});
+				}
 			}
 			if (persistence.DoomControllerData != null)
 			{

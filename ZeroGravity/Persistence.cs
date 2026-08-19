@@ -104,7 +104,8 @@ public class Persistence
 			Players = new HashSet<PersistenceObjectData>(),
 			RespawnObjects = new HashSet<PersistenceObjectData>(),
 			SpawnPoints = new HashSet<PersistenceObjectData>(),
-			ArenaControllers = new HashSet<PersistenceObjectData>()
+			ArenaControllers = new HashSet<PersistenceObjectData>(),
+			Pivots = new HashSet<PersistenceObjectData>()
 		};
 
 		foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
@@ -144,6 +145,26 @@ public class Persistence
 		{
 			per.ArenaControllers.Add(dmac.GetPersistenceData());
 		}
+
+		// Items a player released inside a vessel float on their own pivot and belong to no vessel, so
+		// nothing else in this file reaches them and they are lost on shutdown. Record which vessel
+		// each one was released in, so it can be put back there on load. Items released in open space
+		// have no vessel and are deliberately left out: they drift out of reach and are cleaned up.
+		foreach (SpaceObject spaceObject in Server.Instance.AllSpaceObjects)
+		{
+			if (spaceObject is not DynamicObject dobj || dobj.Parent is not Pivot || dobj.DroppedInVesselGuid == 0L)
+			{
+				continue;
+			}
+			per.Pivots.Add(new PersistenceObjectDataPivot
+			{
+				GUID = dobj.Guid,
+				ParentVesselGUID = dobj.DroppedInVesselGuid,
+				LocalPosition = dobj.DroppedLocalPosition.ToFloatArray(),
+				Child = dobj.Item != null ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData()
+			});
+		}
+
 		per.DoomControllerData = Server.Instance.DoomedShipController.GetPersistenceData();
 		per.SpawnManagerData = SpawnManager.GetPersistenceData();
 		DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
@@ -220,6 +241,45 @@ public class Persistence
 			RespawnTime = data.RespawnTime,
 			ApDetails = apd
 		});
+	}
+
+	/// <summary>
+	/// 	Puts an item that a player left lying in a vessel back into that vessel, at the place it was
+	/// 	left. It comes back as an ordinary loose item in a room rather than on a pivot, which is what
+	/// 	keeps it saved, shown to clients that come near, and out of reach of the pivot cleanup timer.
+	/// </summary>
+	private static async Task LoadPivotPersistence(PersistenceObjectDataPivot data)
+	{
+		if (data.Child is not PersistenceObjectDataDynamicObject childData)
+		{
+			Debug.LogError("Dropped item persistence has no item data", data.GUID);
+			return;
+		}
+
+		if (Server.Instance.GetObject(data.ParentVesselGUID) is not SpaceObjectVessel vessel)
+		{
+			Debug.LogError("Could not find the vessel a dropped item belongs to", data.GUID, data.ParentVesselGUID);
+			return;
+		}
+
+		DynamicObject dobj = await CreateDynamicObject(childData, vessel);
+		if (dobj == null)
+		{
+			Debug.LogError("Could not recreate dropped item", data.GUID);
+			return;
+		}
+
+		// Put it back exactly as it was: on its own pivot, positioned relative to that pivot, which
+		// sits at the vessel. A vessel's own items are placed by their attach point, so an item lying
+		// loose in a room cannot be expressed as a child of the vessel - clients have no way to place
+		// it. Floating on a pivot is how the game represents this, and clients already draw it.
+		dobj.Parent = new Pivot(dobj, vessel);
+		if (data.LocalPosition != null)
+		{
+			dobj.LocalPosition = data.LocalPosition.ToVector3D();
+		}
+		dobj.DroppedInVesselGuid = vessel.Guid;
+		dobj.DroppedLocalPosition = dobj.LocalPosition;
 	}
 
 	private static void LoadSpawnPointPeristence(PersistenceObjectDataSpawnPoint data)
@@ -317,6 +377,13 @@ public class Persistence
 					var arenaControllerData = data as PersistenceArenaControllerData;
 					DeathMatchArenaController arenaController = new DeathMatchArenaController();
 					await arenaController.LoadPersistenceData(arenaControllerData);
+				}
+			}
+			if (persistence.Pivots != null)
+			{
+				foreach (PersistenceObjectDataPivot pivotData in persistence.Pivots.Cast<PersistenceObjectDataPivot>())
+				{
+					await LoadPivotPersistence(pivotData);
 				}
 			}
 			if (persistence.DoomControllerData != null)
@@ -424,6 +491,8 @@ public struct PersistenceObject
 	public HashSet<PersistenceObjectData> SpawnPoints;
 
 	public HashSet<PersistenceObjectData> ArenaControllers;
+
+	public HashSet<PersistenceObjectData> Pivots;
 
 	public PersistenceObjectData DoomControllerData;
 

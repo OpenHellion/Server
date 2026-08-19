@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -24,17 +25,24 @@ public class QuestTrigger
 
 		public override int GetHashCode()
 		{
-			return new object[(int)checked((nint)PlayerGUID), QuestID, ID].GetHashCode();
+			return HashCode.Combine(PlayerGUID, QuestID, ID);
 		}
 
+		// Most vessels carry no quest trigger id at all, so both sides have to tolerate null. Without
+		// this, comparing against them throws, and since the comparison happens while a player is being
+		// killed the exception escapes an async void path and takes the whole server down.
 		public static bool operator ==(QuestTriggerID x, QuestTriggerID y)
 		{
+			if (x is null || y is null)
+			{
+				return x is null && y is null;
+			}
 			return x.PlayerGUID == y.PlayerGUID && x.QuestID == y.QuestID && x.ID == y.ID;
 		}
 
 		public static bool operator !=(QuestTriggerID x, QuestTriggerID y)
 		{
-			return x.PlayerGUID != y.PlayerGUID || x.QuestID != y.QuestID || x.ID != y.ID;
+			return !(x == y);
 		}
 	}
 

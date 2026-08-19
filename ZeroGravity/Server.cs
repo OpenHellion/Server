@@ -433,6 +433,8 @@ public class Server
 
 	public ImmutableList<Player> AllPlayers => [.. _players.Values];
 
+	public ImmutableList<SpaceObject> AllSpaceObjects => [.. _spaceObjects.Values];
+
 	public static Server Instance => _serverInstance;
 
 	public TimeSpan RunTime => DateTime.UtcNow - _serverStartTime;
@@ -2043,17 +2045,20 @@ public class Server
 		}
 		if (ab is SpaceObjectVessel ves)
 		{
+			// Destroying a vessel walks into the spawn system and the name generator, which keep plain
+			// dictionaries. Doing several at once corrupts them and takes the server down, so the
+			// docked vessels and the crew are dealt with one at a time.
 			if (destroyChildren && ves.AllDockedVessels.Count > 0)
 			{
-				await Parallel.ForEachAsync(ves.AllDockedVessels, async (child, ct) =>
+				foreach (SpaceObjectVessel child in ves.AllDockedVessels.ToList())
 				{
 					await DestroyArtificialBody(child, destroyChildren: false, vesselExploded);
-				});
+				}
 			}
-			await Parallel.ForEachAsync(ves.VesselCrew, async (pl, ct) =>
+			foreach (Player pl in ves.VesselCrew.ToList())
 			{
 				await pl.KillPlayer(HurtType.Shipwreck, createCorpse: false);
-			});
+			}
 			if (vesselExploded)
 			{
 				await ves.DamageVesselsInExplosionRadius();

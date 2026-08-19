@@ -21,13 +21,26 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	private long _MasterClientID;
 
-	private DateTime lastSenderTime;
+	// Starts counting from when the object comes into existence. Left at DateTime.MinValue, an
+	// object restored from persistence looks abandoned for two millennia and SelfDestructCheck
+	// deletes it on the first tick, before any client ever gets the chance to touch it.
+	private DateTime lastSenderTime = DateTime.UtcNow;
 
 	private DateTime takeoverTime;
 
 	public double TimeToLive = -1.0;
 
 	public double LastStatsSendTime;
+
+	/// <summary>
+	/// 	The vessel this object was released inside of, and where it was at that moment. An object
+	/// 	on a pivot belongs to no vessel and so is reachable from nothing that gets persisted; this
+	/// 	is what lets it be put back into that vessel when the world is loaded again. Zero when the
+	/// 	object was released in open space, which is deliberately not persisted.
+	/// </summary>
+	public long DroppedInVesselGuid;
+
+	public Vector3D DroppedLocalPosition = Vector3D.Zero;
 
 	private Vector3D pivotPositionCorrection = Vector3D.Zero;
 
@@ -225,6 +238,13 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	private async void SelfDestructCheck(double dbl)
 	{
+		// Something released inside a vessel is meant to stay where it was left, so it is not junk just
+		// because nobody has been near it for a while. This cleanup is for things let go in open space,
+		// which drift out of reach and can never be recovered.
+		if (DroppedInVesselGuid != 0L)
+		{
+			return;
+		}
 		if (Parent is Pivot && (DateTime.UtcNow - lastSenderTime).TotalSeconds >= 300.0)
 		{
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, SelfDestructCheck);
@@ -376,7 +396,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					newParent = Server.Instance.GetObject(message.AttachData.ParentGUID) as Player;
 					if (await (newParent as Player).PlayerInventory.AddItemToInventory(Item, message.AttachData.InventorySlotID) && oldParent is not Player)
 					{
-						await removeFromOldParent;
+						removeFromOldParent.RunSynchronously();
 					}
 				}
 				else if (message.AttachData.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station)
@@ -384,7 +404,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					newParent = Server.Instance.GetObject(message.AttachData.ParentGUID) as SpaceObjectVessel;
 					if (message.AttachData.IsAttached)
 					{
-						await removeFromOldParent;
+						removeFromOldParent.RunSynchronously();
 						Parent = newParent;
 						(newParent as SpaceObjectVessel).AttachPoints.TryGetValue(message.AttachData.APDetails.InSceneID, out var ap);
 						if (ap == null || !ap.CanFitItem(Item))
@@ -405,22 +425,50 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					}
 					else
 					{
-						await removeFromOldParent;
+						removeFromOldParent.RunSynchronously();
 						LocalPosition = message.AttachData.LocalPosition.ToVector3D();
-						LocalRotation = message.AttachData.LocalPosition.ToQuaternionD();
+						LocalRotation = message.AttachData.LocalRotation.ToQuaternionD();
 					}
 				}
 				else if (message.AttachData.ParentType is SpaceObjectType.PlayerPivot or SpaceObjectType.CorpsePivot or SpaceObjectType.DynamicObjectPivot)
 				{
 					ArtificialBody refObject = GetParent<ArtificialBody>(oldParent);
+
+					// The module the item was released in, before refObject is moved up to the station
+					// it is docked into. The position the client sends is relative to this module, so
+					// recording the station instead would put the item back in the wrong frame.
+					SpaceObjectVessel releasedInside = refObject as SpaceObjectVessel;
+
 					if (refObject is SpaceObjectVessel vessel)
 					{
 						refObject = vessel.MainVessel;
 					}
+
+					// Remember where this came from while we still know: once the object is on a pivot it
+					// has no link back to the vessel it was released in. The client keeps sending attach
+					// data while the object settles, and those repeats arrive with the pivot as the old
+					// parent, so only a release from something that is not already a pivot may clear it.
+					if (releasedInside != null)
+					{
+						DroppedInVesselGuid = releasedInside.Guid;
+
+						// Where it was left, taken from the player who let go of it: their own position
+						// inside the vessel, which the server tracks from their movement. The position
+						// the client sends with the drop is relative to a root of its own that has
+						// nothing to do with the vessel, and the old parent here is the vessel itself,
+						// whose position relative to itself is nothing at all.
+						Player dropper = Server.Instance.GetPlayer(message.Sender);
+						DroppedLocalPosition = dropper != null ? dropper.LocalPosition : Vector3D.Zero;
+					}
+					else if (oldParent is not Pivot)
+					{
+						DroppedInVesselGuid = 0L;
+					}
+
 					newParent = new Pivot(this, refObject);
-					await removeFromOldParent;
+					removeFromOldParent.RunSynchronously();
 					LocalPosition = message.AttachData.LocalPosition.ToVector3D();
-					LocalRotation = message.AttachData.LocalPosition.ToQuaternionD();
+					LocalRotation = message.AttachData.LocalRotation.ToQuaternionD();
 					pivotPositionCorrection = Vector3D.Zero;
 					pivotVelocityCorrection = Vector3D.Zero;
 					foreach (Player pl in Server.Instance.AllPlayers)
@@ -438,7 +486,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					if ((newParent as DynamicObject).Item.Slots != null && (newParent as DynamicObject).Item.Slots.TryGetValue(message.AttachData.ItemSlotID, out slot) && slot != null && slot.CanFitItem(Item))
 					{
 						PickedUp();
-						await removeFromOldParent;
+						removeFromOldParent.RunSynchronously();
 						slot.FitItem(Item);
 					}
 				}
@@ -585,6 +633,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 			det.StatsData.Tier = Item.Tier;
 			det.StatsData.Armor = Item.Armor;
 		}
+
 		return new SpawnDynamicObjectResponseData
 		{
 			GUID = Guid,

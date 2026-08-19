@@ -356,19 +356,29 @@ internal sealed class GameTransport
 	// Disconnect a client with the provided id.
 	internal void DisconnectInternal(long guid)
 	{
-		_onDisconnected(guid);
-		if (_connections.TryGetValue(guid, out ConnectionData connection))
+		// Both the read loop and the socket error path reach this for the same client, so the entry is
+		// taken out first and everything below runs exactly once. Previously the second call threw on
+		// the already disposed socket before the entry could be removed, leaving the client marked as
+		// connected forever and the server refusing its next login as a duplicate.
+		if (!_connections.Remove(guid, out ConnectionData connection))
 		{
-			try
-			{
-				connection.socket.Shutdown(SocketShutdown.Both);
-			}
-			finally
-			{
-				connection.stream.Close();
-			}
+			return;
+		}
+
+		_onDisconnected(guid);
+		try
+		{
+			connection.socket.Shutdown(SocketShutdown.Both);
+		}
+		catch (Exception ex)
+		{
+			// The socket is already gone; there is nothing left to shut down cleanly.
+			Debug.Log("Socket was already closed when disconnecting client", guid, ex.Message);
+		}
+		finally
+		{
+			connection.stream.Close();
 			connection.cancellationToken.Cancel();
-			_connections.Remove(guid);
 		}
 	}
 

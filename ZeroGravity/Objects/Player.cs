@@ -152,7 +152,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		private set
 		{
-			if (_playerReady = value)
+			// This compared with a single '=', so the body ran on every assignment instead of only when
+			// the value actually changed, firing whatever hangs off it many times a second.
+			if (_playerReady != value)
 			{
 				_playerReady = value;
 				if (PlayerReady && EnvironmentReady)
@@ -498,6 +500,45 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					}
 				}
 			}
+
+			// Items someone has dropped float on their own pivot and belong to no vessel, so none of the
+			// loops above reach them. Without this, anything left lying around before this player
+			// arrived stays invisible to them, even though it is right there in the room.
+			// They go into this same response, and the pivots they hang off are pushed out just before
+			// it: the client resolves an item's parent as the response is handled and never creates a
+			// pivot on demand, so an item whose pivot it has not heard of is placed outside the world.
+			SpaceObjectVessel main = vessel.IsDocked ? vessel.DockedToMainVessel : vessel;
+			HashSet<long> here = [main.Guid];
+			foreach (SpaceObjectVessel docked in main.AllDockedVessels)
+			{
+				here.Add(docked.Guid);
+			}
+
+			bool anyFloating = false;
+			foreach (SpaceObject spaceObject in Server.Instance.AllSpaceObjects)
+			{
+				if (spaceObject is not DynamicObject { Parent: Pivot pivot } floating
+					|| !here.Contains(floating.DroppedInVesselGuid))
+				{
+					continue;
+				}
+				// A pivot gets dropped from the solar system's body list along the way, and once it is
+				// out of that list it can never appear in a movement message again, so no client could
+				// be told it exists. Putting it back is harmless if it is still there.
+				Server.Instance.SolarSystem.AddArtificialBody(pivot);
+
+				res.Data.Add(floating.GetSpawnResponseData(this));
+				SubscribeTo(pivot);
+				UpdateArtificialBodyMovement.Add(pivot.Guid);
+				anyFloating = true;
+			}
+
+			// The pivots have to reach the client before the items that hang off them: it resolves an
+			// item's parent as this response is handled and never creates a pivot on demand.
+			if (anyFloating)
+			{
+				await Server.Instance.SolarSystem.SendMovementMessageToPlayer(this);
+			}
 		}
 		await NetworkController.SendAsync(Guid, res);
 		await NetworkController.SendCharacterSpawnToOtherPlayersAsync(this);
@@ -836,9 +877,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			Pivot pivot = Parent as Pivot;
 			SpaceObjectVessel nearestVessel = message.NearestVesselGUID > 0 ? Server.Instance.GetVessel(message.NearestVesselGUID) : null;
-			SpaceObjectVessel refVessel = nearestVessel.MainVessel;
 
-			if (refVessel.StabilizeToTargetObj != null)
+			// There may be no vessel nearby at all - a player floating in open space reports none - and
+			// the guard against that only appeared six lines further down, after this had already been
+			// dereferenced. The exception escapes an async void listener and stops the whole server.
+			SpaceObjectVessel refVessel = nearestVessel?.MainVessel;
+
+			if (refVessel is { StabilizeToTargetObj: not null })
 			{
 				refVessel = refVessel.StabilizeToTargetObj;
 			}

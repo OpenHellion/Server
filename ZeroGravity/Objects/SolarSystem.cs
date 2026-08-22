@@ -231,6 +231,26 @@ public class SolarSystem
 					}
 				}
 			}
+			// A pivot is an artificial body but not a vessel, and only vessels were walked here, so
+			// an item floating on one - anything a player has let go of - had its position sent to
+			// nobody. It was described once, by the message announcing the drop, and after that
+			// never again: a client arriving later, or the same client after reconnecting, was
+			// never told the thing was there. It is the reason dropped items could not survive a
+			// reconnect and the reason they could not be restored from a save.
+			else if (artificialBody is Pivot pivotBody && player.IsSubscribedTo(pivotBody.Guid))
+			{
+				foreach (DynamicObject dynamicObject in pivotBody.DynamicObjects.Values)
+				{
+					if (dynamicObject.PlayerReceivesMovementMessage(player.Guid) && dynamicObject.LastChangeTime >= player.LastMovementMessageSolarSystemTime)
+					{
+						DynamicObjectMovementMessage dynamicOjectMovement = dynamicObject.GetDynamicObectMovementMessage();
+						if (dynamicOjectMovement is not null)
+						{
+							bodyTransform.DynamicObjectsMovement.Add(dynamicOjectMovement);
+						}
+					}
+				}
+			}
 			else if (artificialBody is Pivot pivot)
 			{
 				switch (pivot.ObjectType)

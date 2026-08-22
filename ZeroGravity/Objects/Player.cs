@@ -317,6 +317,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
+		DynamicObject.ReleaseMastery(Guid);
 		EventSystem.AddListener<CharacterMovementMessage>(UpdateMovementListener);
 		EventSystem.AddListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
 		EventSystem.AddListener<PlayerShootingMessage>(PlayerShootingListener);
@@ -499,45 +500,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 						res.Data.Add(childCorpse.GetSpawnResponseData(this));
 					}
 				}
-			}
-
-			// Items someone has dropped float on their own pivot and belong to no vessel, so none of the
-			// loops above reach them. Without this, anything left lying around before this player
-			// arrived stays invisible to them, even though it is right there in the room.
-			// They go into this same response, and the pivots they hang off are pushed out just before
-			// it: the client resolves an item's parent as the response is handled and never creates a
-			// pivot on demand, so an item whose pivot it has not heard of is placed outside the world.
-			SpaceObjectVessel main = vessel.IsDocked ? vessel.DockedToMainVessel : vessel;
-			HashSet<long> here = [main.Guid];
-			foreach (SpaceObjectVessel docked in main.AllDockedVessels)
-			{
-				here.Add(docked.Guid);
-			}
-
-			bool anyFloating = false;
-			foreach (SpaceObject spaceObject in Server.Instance.AllSpaceObjects)
-			{
-				if (spaceObject is not DynamicObject { Parent: Pivot pivot } floating
-					|| !here.Contains(floating.DroppedInVesselGuid))
-				{
-					continue;
-				}
-				// A pivot gets dropped from the solar system's body list along the way, and once it is
-				// out of that list it can never appear in a movement message again, so no client could
-				// be told it exists. Putting it back is harmless if it is still there.
-				Server.Instance.SolarSystem.AddArtificialBody(pivot);
-
-				res.Data.Add(floating.GetSpawnResponseData(this));
-				SubscribeTo(pivot);
-				UpdateArtificialBodyMovement.Add(pivot.Guid);
-				anyFloating = true;
-			}
-
-			// The pivots have to reach the client before the items that hang off them: it resolves an
-			// item's parent as this response is handled and never creates a pivot on demand.
-			if (anyFloating)
-			{
-				await Server.Instance.SolarSystem.SendMovementMessageToPlayer(this);
 			}
 		}
 		await NetworkController.SendAsync(Guid, res);

@@ -38,10 +38,6 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 	/// 	is what lets it be put back into that vessel when the world is loaded again. Zero when the
 	/// 	object was released in open space, which is deliberately not persisted.
 	/// </summary>
-	public long DroppedInVesselGuid;
-
-	public Vector3D DroppedLocalPosition = Vector3D.Zero;
-
 	private Vector3D pivotPositionCorrection = Vector3D.Zero;
 
 	private Vector3D pivotVelocityCorrection = Vector3D.Zero;
@@ -238,13 +234,6 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	private async void SelfDestructCheck(double dbl)
 	{
-		// Something released inside a vessel is meant to stay where it was left, so it is not junk just
-		// because nobody has been near it for a while. This cleanup is for things let go in open space,
-		// which drift out of reach and can never be recovered.
-		if (DroppedInVesselGuid != 0L)
-		{
-			return;
-		}
 		if (Parent is Pivot && (DateTime.UtcNow - lastSenderTime).TotalSeconds >= 300.0)
 		{
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, SelfDestructCheck);
@@ -435,8 +424,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 					ArtificialBody refObject = GetParent<ArtificialBody>(oldParent);
 
 					// The module the item was released in, before refObject is moved up to the station
-					// it is docked into. The position the client sends is relative to this module, so
-					// recording the station instead would put the item back in the wrong frame.
+					// it is docked into. Null means it was released in open space.
 					SpaceObjectVessel releasedInside = refObject as SpaceObjectVessel;
 
 					if (refObject is SpaceObjectVessel vessel)
@@ -444,38 +432,41 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 						refObject = vessel.MainVessel;
 					}
 
-					// Remember where this came from while we still know: once the object is on a pivot it
-					// has no link back to the vessel it was released in. The client keeps sending attach
-					// data while the object settles, and those repeats arrive with the pivot as the old
-					// parent, so only a release from something that is not already a pivot may clear it.
 					if (releasedInside != null)
 					{
-						DroppedInVesselGuid = releasedInside.Guid;
-
-						// Where it was left, taken from the player who let go of it: their own position
-						// inside the vessel, which the server tracks from their movement. The position
-						// the client sends with the drop is relative to a root of its own that has
-						// nothing to do with the vessel, and the old parent here is the vessel itself,
-						// whose position relative to itself is nothing at all.
-						Player dropper = Server.Instance.GetPlayer(message.Sender);
-						DroppedLocalPosition = dropper != null ? dropper.LocalPosition : Vector3D.Zero;
+						// Let go of inside a vessel, so it stays the vessel's own, and the reply
+						// below carries that back to the client.
+						//
+						// The client says otherwise, over and over: an item resting on the floor
+						// leaves and re-enters its room trigger about once a second, because every
+						// answer re-parents it and re-parenting fires the trigger again. Believing
+						// it puts the item on a pivot of its own, and a pivot's contents are only
+						// ever described once, in the message announcing the drop - the movement
+						// message walks vessels, and a pivot is not a vessel. So the item becomes
+						// invisible to anyone who arrives afterwards, including the player who
+						// dropped it once they reconnect, and there is nothing under any vessel to
+						// write down when the world is saved.
+						//
+						// The shipped game hides all of this: items let go of in a vessel are
+						// cleaned up after five minutes and were never saved, so nobody could tell
+						// they had already stopped existing for everyone else.
+						newParent = releasedInside;
 					}
-					else if (oldParent is not Pivot)
+					else
 					{
-						DroppedInVesselGuid = 0L;
-					}
-
-					newParent = new Pivot(this, refObject);
-					removeFromOldParent.RunSynchronously();
-					LocalPosition = message.AttachData.LocalPosition.ToVector3D();
-					LocalRotation = message.AttachData.LocalRotation.ToQuaternionD();
-					pivotPositionCorrection = Vector3D.Zero;
-					pivotVelocityCorrection = Vector3D.Zero;
-					foreach (Player pl in Server.Instance.AllPlayers)
-					{
-						if (pl.IsSubscribedTo(GetParent<ArtificialBody>(oldParent).Guid))
+						// Let go of in open space, where there is no vessel to belong to.
+						newParent = new Pivot(this, refObject);
+						removeFromOldParent.RunSynchronously();
+						LocalPosition = message.AttachData.LocalPosition.ToVector3D();
+						LocalRotation = message.AttachData.LocalRotation.ToQuaternionD();
+						pivotPositionCorrection = Vector3D.Zero;
+						pivotVelocityCorrection = Vector3D.Zero;
+						foreach (Player pl in Server.Instance.AllPlayers)
 						{
-							pl.SubscribeTo(newParent);
+							if (pl.IsSubscribedTo(GetParent<ArtificialBody>(oldParent).Guid))
+							{
+								pl.SubscribeTo(newParent);
+							}
 						}
 					}
 				}
@@ -603,7 +594,42 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public bool PlayerReceivesMovementMessage(long playerGuid)
 	{
-		return playerGuid != MasterClientID && MasterClientID != 0;
+		// The master client is the one simulating this object, so it is sent nothing - it is the
+		// one doing the telling. But an object restored from a save has never been touched by
+		// anybody and so has no master at all, and the old test then answered "no" for everyone:
+		// the server told nobody where the item was, and it existed in the world without ever
+		// being drawn. With no master, the server is the only authority there is.
+		if (MasterClientID == 0L)
+		{
+			return true;
+		}
+		return playerGuid != MasterClientID;
+	}
+
+	/// <summary>
+	/// Gives up whatever this player was authoritative for. A client that has just connected knows
+	/// nothing, so it cannot go on being the master of objects it has never heard of - and while it
+	/// held that title the server would not tell it where they were.
+	/// </summary>
+	public static void ReleaseMastery(long playerGuid)
+	{
+		if (playerGuid == 0L)
+		{
+			return;
+		}
+		int released = 0;
+		foreach (SpaceObject spaceObject in Server.Instance.AllSpaceObjects)
+		{
+			if (spaceObject is DynamicObject dobj && dobj.MasterClientID == playerGuid)
+			{
+				dobj.MasterClientID = 0L;
+				released++;
+			}
+		}
+		if (released > 0)
+		{
+			Debug.Log("Released mastery of " + released + " objects held by player " + playerGuid);
+		}
 	}
 
 	public async Task DestroyDynamicObject()

@@ -36,7 +36,7 @@ public class DisposableHackingTool : Item
 	{
 		SetInventorySlot(null);
 		SetAttachPoint(null);
-		await DynamicObj.DestroyDynamicObject();
+		await DynamicObj.Destroy();
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

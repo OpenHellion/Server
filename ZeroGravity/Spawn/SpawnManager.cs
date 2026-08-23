@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using OpenHellion.Net;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -113,7 +112,7 @@ public static class SpawnManager
 		}
 		if (priority is SpawnSerialization.AttachPointPriority.Item or SpawnSerialization.AttachPointPriority.TransportBox)
 		{
-			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
+			ItemSlot isl2 = Enumerable.OrderBy(keySelector: priority != SpawnSerialization.AttachPointPriority.TransportBox ? (DynamicObject m) => m.ItemType == ItemType.GenericItem && (m.Item as GenericItem).SubType == GenericItemSubType.TransportBox : (Func<DynamicObject, bool>)((DynamicObject m) => m.ItemType != ItemType.GenericItem || (m.Item as GenericItem).SubType != GenericItemSubType.TransportBox), source: vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Select(Server.Instance.GetDynamicObject).Where((DynamicObject d) => d != null))).ThenBy((DynamicObject m) => MathHelper.RandomNextDouble()).SelectMany((DynamicObject m) => m.Item.Slots.Values)
 				.FirstOrDefault((ItemSlot m) => m.Item == null && m.CanFitItem(data.Type, data.GenericSubType, data.PartType));
 			if (isl2 != null)
 			{
@@ -151,7 +150,7 @@ public static class SpawnManager
 			{
 				return ap;
 			}
-			ItemSlot isl = (from m in vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Values)
+			ItemSlot isl = (from m in vessels.OrderBy((SpaceObjectVessel m) => MathHelper.RandomNextDouble()).SelectMany((SpaceObjectVessel m) => m.DynamicObjects.Select(Server.Instance.GetDynamicObject).Where((DynamicObject d) => d != null))
 				orderby MathHelper.RandomNextDouble()
 				select m).SelectMany((DynamicObject m) => m.Item.Slots.Values).FirstOrDefault((ItemSlot m) => m.Item == null && m.CanFitItem(data.Type, data.GenericSubType, data.PartType));
 			if (isl != null)
@@ -383,9 +382,6 @@ public static class SpawnManager
 			dobj.IsPartOfSpawnSystem = true;
 			SpawnedDynamicObjects.TryAdd(dobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(rule, loot));
 		}
-		SpawnObjectsResponse res = new SpawnObjectsResponse();
-		res.Data.Add(dobj.GetSpawnResponseData(null));
-		await NetworkController.SendToClientsSubscribedTo(res, -1L, dobj.Parent);
 		return true;
 	}
 
@@ -655,7 +651,7 @@ public static class SpawnManager
 					}
 					foreach (long p_dobj in p_sr.Value.LootPool[i].DynamicObjects)
 					{
-						if (Server.Instance.GetObject(p_dobj) is DynamicObject tmpDobj && tmpSr.AddDynamicObjectToRule(tmpDobj, tmpSr.LootPool[i]))
+						if (Server.Instance.GetSpaceObject(p_dobj) is DynamicObject tmpDobj && tmpSr.AddDynamicObjectToRule(tmpDobj, tmpSr.LootPool[i]))
 						{
 							tmpDobj.IsPartOfSpawnSystem = true;
 							SpawnedDynamicObjects.TryAdd(tmpDobj.Guid, new Tuple<SpawnRule, SpawnRuleLoot>(tmpSr, tmpSr.LootPool[i]));
@@ -714,9 +710,9 @@ public static class SpawnManager
 			}
 			if (checkChildren)
 			{
-				foreach (DynamicObject d in dobj2.DynamicObjects.Values)
+				foreach (long dGuid in dobj2.DynamicObjects)
 				{
-					if (d.IsPartOfSpawnSystem)
+					if (Server.Instance.TryGetDynamicObject(dGuid, out DynamicObject d) && d.IsPartOfSpawnSystem)
 					{
 						RemoveSpawnSystemObject(d, checkChildren);
 					}
@@ -738,9 +734,9 @@ public static class SpawnManager
 			}
 			if (checkChildren)
 			{
-				foreach (DynamicObject dobj in ves.DynamicObjects.Values)
+				foreach (long dobjGuid in ves.DynamicObjects)
 				{
-					if (dobj.IsPartOfSpawnSystem)
+					if (Server.Instance.TryGetDynamicObject(dobjGuid, out var dobj) && dobj.IsPartOfSpawnSystem)
 					{
 						RemoveSpawnSystemObject(dobj, checkChildren);
 					}
@@ -774,7 +770,7 @@ public static class SpawnManager
 			else
 			{
 				SpaceObjectVessel ves = null;
-				sr = spawnRules.FirstOrDefault((SpawnRule m) => (ves = m.SpawnedVessels.FirstOrDefault((SpaceObjectVessel n) => n.IsMainVessel && n.VesselData != null && n.VesselData.VesselRegistration == stationName)) != null && (!celestial.HasValue || (celestial.HasValue && m.Orbit.CelestialBody == celestial.Value)));
+				sr = spawnRules.FirstOrDefault((SpawnRule m) => (ves = m.SpawnedVessels.FirstOrDefault((SpaceObjectVessel n) => n.IsMainVessel && n.VesselRegistration == stationName)) != null && (!celestial.HasValue || (celestial.HasValue && m.Orbit.CelestialBody == celestial.Value)));
 				if (ves != null)
 				{
 					return ves.Guid;

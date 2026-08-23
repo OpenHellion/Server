@@ -13,9 +13,7 @@ public class PersistenceObjectDataRespawnObject : PersistenceObjectData
 
 	public float[] Position;
 
-	public float[] Forward;
-
-	public float[] Up;
+	public float[] Rotation;
 
 	public int? AttachPointID;
 

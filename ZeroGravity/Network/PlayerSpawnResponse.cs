@@ -1,48 +1,40 @@
 using System.Collections.Generic;
 using ProtoBuf;
 using ZeroGravity.Data;
-using ZeroGravity.Objects;
 
 namespace ZeroGravity.Network;
 
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
 public class PlayerSpawnResponse : NetworkData
 {
-	public long ParentID;
+	/// <summary>
+	/// 	In space stations (collection of docked ships) this is the station part that is the parent of the player, not the main element of a ship.
+	/// </summary>
+	public long ParentGuid;
 
-	public SpaceObjectType ParentType;
-
-	public ObjectTransform ParentTransform;
-
-	public long MainVesselID;
-
-	public List<GameScenes.SceneId> Scenes;
-
-	public VesselData VesselData;
-
-	public VesselObjects VesselObjects;
-
-	public List<DockedVesselData> DockedVessels;
-
-	public List<AsteroidMiningPointDetails> MiningPoints;
+	public long[] AllNearbySpaceObjects;
 
 	public int Health;
 
 	public bool IsAdmin;
 
-	public List<DynamicObjectDetails> DynamicObjects;
+	public int SpawnPointId;
 
-	public int SpawnPointID;
+	public long? HomeGuid;
 
-	public CharacterTransformData CharacterTransform;
-
-	public long? HomeGUID;
-
-	public double? TimeUntilServerRestart = null;
+	public double? TimeUntilServerRestart;
 
 	public List<QuestDetails> Quests;
 
 	public List<ItemCompoundType> Blueprints;
 
-	public NavigationMapDetails NavMapDetails;
+	public float[] Position;
+
+	public float[] Rotation;
+
+	public DynamicObjectDetails[] DynamicObjects;
+
+	public long AnchorGuid;
+
+	public double[] OriginWorldPosition;
 }

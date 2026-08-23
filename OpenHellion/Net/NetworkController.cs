@@ -16,46 +16,14 @@ public static class NetworkController
 
 	private static StatusConnectionListener _statusPortConnectionListener;
 
-	public static string ServerId = null;
+	public static string ServerId { get; set; }
 
-	public static int MaxPlayers = 100; // TODO: Really just a wrapper.
+	public static int MaxPlayers = 100;
 
 	static NetworkController()
 	{
-		_transport = new GameTransport(OnClientConnected, OnDisconnected, GetMaxPlayers);
+		_transport = new GameTransport(OnClientConnected, OnDisconnected, maxConnections: () => MaxPlayers);
 		EventSystem.AddListener<LogOutRequest>(LogOutRequestListener);
-	}
-
-	public static async Task SendCharacterSpawnToOtherPlayersAsync(Player spawnedPlayer)
-	{
-		if (!IsPlayerConnected(spawnedPlayer.Guid))
-		{
-			return;
-		}
-		SpawnObjectsResponse res = new SpawnObjectsResponse();
-		res.Data.Add(spawnedPlayer.GetSpawnResponseData(null));
-		foreach (Player player in GetAllConnectedPlayers())
-		{
-			if (player != null && player != spawnedPlayer && player.IsAlive && player.EnvironmentReady && player.IsSubscribedTo(spawnedPlayer, checkParent: true))
-			{
-				await SendAsync(player.Guid, res).ConfigureAwait(false);
-			}
-		}
-	}
-
-	public static void AddCharacterSpawnsToResponse(Player pl, ref SpawnObjectsResponse res)
-	{
-		if (pl == null)
-		{
-			return;
-		}
-		foreach (Player other in Server.Instance.AllPlayers)
-		{
-			if (pl != other && other.IsAlive && pl.IsSubscribedTo(other, checkParent: true))
-			{
-				res.Data.Add(other.GetSpawnResponseData(pl));
-			}
-		}
 	}
 
 	private static async Task<long> OnClientConnected(NetworkStream stream, long[] otherConnections, int maxMessageSize)
@@ -201,12 +169,7 @@ public static class NetworkController
 	/// </summary>
 	public static Player[] GetAllConnectedPlayers()
 	{
-		return (from guid in _transport.GetConnectionsGUIDAsync() select Server.Instance.GetPlayer(guid)).ToArray();
-	}
-
-	public static int GetMaxPlayers()
-	{
-		return MaxPlayers;
+		return (from guid in _transport.GetConnectionsGuidAsync() select Server.Instance.GetPlayer(guid)).ToArray();
 	}
 
 	/// <summary>
@@ -244,6 +207,7 @@ public static class NetworkController
 	/// 	Send a message to all clients subscribed to a space object.<br />
 	/// 	You can choose to skip one player.
 	/// </summary>
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public static async Task SendToClientsSubscribedTo(NetworkData data, long skipPlayerGuid = -1L, params SpaceObject[] spaceObjects)
 	{
 		if (spaceObjects.Length == 0)
@@ -256,16 +220,17 @@ public static class NetworkController
 			{
 				if (spaceObjects.Any((SpaceObject m) => m != null && player.IsSubscribedTo(m, checkParent: false)))
 				{
-					await SendAsync(player.Guid, data).ConfigureAwait(false);
+					await SendAsync(player.Guid, data);
 				}
 			}
-			else if (!player.EnvironmentReady && data is ShipStatsMessage message && player.IsSubscribedTo(message.GUID))
+			else if (!player.EnvironmentReady && data is ShipStatsMessage message && player.IsSubscribedTo(message.Guid))
 			{
 				player.MessagesReceivedWhileLoading.Enqueue(message);
 			}
 		});
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public static async Task SendToClientsSubscribedToParents(NetworkData data, SpaceObject spaceObject, long skipPlayerGuid = -1L, int depth = 4)
 	{
 		List<SpaceObject> parents = new List<SpaceObject>

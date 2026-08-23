@@ -4,7 +4,19 @@ namespace ZeroGravity.Objects;
 
 public abstract class SpaceObjectTransferable : SpaceObject
 {
-	public Vector3D LocalPosition;
+	private Vector3D _localPosition;
+
+	public Vector3D LocalPosition
+	{
+		get
+		{
+			return _localPosition;
+		}
+		set
+		{
+			_localPosition = value;
+		}
+	}
 
 	public QuaternionD LocalRotation;
 
@@ -17,32 +29,27 @@ public abstract class SpaceObjectTransferable : SpaceObject
 				Debug.LogError("SpaceObjectTransferable must have a parent!", Guid);
 				return LocalPosition;
 			}
-			if (Parent is SpaceObjectVessel)
-			{
-				SpaceObjectVessel vessel = Parent as SpaceObjectVessel;
-				return vessel.Position + QuaternionD.LookRotation(vessel.Forward, vessel.Up) * LocalPosition;
-			}
-			return Parent.Position + LocalPosition;
+			return Parent.Position + Parent.Rotation * LocalPosition;
 		}
 	}
 
-	public QuaternionD Rotation
+	public override QuaternionD Rotation
 	{
 		get
 		{
-			if (Parent is SpaceObjectVessel)
+			if (Parent == null)
 			{
-				SpaceObjectVessel vessel = Parent as SpaceObjectVessel;
-				return QuaternionD.LookRotation(vessel.Forward, vessel.Up) * LocalRotation;
+				Debug.LogError("SpaceObjectTransferable must have a parent!", Guid);
+				return LocalRotation;
 			}
-			return LocalRotation;
+			return Parent.Rotation * LocalRotation;
 		}
 	}
 
 	public SpaceObjectTransferable(long guid, Vector3D localPosition, QuaternionD localRotation)
 		: base(guid)
 	{
-		LocalPosition = localPosition;
+		_localPosition = localPosition;
 		LocalRotation = localRotation;
 	}
 }

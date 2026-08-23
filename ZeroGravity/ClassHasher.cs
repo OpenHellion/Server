@@ -7,12 +7,8 @@ namespace ZeroGravity;
 
 public static class ClassHasher
 {
-	public static uint GetClassHashCode(Type type, string nspace = null)
+	public static uint GetClassHashCode(Type type)
 	{
-		if (nspace == null)
-		{
-			nspace = type.Namespace;
-		}
 		HashSet<Type> classes = new HashSet<Type>();
 		Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 		foreach (Assembly asm in assemblies)
@@ -22,7 +18,7 @@ public static class ClassHasher
 			{
 				if ((type.IsClass && t.IsSubclassOf(type)) || (type.IsInterface && t.GetInterfaces().Contains(type)))
 				{
-					addClass(t, classes, nspace);
+					addClass(t, classes, type.Namespace);
 				}
 			}
 		}
@@ -34,7 +30,7 @@ public static class ClassHasher
 		foreach (Type t2 in array2)
 		{
 			str = str + t2.Name + ":";
-			addHashingData(t2, ref str, nspace);
+			addHashingData(t2, ref str, type.Namespace, new HashSet<Type>());
 			str += "\r\n";
 		}
 		uint hashedValue = 744748791u;
@@ -112,8 +108,12 @@ public static class ClassHasher
 		}
 	}
 
-	private static void addHashingData(Type type, ref string str, string nspace)
+	private static void addHashingData(Type type, ref string str, string nspace, HashSet<Type> visited)
 	{
+		if (!visited.Add(type))
+		{
+			return;
+		}
 		if (type.IsEnum)
 		{
 			string[] names = Enum.GetNames(type);
@@ -136,11 +136,11 @@ public static class ClassHasher
 			string membStr = member.Name;
 			if (member.MemberType == MemberTypes.Field)
 			{
-				addHashingDataMember((member as FieldInfo).FieldType, ref str, nspace);
+				addHashingDataMember((member as FieldInfo).FieldType, ref str, nspace, visited);
 			}
 			else if (member.MemberType == MemberTypes.Property)
 			{
-				addHashingDataMember((member as PropertyInfo).PropertyType, ref str, nspace);
+				addHashingDataMember((member as PropertyInfo).PropertyType, ref str, nspace, visited);
 			}
 			else if (member.MemberType == MemberTypes.Method)
 			{
@@ -149,7 +149,7 @@ public static class ClassHasher
 				foreach (ParameterInfo par2 in parameters)
 				{
 					str = str + " " + par2.Name;
-					addHashingDataMember(par2.ParameterType, ref str, nspace);
+					addHashingDataMember(par2.ParameterType, ref str, nspace, visited);
 				}
 			}
 			else if (member.MemberType == MemberTypes.Constructor)
@@ -162,7 +162,7 @@ public static class ClassHasher
 				foreach (ParameterInfo par in parameters2)
 				{
 					str = str + " " + par.Name;
-					addHashingDataMember(par.ParameterType, ref str, nspace);
+					addHashingDataMember(par.ParameterType, ref str, nspace, visited);
 				}
 			}
 			str = str + (!first ? ", " : " ") + membStr;
@@ -170,7 +170,7 @@ public static class ClassHasher
 		}
 	}
 
-	private static void addHashingDataMember(Type t, ref string str, string nspace)
+	private static void addHashingDataMember(Type t, ref string str, string nspace, HashSet<Type> visited)
 	{
 		if (t.IsPrimitive)
 		{
@@ -178,7 +178,7 @@ public static class ClassHasher
 		}
 		if (t.IsClass && !t.IsNested && t.Namespace == nspace)
 		{
-			addHashingData(t, ref str, nspace);
+			addHashingData(t, ref str, nspace, visited);
 		}
 	}
 }

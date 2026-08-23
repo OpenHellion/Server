@@ -52,9 +52,9 @@ public class OrbitParameters
 
 	private double lastChangeTime;
 
-	private Vector3D _RelativePosition = Vector3D.Zero;
+	private Vector3D _relativePosition = Vector3D.Zero;
 
-	private Vector3D _RelativeVelocity = Vector3D.Zero;
+	private Vector3D _relativeVelocity = Vector3D.Zero;
 
 	private double lastValidTrueAnomaly;
 
@@ -70,15 +70,15 @@ public class OrbitParameters
 				{
 					Debug.LogFormat("Vessel {0} (id: {2}) with main vessel {1}.", vessel.FullName, vessel.MainVessel.FullName, vessel.Guid);
 					return vessel.MainVessel.Orbit.RelativePosition
-					+ QuaternionD.LookRotation(vessel.MainVessel.Forward, vessel.MainVessel.Up)
-					* (vessel.RelativePositionFromMainParent - vessel.MainVessel.VesselData.CollidersCenterOffset.ToVector3D());
+					+ vessel.MainVessel.Rotation
+					* (vessel.RelativePositionFromMainParent - vessel.MainVessel.CollidersCenterOffset.ToVector3D());
 				}
 			}
-			return _RelativePosition;
+			return _relativePosition;
 		}
 		set
 		{
-			_RelativePosition = value;
+			_relativePosition = value;
 		}
 	}
 
@@ -93,11 +93,11 @@ public class OrbitParameters
 					return vessel.MainVessel.Orbit.RelativeVelocity;
 				}
 			}
-			return _RelativeVelocity;
+			return _relativeVelocity;
 		}
 		set
 		{
-			_RelativeVelocity = value;
+			_relativeVelocity = value;
 		}
 	}
 
@@ -211,14 +211,14 @@ public class OrbitParameters
 				semiMinorAxis = semiMajorAxis * System.Math.Sqrt(eccentricity * eccentricity - 1.0);
 			}
 			double trueAnomaly = CalculateTrueAnomaly(this, timeSincePeriapsis);
-			RelativePosition = PositionAtTrueAnomaly(trueAnomaly, getRelativePosition: true);
+			_relativePosition = PositionAtTrueAnomaly(trueAnomaly, getRelativePosition: true);
 			RelativeVelocity = VelocityAtTrueAnomaly(trueAnomaly, getRelativeVelocity: true);
 			gravityInfluenceRadius = semiMajorAxis * (1.0 - eccentricity) * System.Math.Pow(mass / (3.0 * parent.mass), 1.0 / 3.0);
 			gravityInfluenceRadiusSquared = gravityInfluenceRadius * gravityInfluenceRadius;
 		}
 		else
 		{
-			RelativePosition = Vector3D.Zero;
+			_relativePosition = Vector3D.Zero;
 			RelativeVelocity = Vector3D.Zero;
 			orbitalPeriod = 0.0;
 			this.timeSincePeriapsis = 0.0;
@@ -877,25 +877,6 @@ public class OrbitParameters
 		{
 			ResetOrbit(currTime);
 		}
-	}
-
-	public void ParseNetworkData(RealtimeData data)
-	{
-		CheckParent(data.ParentGUID);
-		RelativePosition = data.Position.ToVector3D();
-		RelativeVelocity = data.Velocity.ToVector3D();
-	}
-
-	public void ParseNetworkData(ManeuverData data)
-	{
-		CheckParent(data.ParentGUID);
-		RelativePosition = data.RelPosition.ToVector3D();
-		RelativeVelocity = data.RelVelocity.ToVector3D();
-	}
-
-	public bool AreOrbitsEqual(OrbitParameters orbit)
-	{
-		return parent == orbit.parent && eccentricity.IsEpsilonEqualD(orbit.eccentricity, 1E-08) && semiMajorAxis.IsEpsilonEqualD(orbit.semiMajorAxis, 1E-08) && inclination.IsEpsilonEqualD(orbit.inclination, 1E-08) && argumentOfPeriapsis.IsEpsilonEqualD(orbit.argumentOfPeriapsis, 1E-08) && longitudeOfAscendingNode.IsEpsilonEqualD(orbit.longitudeOfAscendingNode, 1E-08) && solarSystemTimeAtPeriapsis.IsEpsilonEqualD(orbit.solarSystemTimeAtPeriapsis, 0.001);
 	}
 
 	private static bool AreAnglesEqualDeg(double angle1, double angle2, double anglePrecissionDeg)

@@ -16,11 +16,9 @@ public class PersistenceObjectDataAsteroid : PersistenceObjectData
 
 	public bool IsAlwaysVisible;
 
-	public double[] Forward;
-
-	public double[] Up;
-
 	public double[] Rotation;
+
+	public double[] AngularVelocity;
 
 	public List<AsteroidMiningPointDetails> MiningPoints;
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using OpenHellion.Net;
+using OpenHellion.Net.Message;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -10,13 +11,12 @@ using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
 using ZeroGravity.Spawn;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace ZeroGravity.Objects;
 
 public class Ship : SpaceObjectVessel, IPersistantObject
 {
-	private bool isRcsOnline;
+	private bool _isRcsOnline;
 
 	public Vector3D RcsThrustVelocityDifference = Vector3D.Zero;
 
@@ -24,19 +24,19 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public Vector3D ExtraRcsThrustVelocityDifference = Vector3D.Zero;
 
-	private double rcsThrustResetTimer;
+	private double _rcsThrustResetTimer;
 
-	private double rcsThrustResetTreshold = 0.2;
+	private const double RcsThrustResetTreshold = 0.2;
 
 	public Vector3D EngineThrustVelocityDifference = Vector3D.Zero;
 
 	public Vector3D ExtraEngineThrust = Vector3D.Zero;
 
-	private double engineThrustPercentage;
+	private double _engineThrustPercentage;
 
-	private double currentEngineThrustPerc;
+	private double _currentEngineThrustPerc;
 
-	private bool isRotationOnline;
+	private bool _isRotationOnline;
 
 	public Vector3D RotationThrustVelocityDifference = Vector3D.Zero;
 
@@ -44,29 +44,23 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public Vector3D ExtraRotationThrustVelocityDifference = Vector3D.Zero;
 
-	private double rotationThrustResetTimer;
+	private double _rotationThrustResetTimer;
 
-	private double rotationThrustResetTreshold = 0.5;
+	private const double RotationThrustResetTreshold = 0.5;
 
-	private double autoStabilizeTimer;
+	private double _autoStabilizeTimer;
 
-	private double autoStabilizeTreshold = 60.0;
+	private const double AutoStabilizeTreshold = 60.0;
 
-	private Vector3D stabilize = Vector3D.Zero;
+	private Vector3D _stabilize = Vector3D.Zero;
 
-	private double stabilizeResetTimer;
+	private double _stabilizeResetTimer;
 
-	private double stabilizeResetTreshold = 1.0;
-
-	private double systemsUpdateTimer;
+	private const double StabilizeResetTreshold = 1.0;
 
 	public int ColliderIndex = 1;
 
-	public bool CollectAtmosphere;
-
-	public bool sendResourceUpdate;
-
-	private bool rcsThrustChanged;
+	private bool _rcsThrustChanged;
 
 	private Vector3D? _currRcsMoveThrust;
 
@@ -76,21 +70,15 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	private float[] RadarSignatureHealthMultipliers;
 
-	public static bool DoSpecialPrint = false;
-
 	private string RescueShipTag = "";
 
-	private GameScenes.SceneId RescueShipSceneID = GameScenes.SceneId.AltCorp_Shuttle_CECA;
+	private GameScenes.SceneId _rescueShipSceneID = GameScenes.SceneId.AltCorp_Shuttle_CECA;
 
 	private double RespawnTimeForShip = 60.0;
 
-	public double timePassedSinceRequest;
+	public double TimePassedSinceRequest;
 
-	public SpaceObjectVessel CurrentSpawnedShip;
-
-	public const double vesselRequestDistanceThreshold = 5000.0;
-
-	private TimeSpan lastShipCollisionMessageTime = Server.Instance.RunTime;
+	private TimeSpan _lastShipCollisionMessageTime = Server.Instance.RunTime;
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.Ship;
 
@@ -105,7 +93,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			if (_currRcsMoveThrust != value)
 			{
 				_currRcsMoveThrust = value;
-				rcsThrustChanged = true;
+				_rcsThrustChanged = true;
 			}
 		}
 	}
@@ -121,7 +109,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			if (_currRcsRotationThrust != value)
 			{
 				_currRcsRotationThrust = value;
-				rcsThrustChanged = true;
+				_rcsThrustChanged = true;
 			}
 		}
 	}
@@ -142,8 +130,8 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public float TimeToLive => (float)(Health / (ExposureDamage * Server.VesselDecayRateMultiplier));
 
-	public Ship(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, Vector3D forward, Vector3D up)
-		: base(guid, initializeOrbit, position, velocity, forward, up)
+	public Ship(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, QuaternionD rotation)
+		: base(guid, initializeOrbit, position, velocity, rotation)
 	{
 		Radius = 100.0;
 		EventSystem.AddListener<ShipStatsMessage>(ShipStatsMessageListener);
@@ -157,20 +145,20 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public void ResetRotationAndThrust()
 	{
-		isRcsOnline = false;
+		_isRcsOnline = false;
 		RcsThrustVelocityDifference = Vector3D.Zero;
 		RcsThrustDirection = Vector3D.Zero;
-		rcsThrustResetTimer = 0.0;
+		_rcsThrustResetTimer = 0.0;
 		EngineThrustVelocityDifference = Vector3D.Zero;
-		engineThrustPercentage = 0.0;
-		currentEngineThrustPerc = 0.0;
-		isRotationOnline = false;
+		_engineThrustPercentage = 0.0;
+		_currentEngineThrustPerc = 0.0;
+		_isRotationOnline = false;
 		RotationThrustVelocityDifference = Vector3D.Zero;
 		RotationThrustDirection = Vector3D.Zero;
-		rotationThrustResetTimer = 0.0;
-		stabilize = Vector3D.Zero;
-		stabilizeResetTimer = 0.0;
-		Rotation = Vector3D.Zero;
+		_rotationThrustResetTimer = 0.0;
+		_stabilize = Vector3D.Zero;
+		_stabilizeResetTimer = 0.0;
+		AngularVelocityPerAxis = Vector3D.Zero;
 		AngularVelocity = Vector3D.Zero;
 	}
 
@@ -201,30 +189,30 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public bool CalculateEngineThrust(double timeDelta)
 	{
-		double currPerc = engineThrustPercentage;
+		double currPerc = _engineThrustPercentage;
 		if (!EngineOnLine)
 		{
 			currPerc = 0.0;
 		}
-		if (currPerc.IsNotEpsilonZeroD() || currentEngineThrustPerc.IsNotEpsilonZeroD())
+		if (currPerc.IsNotEpsilonZeroD() || _currentEngineThrustPerc.IsNotEpsilonZeroD())
 		{
 			int thrustPercSign = 1;
-			if ((currentEngineThrustPerc < 0.0 && currPerc >= -4.94065645841247E-324) || (currentEngineThrustPerc > 0.0 && currPerc > double.Epsilon))
+			if ((_currentEngineThrustPerc < 0.0 && currPerc >= -4.94065645841247E-324) || (_currentEngineThrustPerc > 0.0 && currPerc > double.Epsilon))
 			{
 				thrustPercSign = 1;
 			}
-			else if ((currentEngineThrustPerc > 0.0 && currPerc <= double.Epsilon) || (currentEngineThrustPerc < 0.0 && currPerc < double.Epsilon))
+			else if ((_currentEngineThrustPerc > 0.0 && currPerc <= double.Epsilon) || (_currentEngineThrustPerc < 0.0 && currPerc < double.Epsilon))
 			{
 				thrustPercSign = -1;
 			}
-			currentEngineThrustPerc += timeDelta * Engine.AccelerationBuildup * thrustPercSign;
-			if (thrustPercSign == 1 && currentEngineThrustPerc > currPerc)
+			_currentEngineThrustPerc += timeDelta * Engine.AccelerationBuildup * thrustPercSign;
+			if (thrustPercSign == 1 && _currentEngineThrustPerc > currPerc)
 			{
-				currentEngineThrustPerc = currPerc;
+				_currentEngineThrustPerc = currPerc;
 			}
-			else if (thrustPercSign == -1 && currentEngineThrustPerc < currPerc)
+			else if (thrustPercSign == -1 && _currentEngineThrustPerc < currPerc)
 			{
-				currentEngineThrustPerc = currPerc;
+				_currentEngineThrustPerc = currPerc;
 			}
 			EngineThrustVelocityDifference = GetEngineThrust() * timeDelta;
 			ResetAutoStabilizeTimer();
@@ -241,12 +229,12 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public Vector3D GetEngineThrust()
 	{
-		return Forward * currentEngineThrustPerc * (currentEngineThrustPerc > 0.0 ? EngineAcceleration : EngineReverseAcceleration);
+		return Rotation * Vector3D.Forward * _currentEngineThrustPerc * (_currentEngineThrustPerc > 0.0 ? EngineAcceleration : EngineReverseAcceleration);
 	}
 
 	public bool CalculateRcsThrust(double timeDelta)
 	{
-		if (!isRcsOnline && ExtraRcsThrustVelocityDifference.IsEpsilonZero())
+		if (!_isRcsOnline && ExtraRcsThrustVelocityDifference.IsEpsilonZero())
 		{
 			if (CurrRcsMoveThrust.HasValue)
 			{
@@ -254,21 +242,21 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			}
 			return false;
 		}
-		RcsThrustVelocityDifference = ExtraRcsThrustVelocityDifference + RcsThrustDirection * RCSAcceleration * timeDelta * Server.RcsThrustMultiplier;
+		RcsThrustVelocityDifference = ExtraRcsThrustVelocityDifference + RcsThrustDirection * RCSAcceleration * timeDelta;
 		ExtraRcsThrustVelocityDifference = Vector3D.Zero;
-		rcsThrustResetTimer += timeDelta;
+		_rcsThrustResetTimer += timeDelta;
 		CurrRcsMoveThrust = RcsThrustVelocityDifference;
 		ResetAutoStabilizeTimer();
-		if (rcsThrustResetTimer >= rcsThrustResetTreshold)
+		if (_rcsThrustResetTimer >= RcsThrustResetTreshold)
 		{
-			isRcsOnline = false;
+			_isRcsOnline = false;
 		}
 		return true;
 	}
 
 	public bool CalculateRotationThrust(double timeDelta)
 	{
-		if (!isRotationOnline && ExtraRotationThrustVelocityDifference.IsEpsilonZero())
+		if (!_isRotationOnline && ExtraRotationThrustVelocityDifference.IsEpsilonZero())
 		{
 			if (CurrRcsRotationThrust.HasValue)
 			{
@@ -276,14 +264,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			}
 			return false;
 		}
-		RotationThrustVelocityDifference = ExtraRotationThrustVelocityDifference + RotationThrustDirection * RCSRotationAcceleration * timeDelta * Server.RcsRotationMultiplier;
+		RotationThrustVelocityDifference = ExtraRotationThrustVelocityDifference + RotationThrustDirection * RCSRotationAcceleration * timeDelta;
 		ExtraRotationThrustVelocityDifference = Vector3D.Zero;
-		rotationThrustResetTimer += timeDelta;
+		_rotationThrustResetTimer += timeDelta;
 		CurrRcsRotationThrust = RotationThrustVelocityDifference;
 		ResetAutoStabilizeTimer();
-		if (rotationThrustResetTimer >= rotationThrustResetTreshold)
+		if (_rotationThrustResetTimer >= RotationThrustResetTreshold)
 		{
-			isRotationOnline = false;
+			_isRotationOnline = false;
 		}
 		return true;
 	}
@@ -311,20 +299,20 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			return false;
 		}
-		if (stabilize.IsNotEpsilonZero())
+		if (_stabilize.IsNotEpsilonZero())
 		{
 			if (IsMainVessel)
 			{
-				DampenRotation(stabilize, timeDelta, RCS.MaxOperationRate);
+				DampenRotation(_stabilize, timeDelta, RCS.MaxOperationRate);
 			}
 			else
 			{
-				(MainVessel as Ship).DampenRotation(stabilize, timeDelta, RCS.MaxOperationRate, RCSRotationStabilization);
+				(MainVessel as Ship).DampenRotation(_stabilize, timeDelta, RCS.MaxOperationRate, RCSRotationStabilization);
 			}
-			stabilizeResetTimer += timeDelta;
-			if (stabilizeResetTimer >= stabilizeResetTreshold)
+			_stabilizeResetTimer += timeDelta;
+			if (_stabilizeResetTimer >= StabilizeResetTreshold)
 			{
-				stabilize = Vector3D.Zero;
+				_stabilize = Vector3D.Zero;
 			}
 			ResetAutoStabilizeTimer();
 			return true;
@@ -334,7 +322,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public async Task<bool> CalculateAutoStabilizeRotation(double timeDelta)
 	{
-		if (Rotation.IsNotEpsilonZero() && !AutoStabilizationDisabled && !AllVessels.Any((SpaceObjectVessel m) => m.VesselCrew.FirstOrDefault((Player n) => n.IsPilotingVessel) != null))
+		if (AngularVelocityPerAxis.IsNotEpsilonZero() && !AutoStabilizationDisabled && !AllVessels.Any((SpaceObjectVessel m) => m.VesselCrew.FirstOrDefault((Player n) => n.IsPilotingVessel) != null))
 		{
 			SpaceObjectVessel rcsVessel = null;
 			if (!IsPrefabStationVessel)
@@ -353,8 +341,8 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					}
 				}
 			}
-			autoStabilizeTimer += timeDelta;
-			if (autoStabilizeTimer > autoStabilizeTreshold)
+			_autoStabilizeTimer += timeDelta;
+			if (_autoStabilizeTimer > AutoStabilizeTreshold)
 			{
 				if (rcsVessel != null)
 				{
@@ -378,22 +366,22 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		if (MainVessel is Ship)
 		{
-			(MainVessel as Ship).autoStabilizeTimer = 0.0;
+			(MainVessel as Ship)._autoStabilizeTimer = 0.0;
 		}
 	}
 
 	public async Task CheckThrustStatsMessage()
 	{
-		if (rcsThrustChanged)
+		if (_rcsThrustChanged)
 		{
 			ShipStatsMessage ssm = new ShipStatsMessage();
-			ssm.GUID = Guid;
+			ssm.Guid = Guid;
 			ssm.ThrustStats = new RcsThrustStats
 			{
 				MoveTrust = CurrRcsMoveThrust.HasValue ? CurrRcsMoveThrust.Value.ToFloatArray() : null,
 				RotationTrust = CurrRcsRotationThrust.HasValue ? CurrRcsRotationThrust.Value.ToFloatArray() : null
 			};
-			rcsThrustChanged = false;
+			_rcsThrustChanged = false;
 			await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		}
 	}
@@ -401,14 +389,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	public async void ShipStatsMessageListener(NetworkData data)
 	{
 		var message = data as ShipStatsMessage;
-		if (message.GUID != Guid)
+		if (message.Guid != Guid)
 		{
 			return;
 		}
 		bool sendShipStatsMsg = false;
 		ShipStatsMessage retMsg = new ShipStatsMessage
 		{
-			GUID = Guid,
+			Guid = Guid,
 			Temperature = Temperature,
 			Health = Health,
 			Armor = Armor,
@@ -416,7 +404,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		};
 		Player pl = Server.Instance.GetPlayer(message.Sender);
 		bool requestEngine = EngineOnLine;
-		bool requestRCS = message.Thrust != null || message.Rotation != null || message.AutoStabilize != null || (message.TargetStabilizationGUID.HasValue && message.Thrust == null);
+		bool requestRCS = message.Thrust != null || message.Rotation != null || message.AutoStabilize != null || (message.TargetStabilizationGuid.HasValue && message.Thrust == null);
 		bool canUseEngine = false;
 		bool canUseRCS = false;
 		bool updateDM = false;
@@ -441,10 +429,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (Engine != null && message.EngineThrustPercentage.HasValue)
 		{
-			engineThrustPercentage = message.EngineThrustPercentage.Value;
-			retMsg.EngineThrustPercentage = (float)engineThrustPercentage;
-			Engine.RequiredThrust = (float)System.Math.Abs(engineThrustPercentage);
-			Engine.ReverseThrust = engineThrustPercentage < 0.0;
+			_engineThrustPercentage = message.EngineThrustPercentage.Value;
+			retMsg.EngineThrustPercentage = (float)_engineThrustPercentage;
+			Engine.RequiredThrust = (float)System.Math.Abs(_engineThrustPercentage);
+			Engine.ReverseThrust = _engineThrustPercentage < 0.0;
 			sendShipStatsMsg = true;
 		}
 		if (RCS != null && canUseRCS)
@@ -462,14 +450,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				opRateThr = (float)RcsThrustDirection.Magnitude / RCS.MaxOperationRate;
 				if (!RcsThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001))
 				{
-					rcsThrustResetTimer = 0.0;
-					isRcsOnline = true;
-					retMsg.TargetStabilizationGUID = -1L;
+					_rcsThrustResetTimer = 0.0;
+					_isRcsOnline = true;
+					retMsg.TargetStabilizationGuid = -1L;
 					sendShipStatsMsg = true;
 				}
 				else
 				{
-					isRcsOnline = false;
+					_isRcsOnline = false;
 				}
 			}
 			if (message.Rotation != null && (CurrentCourse == null || !CurrentCourse.IsInProgress))
@@ -483,33 +471,33 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				opRateThr = (float)RotationThrustDirection.Magnitude / RCS.MaxOperationRate;
 				if (!RotationThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001))
 				{
-					rotationThrustResetTimer = 0.0;
-					isRotationOnline = true;
+					_rotationThrustResetTimer = 0.0;
+					_isRotationOnline = true;
 				}
 				else
 				{
-					isRotationOnline = false;
+					_isRotationOnline = false;
 				}
 			}
 			if (message.AutoStabilize != null)
 			{
-				stabilize = message.AutoStabilize.ToVector3D();
-				stabilizeResetTimer = 0.0;
+				_stabilize = message.AutoStabilize.ToVector3D();
+				_stabilizeResetTimer = 0.0;
 				RCS.OperationRate = RCS.MaxOperationRate;
 			}
 			if (RCS.OperationRate == 0f)
 			{
 				RCS.OperationRate = System.Math.Max(opRateThr, opRateRot);
 			}
-			if (message.TargetStabilizationGUID.HasValue && message.Thrust == null)
+			if (message.TargetStabilizationGuid.HasValue && message.Thrust == null)
 			{
-				if (Server.Instance.GetObject(message.TargetStabilizationGUID.Value) is SpaceObjectVessel target && StabilizeToTarget(target))
+				if (Server.Instance.GetSpaceObject(message.TargetStabilizationGuid.Value) is SpaceObjectVessel target && StabilizeToTarget(target))
 				{
-					retMsg.TargetStabilizationGUID = target.Guid;
+					retMsg.TargetStabilizationGuid = target.Guid;
 				}
 				else
 				{
-					retMsg.TargetStabilizationGUID = -1L;
+					retMsg.TargetStabilizationGuid = -1L;
 				}
 				sendShipStatsMsg = true;
 			}
@@ -622,20 +610,20 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			foreach (SceneDockingPortDetails stDetails in message.VesselObjects.DockingPorts)
 			{
 				VesselDockingPort port = DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == stDetails.ID.InSceneID);
-				if (port == null || stDetails.DockedToID == null || !Server.Instance.DoesObjectExist(stDetails.DockedToID.VesselGUID))
+				if (port == null || stDetails.DockedToID == null || !Server.Instance.TryGetSpaceObject(stDetails.DockedToID.VesselGUID, out SpaceObject dockedToSpaceVessel))
 				{
 					continue;
 				}
 				if (stDetails.DockingStatus)
 				{
-					Ship dockToShip = Server.Instance.GetVessel(stDetails.DockedToID.VesselGUID) as Ship;
+					Ship dockToShip = dockedToSpaceVessel as Ship;
 					VesselDockingPort parentPort = dockToShip.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == stDetails.DockedToID.InSceneID);
 					System.Diagnostics.Debug.Assert(parentPort != null);
 					if (!await DockToVessel(port, parentPort, dockToShip))
 					{
 						continue;
 					}
-					stDetails.CollidersCenterOffset = DockedToMainVessel.VesselData.CollidersCenterOffset;
+					stDetails.CollidersCenterOffset = DockedToMainVessel.CollidersCenterOffset;
 					stDetails.RelativePositionUpdate = [];
 					stDetails.RelativeRotationUpdate = [];
 					foreach (Ship s in DockedToMainVessel.AllDockedVessels.Cast<Ship>())
@@ -754,10 +742,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			retMsg.VesselObjects.ResourceContainers = MainDistributionManager.GetResourceContainersDetails(changedOnly: true, Guid);
 			sendShipStatsMsg |= retMsg.VesselObjects.ResourceContainers.Count > 0;
 		}
-		if (message.GatherAtmosphere.HasValue)
-		{
-			CollectAtmosphere = message.GatherAtmosphere.Value;
-		}
 		if (message.SelfDestructTime.HasValue)
 		{
 			if (message.SelfDestructTime.Value >= 0f)
@@ -800,9 +784,9 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			vessel = list.OrderBy((SpaceObjectVessel x) => MathHelper.RandomNextDouble()).First();
 			await vessel.ChangeHealthBy(0f - dmg, null, VesselRepairPoint.Priority.External, force: false, IsDebrisFragment ? VesselDamageType.LargeDebrisHit : VesselDamageType.Collision);
 		}
-		if ((Server.Instance.RunTime - lastShipCollisionMessageTime).TotalSeconds > 0.1)
+		if ((Server.Instance.RunTime - _lastShipCollisionMessageTime).TotalSeconds > 0.1)
 		{
-			lastShipCollisionMessageTime = Server.Instance.RunTime;
+			_lastShipCollisionMessageTime = Server.Instance.RunTime;
 			ShipCollisionMessage scm = new ShipCollisionMessage
 			{
 				CollisionVelocity = (float)vel,
@@ -813,26 +797,35 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 	}
 
-	public override SpawnObjectResponseData GetSpawnResponseData(Player pl)
+	public ObjectsInfoResponse.ShipData GetShipData(Vector3D anchorPosition)
 	{
 		if (IsDocked && DockedToMainVessel is Ship ship)
 		{
-			return ship.GetSpawnResponseData(pl);
+			return ship.GetShipData(anchorPosition);
 		}
-		bool isDummy = (pl.Position - Position).SqrMagnitude > 100000000.0;
-		return new SpawnShipResponseData
+
+		return new ObjectsInfoResponse.ShipData
 		{
-			GUID = Guid,
-			Data = VesselData,
-			VesselObjects = GetVesselObjects(),
-			IsDummy = isDummy,
-			DockedVessels = GetDockedVesselsData(),
+			Guid = Guid,
+			Position = (Position - anchorPosition).ToFloatArray(),
+			Rotation = Rotation.ToFloatArray(),
+			VesselRegistration = VesselRegistration,
+			VesselName = VesselName,
+			Tag = VesselTag,
+			SceneId = SceneId,
+			CollidersCenterOffset = CollidersCenterOffset,
+			IsDebrisFragment = IsDebrisFragment,
+			RadarSignature = RadarSignature,
+			IsDistressSignalActive = IsDistressSignalActive,
+			IsAlwaysVisible = IsAlwaysVisible,
 			DockingControlsDisabled = DockingControlsDisabled,
-			SecurityPanelsLocked = SecurityPanelsLocked
+			SecurityPanelsLocked = SecurityPanelsLocked,
+			VesselObjects = GetVesselObjects(),
+			DockedVessels = GetDockedVesselsData()
 		};
 	}
 
-	public List<DockedVesselData> GetDockedVesselsData()
+	public DockedVesselData[] GetDockedVesselsData()
 	{
 		if (AllDockedVessels == null || AllDockedVessels.Count == 0)
 		{
@@ -846,40 +839,27 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				Ship sh = ves as Ship;
 				retVal.Add(new DockedVesselData
 				{
-					GUID = sh.Guid,
-					Data = sh.VesselData,
+					Guid = sh.Guid,
+					Position = sh.RelativePositionFromMainParent.ToFloatArray(),
+					Rotation = sh.RelativeRotationFromMainParent.ToFloatArray(),
+					VesselRegistration = sh.VesselRegistration,
+					VesselName = sh.VesselName,
+					Tag = sh.VesselTag,
+					SpawnRuleId = sh.SpawnRuleId,
+					SceneId = sh.SceneId,
+					CollidersCenterOffset = sh.CollidersCenterOffset,
+					IsDebrisFragment = sh.IsDebrisFragment,
+					CreationSolarSystemTime = sh.CreationSolarSystemTime,
+					RadarSignature = sh.RadarSignature,
+					IsDistressSignalActive = sh.IsDistressSignalActive,
+					IsAlwaysVisible = sh.IsAlwaysVisible,
 					VesselObjects = sh.GetVesselObjects(),
 					DockingControlsDisabled = sh.DockingControlsDisabled,
 					SecurityPanelsLocked = sh.SecurityPanelsLocked
 				});
 			}
 		}
-		return retVal;
-	}
-
-	public override InitializeSpaceObjectMessage GetInitializeMessage()
-	{
-		InitializeSpaceObjectMessage msg = new InitializeSpaceObjectMessage();
-		msg.GUID = Guid;
-		msg.DynamicObjects = new List<DynamicObjectDetails>();
-		foreach (DynamicObject dobj in DynamicObjects.Values)
-		{
-			msg.DynamicObjects.Add(dobj.GetDetails());
-		}
-		msg.Corpses = new List<CorpseDetails>();
-		foreach (Corpse cobj in Corpses.Values)
-		{
-			msg.Corpses.Add(cobj.GetDetails());
-		}
-		msg.Characters = new List<CharacterDetails>();
-		foreach (Player pl in VesselCrew)
-		{
-			msg.Characters.Add(pl.GetDetails());
-		}
-		InitializeShipAuxData auxData = new InitializeShipAuxData();
-		auxData.VesselObjects = GetVesselObjects();
-		msg.AuxData = auxData;
-		return msg;
+		return retVal.ToArray();
 	}
 
 	private async Task FillShipData(GameScenes.SceneId sceneID, List<StructureSceneData> structureSceneDataList, bool loadDynamicObjects = true, float? health = null)
@@ -920,12 +900,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			TagChance tc = data.AdditionalTags[MathHelper.RandomRange(0, data.AdditionalTags.Length)];
 			if (MathHelper.RandomNextDouble() < tc.Chance)
 			{
-				if (VesselData.Tag == null)
-				{
-					VesselData.Tag = "";
-				}
-				VesselData vesselData = VesselData;
-				vesselData.Tag = vesselData.Tag + (VesselData.Tag == "" ? "" : ";") + tc.Tag;
+				VesselTag += (VesselTag == "" ? "" : ";") + tc.Tag;
 			}
 		}
 		if (data.Doors is { Count: > 0 })
@@ -1062,6 +1037,8 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				ShipSpawnPoint newSpawnPoint = new ShipSpawnPoint
 				{
 					SpawnPointID = spd.InSceneID,
+					RelativePosition = spd.Position.ToVector3D(),
+					RelativeRotation = spd.Rotation.ToQuaternionD(),
 					Type = spd.Type,
 					Executor = executor,
 					ExecutorStateID = spd.ExecutorStateID,
@@ -1098,7 +1075,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			foreach (SubSystemData ssd in data.SubSystems)
 			{
-				Systems.Add(createSubSystem(ssd));
+				Systems.Add(CreateSubSystem(ssd));
 			}
 		}
 		if (data.Generators is { Count: > 0 })
@@ -1208,19 +1185,13 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	private async Task CreateShipData(string shipRegistration, string shipTag, GameScenes.SceneId shipItemID, bool loadDynamicObjects, float? health = null)
 	{
-		VesselData = new VesselData
-		{
-			Id = Guid,
-			VesselRegistration = shipRegistration,
-			VesselName = "",
-			Tag = shipTag,
-			SceneID = shipItemID,
-			IsDebrisFragment = IsDebrisFragment,
-			CreationSolarSystemTime = Server.SolarSystemTime
-		};
-		await FillShipData(VesselData.SceneID, StaticData.StructuresDataList, loadDynamicObjects, health);
-		VesselData.RadarSignature = RadarSignature;
-		ReadBoundsAndMass(VesselData.SceneID, Vector3D.Zero);
+		VesselRegistration = shipRegistration;
+		VesselName = "";
+		VesselTag = shipTag;
+		SceneId = shipItemID;
+		CreationSolarSystemTime = Server.SolarSystemTime;
+		await FillShipData(SceneId, StaticData.StructuresDataList, loadDynamicObjects, health);
+		ReadBoundsAndMass(SceneId, Vector3D.Zero);
 		RecalculateCenter();
 	}
 
@@ -1276,24 +1247,23 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		Vector3D shipPos = Vector3D.Zero;
 		Vector3D shipVel = Vector3D.Zero;
-		Vector3D shipForward = Vector3D.Forward;
-		Vector3D shipUp = Vector3D.Up;
-		Ship newShip = new Ship(shipID < 0 ? GUIDFactory.NextVesselGUID() : shipID, initializeOrbit: false, shipPos, shipVel, shipForward, shipUp)
+		QuaternionD shipRotation = QuaternionD.Identity;
+		Ship newShip = new Ship(shipID < 0 ? GUIDFactory.NextVesselGUID() : shipID, initializeOrbit: false, shipPos, shipVel, shipRotation)
 		{
 			IsDebrisFragment = isDebrisFragment
 		};
 		await newShip.CreateShipData(registration, vesselTag, sceneID, loadDynamicObjects: true, health);
 		newShip.DistributionManager = new DistributionManager(newShip);
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(newShip);
-		Server.Instance.SolarSystem.GetSpawnPosition(SpaceObjectType.Ship, newShip.Radius, checkPosition, out shipPos, out shipVel, out shipForward, out shipUp, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out OrbitParameters orbit);
-		newShip.InitializeOrbit(shipPos, shipVel, shipForward, shipUp, orbit);
+		Server.Instance.SolarSystem.GetSpawnPosition(newShip.Radius, checkPosition, out shipPos, out shipVel, out shipRotation, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out OrbitParameters orbit);
+		newShip.InitializeOrbit(shipPos, shipVel, shipRotation, orbit);
 		if (registration.IsNullOrEmpty())
 		{
-			newShip.VesselData.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(SpaceObjectType.Ship, newShip.Orbit.Parent.CelestialBody, sceneID);
+			newShip.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(SpaceObjectType.Ship, newShip.Orbit.Parent.CelestialBody, sceneID);
 		}
-		foreach (DynamicObject dobj in newShip.DynamicObjects.Values)
+		foreach (long guid in newShip.DynamicObjects)
 		{
-			if (dobj.Item is { AttachPointID: not null })
+			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj) && dobj.Item is { AttachPointID: not null })
 			{
 				VesselComponent comp = newShip.MainDistributionManager.GetVesselComponentByPartSlot(dobj.Item.AttachPointID);
 				if (comp != null && dobj.Item is MachineryPart part)
@@ -1345,7 +1315,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			ShipStatsMessage retStatsMsg = new ShipStatsMessage();
 			retStatsMsg.VesselObjects = new VesselObjects();
-			retStatsMsg.GUID = Guid;
+			retStatsMsg.Guid = Guid;
 			retStatsMsg.VesselObjects.SceneTriggerExecutors = executors;
 			ShipStatsMessageListener(retStatsMsg);
 		}
@@ -1385,7 +1355,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			Temperature = SpaceExposureTemperature(Temperature, HeatCollectionFactor, HeatDissipationFactor, (float)Mass, deltaTime);
 		}
-		systemsUpdateTimer += deltaTime;
 		if (CurrentCourse != null && AutoActivateCourse == CurrentCourse && CurrentCourse.StartSolarSystemTime > Server.SolarSystemTime && CurrentCourse.StartSolarSystemTime <= Server.SolarSystemTime + 1.0)
 		{
 			await AutoActivateCourse.ToggleActivated(activate: true);
@@ -1400,27 +1369,33 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			await MainDistributionManager.UpdateSystems(ConnectionsChanged, ConnectionsChanged);
 			ConnectionsChanged = false;
 		}
-		ShipStatsMessage ssm = new ShipStatsMessage();
-		ssm.GUID = Guid;
-		ssm.Temperature = Temperature;
-		ssm.Health = Health;
-		ssm.Armor = Armor;
-		ssm.VesselObjects = new VesselObjects();
-		ssm.VesselObjects.SubSystems = DistributionManager.GetSubSystemsDetails(changedOnly: true, Guid);
-		ssm.VesselObjects.Generators = DistributionManager.GetGeneratorsDetails(changedOnly: true, Guid);
-		ssm.VesselObjects.RoomTriggers = DistributionManager.GetRoomsDetails(changedOnly: true, Guid);
-		ssm.VesselObjects.ResourceContainers = DistributionManager.GetResourceContainersDetails(changedOnly: true, Guid);
-		ssm.VesselObjects.RepairPoints = GetVesselRepairPointsDetails(changedOnly: true);
-		ssm.VesselObjects.Doors = DistributionManager.GetDoorsDetails(changedOnly: true, Guid);
+		ShipStatsMessage ssm = new ShipStatsMessage
+		{
+			Guid = Guid,
+			Temperature = Temperature,
+			Health = Health,
+			Armor = Armor,
+			VesselObjects = new VesselObjects
+			{
+				SubSystems = DistributionManager.GetSubSystemsDetails(changedOnly: true, Guid),
+				Generators = DistributionManager.GetGeneratorsDetails(changedOnly: true, Guid),
+				RoomTriggers = DistributionManager.GetRoomsDetails(changedOnly: true, Guid),
+				ResourceContainers = DistributionManager.GetResourceContainersDetails(changedOnly: true, Guid),
+				RepairPoints = GetVesselRepairPointsDetails(changedOnly: true),
+				Doors = DistributionManager.GetDoorsDetails(changedOnly: true, Guid)
+			}
+		};
 		if (SelfDestructTimer != null && prevDestructionSolarSystemTime != SelfDestructTimer.DestructionSolarSystemTime)
 		{
 			prevDestructionSolarSystemTime = SelfDestructTimer.DestructionSolarSystemTime;
 			ssm.SelfDestructTime = SelfDestructTimer?.Time;
 		}
 		await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
-		foreach (DynamicObject dobj in DynamicObjects.Values.Where((DynamicObject x) => x.Item != null && x.Item.AttachPointType != AttachPointType.None))
+		foreach (long guid in DynamicObjects)
 		{
-			if (dobj.Item.AttachPointType == AttachPointType.BatteryRechargePoint && dobj.Item is Battery bat)
+			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj)
+				&& dobj.Item.AttachPointType == AttachPointType.BatteryRechargePoint
+				&& dobj.Item is Battery bat)
 			{
 				await bat.ChangeQuantity(bat.ChargeAmount);
 			}
@@ -1457,67 +1432,65 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			rotationStabilization = RCS == null && IsPrefabStationVessel ? 1f : RCSRotationStabilization;
 		}
-		double stabilizationValue = rotationStabilization.Value * stabilizationMultiplier * timeDelta * Server.RcsRotationMultiplier;
-		Vector3D oldRotation = Rotation;
-		if (Rotation.X > 0.0)
+		double stabilizationValue = rotationStabilization.Value * stabilizationMultiplier * timeDelta;
+		Vector3D oldRotation = AngularVelocityPerAxis;
+		if (AngularVelocityPerAxis.X > 0.0)
 		{
-			Rotation.X = MathHelper.Clamp(Rotation.X - stabilizationValue * stabilizeAxes.X, 0.0, Rotation.X);
+			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X - stabilizationValue * stabilizeAxes.X, 0.0, AngularVelocityPerAxis.X);
 		}
 		else
 		{
-			Rotation.X = MathHelper.Clamp(Rotation.X + stabilizationValue * stabilizeAxes.X, Rotation.X, 0.0);
+			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X + stabilizationValue * stabilizeAxes.X, AngularVelocityPerAxis.X, 0.0);
 		}
-		if (Rotation.Y > 0.0)
+		if (AngularVelocityPerAxis.Y > 0.0)
 		{
-			Rotation.Y = MathHelper.Clamp(Rotation.Y - stabilizationValue * stabilizeAxes.Y, 0.0, Rotation.Y);
-		}
-		else
-		{
-			Rotation.Y = MathHelper.Clamp(Rotation.Y + stabilizationValue * stabilizeAxes.Y, Rotation.Y, 0.0);
-		}
-		if (Rotation.Z > 0.0)
-		{
-			Rotation.Z = MathHelper.Clamp(Rotation.Z - stabilizationValue * stabilizeAxes.Z, 0.0, Rotation.Z);
+			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y - stabilizationValue * stabilizeAxes.Y, 0.0, AngularVelocityPerAxis.Y);
 		}
 		else
 		{
-			Rotation.Z = MathHelper.Clamp(Rotation.Z + stabilizationValue * stabilizeAxes.Z, Rotation.Z, 0.0);
+			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y + stabilizationValue * stabilizeAxes.Y, AngularVelocityPerAxis.Y, 0.0);
+		}
+		if (AngularVelocityPerAxis.Z > 0.0)
+		{
+			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z - stabilizationValue * stabilizeAxes.Z, 0.0, AngularVelocityPerAxis.Z);
+		}
+		else
+		{
+			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z + stabilizationValue * stabilizeAxes.Z, AngularVelocityPerAxis.Z, 0.0);
 		}
 		if (!CurrRcsRotationThrust.HasValue)
 		{
-			CurrRcsRotationThrust = Rotation - oldRotation;
+			CurrRcsRotationThrust = AngularVelocityPerAxis - oldRotation;
 		}
-	}
-
-	public void GatherAtmosphere()
-	{
 	}
 
 	public PersistenceObjectData GetPersistenceData()
 	{
-		PersistenceObjectDataShip data = new PersistenceObjectDataShip();
-		data.GUID = Guid;
-		data.Health = Health;
-		data.IsInvulnerable = IsInvulnerable;
-		data.DockingControlsDisabled = DockingControlsDisabled;
-		data.SecurityPanelsLocked = SecurityPanelsLocked;
-		data.OrbitData = new OrbitData();
-		Orbit.FillOrbitData(ref data.OrbitData);
-		data.Forward = Forward.ToArray();
-		data.Up = Up.ToArray();
-		data.Rotation = Rotation.ToArray();
-		data.Registration = VesselData.VesselRegistration;
-		data.Name = VesselData.VesselName;
-		data.EmblemId = EmblemId;
-		data.Tag = VesselData.Tag;
-		data.SceneID = SceneID;
-		data.timePassedSinceShipCall = timePassedSinceRequest;
-		data.IsDistressSignalActive = IsDistressSignalActive;
-		data.IsAlwaysVisible = IsAlwaysVisible;
-		data.IsPrefabStationVessel = IsPrefabStationVessel;
-		data.SelfDestructTimer = SelfDestructTimer?.GetData();
-		data.AuthorizedPersonel = AuthorizedPersonel;
-		data.StartingSetId = StartingSetId;
+		var orbitData = new OrbitData();
+		Orbit.FillOrbitData(ref orbitData);
+		PersistenceObjectDataShip data = new PersistenceObjectDataShip
+		{
+			GUID = Guid,
+			Health = Health,
+			IsInvulnerable = IsInvulnerable,
+			DockingControlsDisabled = DockingControlsDisabled,
+			SecurityPanelsLocked = SecurityPanelsLocked,
+			OrbitData = orbitData,
+			Rotation = Rotation.ToArray(),
+			AngularVelocity = AngularVelocityPerAxis.ToArray(),
+			Registration = VesselRegistration,
+			Name = VesselName,
+			EmblemId = EmblemId,
+			Tag = VesselTag,
+			SceneID = SceneId,
+			timePassedSinceShipCall = TimePassedSinceRequest,
+			IsDistressSignalActive = IsDistressSignalActive,
+			IsAlwaysVisible = IsAlwaysVisible,
+			IsPrefabStationVessel = IsPrefabStationVessel,
+			SelfDestructTimer = SelfDestructTimer?.GetData(),
+			AuthorizedPersonel = AuthorizedPersonel,
+			StartingSetId = StartingSetId
+		};
 		if (DockedToVessel != null)
 		{
 			foreach (VesselDockingPort port in DockingPorts)
@@ -1541,9 +1514,12 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			data.CourseInProgress = CurrentCourse.CurrentCourseItem;
 		}
 		data.DynamicObjects = new List<PersistenceObjectData>();
-		foreach (DynamicObject dobj in DynamicObjects.Values)
+		foreach (long guid in DynamicObjects)
 		{
-			data.DynamicObjects.Add(dobj.Item != null ? dobj.Item.GetPersistenceData() : dobj.GetPersistenceData());
+			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dynamicObject))
+			{
+				data.DynamicObjects.Add(dynamicObject.Item != null ? dynamicObject.Item.GetPersistenceData() : dynamicObject.GetPersistenceData());
+			}
 		}
 		if (CargoBay != null)
 		{
@@ -1609,18 +1585,18 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		PersistenceObjectDataShip data = persistenceData as PersistenceObjectDataShip;
 		Guid = data.GUID;
 		await CreateShipData(data.Registration, data.Tag, data.SceneID, loadDynamicObjects: false);
-		VesselData.VesselName = data.Name;
+		VesselName = data.Name;
 		EmblemId = data.EmblemId;
 		LoadShipRequestPersistance(data.timePassedSinceShipCall);
 		DistributionManager = new DistributionManager(this);
-		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Forward.ToVector3D(), data.Up.ToVector3D());
+		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Rotation.ToQuaternionD());
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(this);
-		Rotation = data.Rotation.ToVector3D();
+		AngularVelocityPerAxis = data.AngularVelocity.ToVector3D();
 		await SetHealthAsync(data.Health);
 		IsInvulnerable = data.IsInvulnerable;
 		DockingControlsDisabled = data.DockingControlsDisabled;
 		SecurityPanelsLocked = data.SecurityPanelsLocked;
-		StructureSceneData structureSceneData = ObjectCopier.DeepCopy(StaticData.StructuresDataList.Find((StructureSceneData m) => m.ItemID == (short)SceneID));
+		StructureSceneData structureSceneData = ObjectCopier.DeepCopy(StaticData.StructuresDataList.Find((StructureSceneData m) => m.ItemID == (short)SceneId));
 
 		foreach (PersistenceObjectDataDynamicObject dobjData in data.DynamicObjects.Cast<PersistenceObjectDataDynamicObject>())
 		{
@@ -1712,25 +1688,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		Server.Instance.Add(this);
 		SetPhysicsParameters();
-		if (data.DockedToShipGUID.HasValue)
-		{
-			Ship dockToShip = Server.Instance.GetVessel(data.DockedToShipGUID.Value) as Ship;
-
-			VesselDockingPort myPort = DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedPortID.Value);
-			VesselDockingPort dockedToPort = dockToShip.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedToPortID.Value);
-
-			System.Diagnostics.Debug.Assert(myPort != null);
-			System.Diagnostics.Debug.Assert(dockedToPort != null);
-
-			await DockToVessel(myPort, dockedToPort, dockToShip, disableStabilization: false, useCurrentSolarSystemTime: true, buildingStation: true);
-		}
-		if (data.StabilizeToTargetGUID.HasValue)
-		{
-			SpaceObjectVessel ab = Server.Instance.GetObject(data.StabilizeToTargetGUID.Value) as SpaceObjectVessel;
-			StabilizeToTarget(ab, forceStabilize: true);
-			StabilizeToTargetRelPosition = data.StabilizeToTargetPosition.ToVector3D();
-			await UpdateStabilization();
-		}
 		if (data.timePassedSinceShipCall > 0.0)
 		{
 			LoadShipRequestPersistance(data.timePassedSinceShipCall);
@@ -1750,6 +1707,34 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 	}
 
+	/// <summary>
+	/// 	Restores docking and stabilization relationships after all ships have been loaded.
+	/// 	Must be called in a second pass so every target vessel is guaranteed to be in the
+	/// 	server's vessel registry before we try to link ports.
+	/// </summary>
+	public async Task RestoreDocking(PersistenceObjectDataShip data)
+	{
+		if (data.DockedToShipGUID.HasValue)
+		{
+			Ship dockToShip = Server.Instance.GetVessel(data.DockedToShipGUID.Value) as Ship;
+
+			VesselDockingPort myPort = DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedPortID.Value);
+			VesselDockingPort dockedToPort = dockToShip.DockingPorts.First((VesselDockingPort m) => m.ID.InSceneID == data.DockedToPortID.Value);
+
+			System.Diagnostics.Debug.Assert(myPort != null);
+			System.Diagnostics.Debug.Assert(dockedToPort != null);
+
+			await DockToVessel(myPort, dockedToPort, dockToShip, disableStabilization: false, useCurrentSolarSystemTime: true, buildingStation: true);
+		}
+		if (data.StabilizeToTargetGUID.HasValue)
+		{
+			SpaceObjectVessel ab = Server.Instance.GetSpaceObject(data.StabilizeToTargetGUID.Value) as SpaceObjectVessel;
+			StabilizeToTarget(ab, forceStabilize: true);
+			StabilizeToTargetRelPosition = data.StabilizeToTargetPosition.ToVector3D();
+			await UpdateStabilization();
+		}
+	}
+
 	public async void VesselRequestListener(NetworkData data)
 	{
 		var request = data as VesselRequest;
@@ -1760,10 +1745,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		var response = new VesselRequestResponse();
 		response.GUID = Guid;
 		response.Active = false;
-		if (timePassedSinceRequest > 0.0)
+		if (TimePassedSinceRequest > 0.0)
 		{
 			response.Message = RescueShipMessages.ShipEnRoute;
-			response.Time = (float)(RespawnTimeForShip - timePassedSinceRequest);
+			response.Time = (float)(RespawnTimeForShip - TimePassedSinceRequest);
 			foreach (Player p3 in MainVessel.VesselCrew)
 			{
 				await NetworkController.SendAsync(p3.Guid, response);
@@ -1779,11 +1764,11 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				return;
 			}
 		}
-		if (Server.Instance.SolarSystem.GetArtificialBodieslsInRange(this, 5000.0).FirstOrDefault((ArtificialBody m) => m is SpaceObjectVessel vessel && GameScenes.Ranges.IsShip(vessel.SceneID)) == null)
+		if (!Server.Instance.SolarSystem.GetVesselsInRange(Position, 5000, Guid).Any((SpaceObjectVessel m) => GameScenes.Ranges.IsShip(m.SceneId)))
 		{
-			timePassedSinceRequest = 1.0;
+			TimePassedSinceRequest = 1.0;
 			RespawnTimeForShip = request.Time;
-			RescueShipSceneID = request.RescueShipSceneID;
+			_rescueShipSceneID = request.RescueShipSceneID;
 			RescueShipTag = request.RescueShipTag;
 			response.Message = RescueShipMessages.ShipCalled;
 			response.Time = (float)RespawnTimeForShip;
@@ -1792,16 +1777,14 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			{
 				await NetworkController.SendAsync(p2.Guid, response);
 			}
+			foreach (Ship shp2 in MainVessel.AllDockedVessels.Cast<Ship>())
 			{
-				foreach (Ship shp2 in MainVessel.AllDockedVessels.Cast<Ship>())
+				foreach (Player pl2 in shp2.VesselCrew)
 				{
-					foreach (Player pl2 in shp2.VesselCrew)
-					{
-						await NetworkController.SendAsync(pl2.Guid, response);
-					}
+					await NetworkController.SendAsync(pl2.Guid, response);
 				}
-				return;
 			}
+			return;
 		}
 		response.Message = RescueShipMessages.AnotherShipInRange;
 		foreach (Player p in MainVessel.VesselCrew)
@@ -1821,47 +1804,49 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		if (timeSince > 0.001)
 		{
-			timePassedSinceRequest = timeSince;
+			TimePassedSinceRequest = timeSince;
 			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
 		}
 	}
 
-	public async void SpawnShipCallback(double dbl)
+	public async void SpawnShipCallback(double deltaTime)
 	{
-		timePassedSinceRequest += dbl;
-		if (!(timePassedSinceRequest > RespawnTimeForShip))
+		TimePassedSinceRequest += deltaTime;
+
+		if (TimePassedSinceRequest > RespawnTimeForShip)
 		{
-			return;
-		}
-		double a = MathHelper.RandomRange(0.0, System.Math.PI * 2.0);
-		double b = MathHelper.RandomRange(0.0, System.Math.PI);
-		double r = MathHelper.RandomRange(Radius + 200.0, Radius + 350.0);
-		Vector3D newPos = r * new Vector3D(System.Math.Cos(a) * System.Math.Sin(b), System.Math.Sin(a) * System.Math.Sin(b), System.Math.Cos(b));
-		CurrentSpawnedShip = await SpawnRescueShip(this, newPos, RescueShipSceneID, RescueShipTag);
-		Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
-		timePassedSinceRequest = 0.0;
-		VesselRequestResponse vrr = new VesselRequestResponse();
-		vrr.Active = false;
-		vrr.GUID = Guid;
-		vrr.Message = RescueShipMessages.ShipArrived;
-		foreach (Player p in MainVessel.VesselCrew)
-		{
-			await NetworkController.SendAsync(p.Guid, vrr);
-		}
-		foreach (Ship shp in MainVessel.AllDockedVessels.Cast<Ship>())
-		{
-			foreach (Player pl in shp.VesselCrew)
+			double a = MathHelper.RandomRange(0.0, System.Math.PI * 2.0);
+			double b = MathHelper.RandomRange(0.0, System.Math.PI);
+			double r = MathHelper.RandomRange(Radius + 200.0, Radius + 350.0);
+
+			Vector3D newPos = r * new Vector3D(System.Math.Cos(a) * System.Math.Sin(b), System.Math.Sin(a) * System.Math.Sin(b), System.Math.Cos(b));
+
+			Ship rescueShip = await CreateNewShip(_rescueShipSceneID, "", -1L, [Guid], null, newPos, null, MathHelper.RandomRotation(), RescueShipTag + (RescueShipTag == "" || RescueShipTag.EndsWith(";") ? "" : ";") + "_RescueVessel");
+			rescueShip.StabilizeToTarget(this, forceStabilize: true);
+
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_sec, SpawnShipCallback);
+			TimePassedSinceRequest = 0.0;
+
+			VesselRequestResponse response = new VesselRequestResponse
 			{
-				await NetworkController.SendAsync(pl.Guid, vrr);
+				Active = false,
+				GUID = Guid,
+				Message = RescueShipMessages.ShipArrived
+			};
+
+			foreach (Player p in MainVessel.VesselCrew)
+			{
+				await NetworkController.SendAsync(p.Guid, response);
+			}
+
+			foreach (Ship shp in MainVessel.AllDockedVessels.Cast<Ship>())
+			{
+				foreach (Player pl in shp.VesselCrew)
+				{
+					await NetworkController.SendAsync(pl.Guid, response);
+				}
 			}
 		}
-	}
-
-	public static async Task<Ship> SpawnRescueShip(SpaceObjectVessel mainShip, Vector3D pos, GameScenes.SceneId sceneID, string tag)
-	{
-		Ship rescueShip = await CreateNewShip(sceneID, "", -1L, new List<long> { mainShip.Guid }, null, pos, null, MathHelper.RandomRotation(), tag + (tag == "" || tag.EndsWith(";") ? "" : ";") + "_RescueVessel");
-		rescueShip.StabilizeToTarget(mainShip, forceStabilize: true);
-		return rescueShip;
 	}
 
 	public void DistressCallRequestListener(NetworkData data)
@@ -2067,13 +2052,15 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			{
 				if (retMsg == null && sendStatsMessage)
 				{
-					retMsg = new ShipStatsMessage();
-					retMsg.GUID = Guid;
-					retMsg.Temperature = Temperature;
-					retMsg.Health = Health;
-					retMsg.Armor = Armor;
-					retMsg.VesselObjects = new VesselObjects();
-					retMsg.VesselObjects.SpawnPoints = new List<SpawnPointStats>();
+					retMsg = new ShipStatsMessage
+					{
+						Guid = Guid,
+						Temperature = Temperature,
+						Health = Health,
+						Armor = Armor,
+						VesselObjects = new VesselObjects()
+					};
+					retMsg.VesselObjects.SpawnPoints = [];
 					retMsg.SelfDestructTime = SelfDestructTimer?.Time;
 				}
 				sp.Player = null;
@@ -2165,7 +2152,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			}
 			foreach (VesselRepairPoint rp in list.Where((VesselRepairPoint m) => m.Health > 0f))
 			{
-				if (rp.AffectedSystem is { Defective: true} && MathHelper.RandomNextDouble() < damage * Server.DamageUpgradePartChanceMultiplier / MaxHealth)
+				if (rp.AffectedSystem is { Defective: true} && MathHelper.RandomNextDouble() < damage / MaxHealth)
 				{
 					MachineryPart mp = (from m in rp.AffectedSystem.MachineryParts.Values
 						where m != null

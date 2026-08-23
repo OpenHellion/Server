@@ -9,11 +9,9 @@ public class PersistenceObjectDataShip : PersistenceObjectData
 {
 	public OrbitData OrbitData;
 
-	public double[] Forward;
-
-	public double[] Up;
-
 	public double[] Rotation;
+
+	public double[] AngularVelocity;
 
 	public string Registration;
 

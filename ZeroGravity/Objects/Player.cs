@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using OpenHellion;
 using OpenHellion.Net;
+using OpenHellion.Net.Message;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -38,8 +40,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public double LastMovementMessageSolarSystemTime = -1.0;
 
-	public List<long> UpdateArtificialBodyMovement = new List<long>();
-
 	public bool IsAlive;
 
 	private bool _environmentReady;
@@ -66,33 +66,68 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public CharacterAnimationData AnimationData;
 
+	public sbyte[] JetpackDirection;
+
+	public Dictionary<byte, RagdollItemData> RagdollData;
+
 	public int AnimationStatsMask;
 
 	private readonly HashSet<long> _subscribedToSpaceObjects = [];
 
-	private float[] _gravity;
-
+	/// <summary>
+	/// 	The player's own motion, measured against the parent and in the parent's axes: the rate
+	/// 	<see cref="SpaceObjectTransferable.LocalPosition" /> changes at.
+	/// </summary>
 	public Vector3D LocalVelocity = Vector3D.Zero;
 
-	private float _collisionImpactVelocity;
+	public override Vector3D Velocity => (Parent?.Velocity ?? Vector3D.Zero)
+		+ (Parent?.Rotation ?? QuaternionD.Identity) * LocalVelocity;
+
+	private long _anchorGuid;
+
+	public long AnchorGuid
+	{
+		get => _anchorGuid;
+		set
+		{
+			if (_anchorGuid == value)
+			{
+				return;
+			}
+
+			_anchorGuid = value;
+			LastReportedPosition = null;
+			LastReportedVelocity = null;
+		}
+	}
+
+	public const double AnchorRebaseDistance = 200.0;
+
+	public const double AnchorKeepDistance = AnchorRebaseDistance * 1.5;
+
+	private double _lastMoveRequestTime = -1.0;
+
+	private double _lastAnimationMessageTime = -1.0;
+
+	// Movement requests and parent changes share one queue because only their relative order tells us
+	// which anchor each request was measured from.
+	private readonly ConcurrentQueue<NetworkData> _pendingMoveRequests = new();
+
+	public Vector3D? LastReportedPosition;
+
+	public Vector3D? LastReportedVelocity;
+
+	private const double MaxResimDeltaTime = 0.5;
+
+	private const double ResimPositionSlack = 2.0;
+
+	private const double AcceptedJumpWarningDistance = 5.0;
+
+	private const double TransformCorrectionEpsilon = 0.01;
 
 	private Helmet _currentHelmet;
 
 	private Jetpack _currentJetpack;
-
-	public Dictionary<byte, RagdollItemData> RagdollData;
-
-	private sbyte[] _jetpackDirection;
-
-	private Vector3D _pivotPositionCorrection = Vector3D.Zero;
-
-	private Vector3D _pivotVelocityCorrection = Vector3D.Zero;
-
-	private Vector3D? _dockUndockPositionCorrection;
-
-	private QuaternionD? _dockUndockRotationCorrection;
-
-	private bool _dockUndockWaitForMsg;
 
 	public bool IsAdmin = false;
 
@@ -106,9 +141,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public float CoreTemperature = 37f;
 
-	private double _lastPivotResetTime;
+	private const double DeathDisconnectGraceSeconds = 60.0;
 
-	private double _lateDisconnectWait;
+	private double _deathDisconnectWait;
 
 	public bool IsInsideSpawnPoint;
 
@@ -122,7 +157,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public List<ItemCompoundType> Blueprints = ObjectCopier.DeepCopy(StaticData.DefaultBlueprints);
 
-	public NavigationMapDetails NavMapDetails;
+	// Vessels this player has discovered by scanning. Combined with always-visible/distress vessels
+	// to form the set the player is allowed to see on the navigation map.
+	// TODO persist.
+	public readonly HashSet<long> DiscoveredVessels = [];
 
 	public bool Initialize = true;
 
@@ -264,6 +302,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public Player(long guid, Vector3D localPosition, QuaternionD localRotation)
 		: base(guid, localPosition, localRotation)
 	{
+		Health = MaxHealth;
+
 		_healTimer = new Timer(100.0)
 		{
 			Enabled = false
@@ -315,7 +355,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		EventSystem.AddListener<CharacterMovementMessage>(UpdateMovementListener);
+		EventSystem.AddListener<MoveObjectRequest>(MoveObjectRequestListener);
+		EventSystem.AddListener<ChangeParentMessage>(ChangeParentMessageListener);
+		EventSystem.AddListener<CharacterAnimationMessage>(CharacterAnimationMessageListener);
 		EventSystem.AddListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
 		EventSystem.AddListener<PlayerShootingMessage>(PlayerShootingListener);
 		EventSystem.AddListener<PlayerStatsMessage>(PlayerStatsMessageListener);
@@ -326,14 +368,16 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		EventSystem.AddListener<LockToTriggerMessage>(LockToTriggerMessageListener);
 		EventSystem.AddListener<QuestTriggerMessage>(QuestTriggerMessageListener);
 		EventSystem.AddListener<SkipQuestMessage>(SkipQuestMessageListener);
-		EventSystem.AddListener<NavigationMapDetailsMessage>(NavigationMapDetailsMessageListener);
+		EventSystem.AddListener<ScanForObjectsRequest>(ScanForObjectsRequestListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
 		EnvironmentReady = false;
 		PlayerReady = false;
-		EventSystem.RemoveListener<CharacterMovementMessage>(UpdateMovementListener);
+		EventSystem.RemoveListener<MoveObjectRequest>(MoveObjectRequestListener);
+		EventSystem.RemoveListener<ChangeParentMessage>(ChangeParentMessageListener);
+		EventSystem.RemoveListener<CharacterAnimationMessage>(CharacterAnimationMessageListener);
 		EventSystem.RemoveListener<EnvironmentReadyMessage>(EnvironmentReadyListener);
 		EventSystem.RemoveListener<PlayerShootingMessage>(PlayerShootingListener);
 		EventSystem.RemoveListener<PlayerStatsMessage>(PlayerStatsMessageListener);
@@ -344,7 +388,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		EventSystem.RemoveListener<LockToTriggerMessage>(LockToTriggerMessageListener);
 		EventSystem.RemoveListener<QuestTriggerMessage>(QuestTriggerMessageListener);
 		EventSystem.RemoveListener<SkipQuestMessage>(SkipQuestMessageListener);
-		EventSystem.RemoveListener<NavigationMapDetailsMessage>(NavigationMapDetailsMessageListener);
+		EventSystem.RemoveListener<ScanForObjectsRequest>(ScanForObjectsRequestListener);
 	}
 
 	public async Task RemovePlayerFromTrigger()
@@ -378,11 +422,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	private static async Task PassTroughtShootMessage(PlayerShootingMessage psm)
 	{
-		PlayerShootingMessage sending = new PlayerShootingMessage();
-		sending.HitIndentifier = -1;
-		sending.ShotData = psm.ShotData;
-		sending.HitGUID = psm.HitGUID;
-		sending.GUID = psm.GUID;
+		PlayerShootingMessage sending = new PlayerShootingMessage
+		{
+			HitIndentifier = -1,
+			ShotData = psm.ShotData,
+			HitGUID = psm.HitGUID,
+			GUID = psm.GUID
+		};
 		await NetworkController.SendToAllAsync(sending, psm.Sender);
 	}
 
@@ -421,9 +467,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			await PassTroughtShootMessage(message);
 			return;
 		}
-		SpaceObject sp = Server.Instance.GetObject(message.HitGUID);
-		float damage = 0f;
-		damage = wep == null ? message.ShotData.IsMeleeAttack ? 30f : 0f : message.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage;
+		SpaceObject sp = Server.Instance.GetSpaceObject(message.HitGUID);
+		float damage = wep == null ? message.ShotData.IsMeleeAttack ? 30f : 0f : message.ShotData.IsMeleeAttack ? wep.MeleeDamage : wep.Damage;
 		if (sp is DynamicObject dynamicObject)
 		{
 			await dynamicObject.Item.TakeDamage(new Dictionary<TypeOfDamage, float> {
@@ -432,7 +477,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				damage
 			} });
 		}
-		if (Server.Instance.GetObject(message.HitGUID) is Player hitPlayer)
+		if (Server.Instance.GetSpaceObject(message.HitGUID) is Player hitPlayer)
 		{
 			await NetworkController.SendToClientsSubscribedTo(message, Guid, Parent, hitPlayer.Parent);
 			await hitPlayer.TakeHitDamage(damage, (HitBoxType)message.ShotData.colliderType, message.ShotData.IsMeleeAttack, message.ShotData.Orientation.ToVector3D());
@@ -442,13 +487,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	protected async void PlayerDrillingListener(NetworkData data)
 	{
 		var message = data as PlayerDrillingMessage;
-		HandDrill drill = ItemInHands as HandDrill;
-		if (message.Sender == Guid && drill != null)
+		if (message.Sender == Guid && ItemInHands is HandDrill drill)
 		{
-			PlayerDrillingMessage pdmForOtherChar = new PlayerDrillingMessage();
-			pdmForOtherChar.DrillersGUID = FakeGuid;
-			pdmForOtherChar.dontPlayEffect = message.dontPlayEffect;
-			pdmForOtherChar.isDrilling = message.isDrilling;
+			PlayerDrillingMessage pdmForOtherChar = new PlayerDrillingMessage
+			{
+				DrillersGUID = FakeGuid,
+				dontPlayEffect = message.dontPlayEffect,
+				isDrilling = message.isDrilling
+			};
 			await NetworkController.SendToClientsSubscribedTo(pdmForOtherChar, Guid, Parent);
 			if (drill.CanDrill && message.MiningPointID != null && Server.Instance.GetVessel(message.MiningPointID.VesselGUID) is Asteroid asteroid && asteroid.MiningPoints.TryGetValue(message.MiningPointID.InSceneID, out var miningPoint))
 			{
@@ -467,43 +513,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			return;
 		}
-		SpawnObjectsResponse res = new SpawnObjectsResponse();
-		NetworkController.AddCharacterSpawnsToResponse(this, ref res);
-		if (Parent is SpaceObjectVessel)
-		{
-			SpaceObjectVessel vessel = Parent as SpaceObjectVessel;
-			if (vessel.IsDocked)
-			{
-				vessel = vessel.DockedToMainVessel;
-			}
-			foreach (DynamicObject dynamicObject in vessel.DynamicObjects.Values)
-			{
-				res.Data.Add(dynamicObject.GetSpawnResponseData(this));
-			}
-			foreach (Corpse corpse in vessel.Corpses.Values)
-			{
-				res.Data.Add(corpse.GetSpawnResponseData(this));
-			}
-			if (vessel.AllDockedVessels.Count > 0)
-			{
-				foreach (SpaceObjectVessel child in vessel.AllDockedVessels)
-				{
-					foreach (DynamicObject childDynamicObject in child.DynamicObjects.Values)
-					{
-						res.Data.Add(childDynamicObject.GetSpawnResponseData(this));
-					}
-					foreach (Corpse childCorpse in child.Corpses.Values)
-					{
-						res.Data.Add(childCorpse.GetSpawnResponseData(this));
-					}
-				}
-			}
-		}
-		await NetworkController.SendAsync(Guid, res);
-		await NetworkController.SendCharacterSpawnToOtherPlayersAsync(this);
+
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		foreach (SpaceObjectVessel ves in from m in _subscribedToSpaceObjects
-			select Server.Instance.GetObject(m) into m
+			select Server.Instance.GetSpaceObject(m) into m
 			where m is SpaceObjectVessel
 			select m as SpaceObjectVessel)
 		{
@@ -517,10 +530,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 			await NetworkController.SendAsync(Guid, new ShipStatsMessage
 			{
-				GUID = ves.Guid,
+				Guid = ves.Guid,
 				VesselObjects = vesselObjects
 			});
 		}
+		_lastMoveRequestTime = -1.0;
+		_lastAnimationMessageTime = -1.0;
 		IsAlive = true;
 		EnvironmentReady = true;
 	}
@@ -683,194 +698,291 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	public void SetDockUndockCorrection(Vector3D? posCorrection, QuaternionD? rotCorrection)
-	{
-		_dockUndockPositionCorrection = posCorrection;
-		_dockUndockRotationCorrection = rotCorrection;
-		_dockUndockWaitForMsg = posCorrection.HasValue && rotCorrection.HasValue;
-	}
-
 	public void ModifyLocalPositionAndRotation(Vector3D locPos, QuaternionD locRot)
 	{
 		LocalPosition += locPos;
 		LocalRotation *= locRot;
 	}
 
-	private async void UpdateMovementListener(NetworkData data)
+	private void MoveObjectRequestListener(NetworkData data)
 	{
-		var message = data as CharacterMovementMessage;
-		if (message.Sender != Guid || !IsAlive || (Parent is Pivot && message.ParentType == SpaceObjectType.None))
+		var message = data as MoveObjectRequest;
+		if (message.Guid != FakeGuid || message.Sender != Guid)
 		{
 			return;
 		}
-		MouseLook = message.TransformData.MouseLook;
-		FreeLookX = message.TransformData.FreeLookX;
-		FreeLookY = message.TransformData.FreeLookY;
-		AnimationData = new CharacterAnimationData
-		{
-			VelocityForward = message.AnimationData.VelocityForward,
-			VelocityRight = message.AnimationData.VelocityRight,
-			ZeroGForward = message.AnimationData.ZeroGForward,
-			ZeroGRight = message.AnimationData.ZeroGRight,
-			PlayerStance = message.AnimationData.PlayerStance,
-			InteractType = message.AnimationData.InteractType,
-			TurningDirection = message.AnimationData.TurningDirection,
-			EquipOrDeEquip = message.AnimationData.EquipOrDeEquip,
-			EquipItemId = message.AnimationData.EquipItemId,
-			EmoteType = message.AnimationData.EmoteType,
-			ReloadItemType = message.AnimationData.ReloadItemType,
-			MeleeAttackType = message.AnimationData.MeleeAttackType,
-			LadderDirection = message.AnimationData.LadderDirection,
-			PlayerStanceFloat = message.AnimationData.PlayerStanceFloat,
-			GetUpType = message.AnimationData.GetUpType,
-			FireMode = message.AnimationData.FireMode,
-			AirTime = message.AnimationData.AirTime
-		};
-		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && message.ParentType == SpaceObjectType.PlayerPivot && !message.PivotReset)
+
+		_pendingMoveRequests.Enqueue(message);
+	}
+
+	private void ChangeParentMessageListener(NetworkData data)
+	{
+		var message = data as ChangeParentMessage;
+		if (message.Guid != FakeGuid || message.Sender != Guid)
 		{
 			return;
 		}
-		if (_pivotPositionCorrection.IsNotEpsilonZero() && message.ParentType == SpaceObjectType.PlayerPivot && message.PivotReset)
+
+		_pendingMoveRequests.Enqueue(message);
+	}
+
+	/// <summary>
+	/// 	Changes which object the player belongs to. Only bookkeeping: crew, rooms, life support. The
+	/// 	player does not move, so nothing here reads a position off the message.
+	/// </summary>
+	private async Task ChangeParent(ChangeParentMessage message)
+	{
+		if (Parent == null || message.PreviousParentGuid != Parent.Guid)
 		{
-			_pivotPositionCorrection = Vector3D.Zero;
+			// Already moved on; this describes a parent we no longer have.
 			return;
 		}
-		LocalPosition = message.TransformData.LocalPosition.ToVector3D();
-		if (_pivotPositionCorrection.IsNotEpsilonZero() && Parent is Pivot && !message.PivotReset)
-		{
-			LocalPosition -= _pivotPositionCorrection;
-		}
-		LocalRotation = message.TransformData.LocalRotation.ToQuaternionD();
-		if (message.DockUndockMsg.HasValue && _dockUndockWaitForMsg)
-		{
-			SetDockUndockCorrection(null, null);
-		}
-		if (_dockUndockPositionCorrection.HasValue && _dockUndockRotationCorrection.HasValue)
-		{
-			LocalPosition += _dockUndockPositionCorrection.Value;
-			LocalRotation *= _dockUndockRotationCorrection.Value;
-		}
-		LocalVelocity = message.TransformData.LocalVelocity.ToVector3D();
-		_gravity = message.Gravity;
-		if (message.ImpactVelocity.HasValue)
-		{
-			await DoCollisionDamage(message.ImpactVelocity.Value);
-			_collisionImpactVelocity = message.ImpactVelocity.Value;
-		}
-		else
-		{
-			_collisionImpactVelocity = 0f;
-		}
 
-		if (message.RagdollData != null)
-		{
-			RagdollData = new Dictionary<byte, RagdollItemData>(message.RagdollData);
-		}
-		else
-		{
-			RagdollData?.Clear();
-			RagdollData = null;
-		}
+		Vector3D worldPosition = Position;
+		QuaternionD worldRotation = Rotation;
+		Vector3D worldVelocity = Velocity;
 
-		if (message.JetpackDirection != null)
+		SpaceObject newParent;
+		if (message.ParentGuid == FakeGuid)
 		{
-			_jetpackDirection =
-			[
-				message.JetpackDirection[0],
-				message.JetpackDirection[1],
-				message.JetpackDirection[2],
-				message.JetpackDirection[3]
-			];
-		}
-		else if (_jetpackDirection != null)
-		{
-			_jetpackDirection = null;
-		}
-
-		if (Parent is SpaceObjectVessel && message.ParentType == SpaceObjectType.PlayerPivot)
-		{
-			_pivotPositionCorrection = Vector3D.Zero;
-			_pivotVelocityCorrection = Vector3D.Zero;
-			LocalPosition = Vector3D.Zero;
-			SpaceObjectVessel refVessel2 = (Parent as SpaceObjectVessel).MainVessel;
-			Pivot pivot2 = new Pivot(this, refVessel2);
-			pivot2.Orbit.CopyDataFrom(refVessel2.Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
-			pivot2.Orbit.SetLastChangeTime(Server.SolarSystemTime);
-			SubscribeTo(Parent);
-			foreach (Player pl in Server.Instance.AllPlayers)
+			if (Parent is not SpaceObjectVessel)
 			{
-				if (pl.IsSubscribedTo(Parent.Guid))
+				Debug.LogWarning("Cannot create a pivot without a vessel to leave", Guid, Name,
+					"parent", Parent.Guid, "type", Parent.GetType().Name);
+				return;
+			}
+
+			Pivot pivot = new Pivot(this, worldPosition, worldVelocity);
+			pivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
+			newParent = pivot;
+		}
+		else if (Server.Instance.TryGetSpaceObject(message.ParentGuid, out SpaceObject requestedParent)
+			&& requestedParent is ArtificialBody requestedBody)
+		{
+			newParent = requestedBody;
+		}
+		else
+		{
+			Debug.LogWarning("Ignored a parent change naming a parent nothing can be measured against",
+				Guid, Name, "requested", message.ParentGuid);
+			return;
+		}
+
+		SpaceObject oldParent = Parent;
+		foreach (Player pl in Server.Instance.AllPlayers)
+		{
+			if (pl.IsSubscribedTo(oldParent.Guid))
+			{
+				pl.SubscribeTo(newParent);
+			}
+		}
+
+		Parent = newParent;
+		if (oldParent is Pivot oldPivot)
+		{
+			await oldPivot.Destroy();
+		}
+
+		// Same place, measured from the new parent.
+		QuaternionD parentRotationInverse = QuaternionD.Inverse(Parent.Rotation);
+		LocalPosition = parentRotationInverse * (worldPosition - Parent.Position);
+		LocalRotation = parentRotationInverse * worldRotation;
+		LocalVelocity = parentRotationInverse * (worldVelocity - Parent.Velocity);
+	}
+
+	/// <summary>
+	/// 	Chooses the body everything sent to this player is measured from.
+	/// </summary>
+	public void UpdateAnchor()
+	{
+		// Logged in but not yet attached to anything. Position is meaningless until then, and asking
+		// for it logs an error.
+		if (Parent == null)
+		{
+			return;
+		}
+
+		if (Parent is SpaceObjectVessel { MainVessel: { } parentMainVessel })
+		{
+			AnchorGuid = parentMainVessel.Guid;
+			return;
+		}
+
+		// Outside: A real vessel in range is always better than a pivot.
+		if (Server.Instance.SolarSystem.NearestSpaceObjectVessel(Position, AnchorKeepDistance)?.MainVessel
+			is { IsWarping: false } nearest)
+		{
+			double reach = nearest.Guid == AnchorGuid ? AnchorKeepDistance : AnchorRebaseDistance;
+			if ((Position - nearest.Position).Magnitude <= reach)
+			{
+				AnchorGuid = nearest.Guid;
+				return;
+			}
+		}
+
+		// Nothing in range but the pivot the player is on.
+		if (Parent is Pivot pivot)
+		{
+			AnchorGuid = pivot.Guid;
+		}
+	}
+
+	/// <summary>
+	/// 	Applies every movement request queued since the last tick.
+	/// </summary>
+	public async Task ApplyPendingMoveRequests()
+	{
+		// Measures movement and time for all messages, not per request.
+		double deltaTime = Server.SolarSystemTime - _lastMoveRequestTime;
+		bool gateArmed = _lastMoveRequestTime >= 0.0 && deltaTime >= 0.0 && deltaTime <= MaxResimDeltaTime;
+		Vector3D drainStartPosition = LocalPosition;
+		double fastest = LocalVelocity.Magnitude;
+		bool acceptedAny = false;
+
+		while (_pendingMoveRequests.TryDequeue(out NetworkData queued))
+		{
+			if (!IsAlive || Parent == null)
+			{
+				continue;
+			}
+
+			if (queued is ChangeParentMessage parentChange)
+			{
+				await ChangeParent(parentChange);
+
+				drainStartPosition = LocalPosition;
+				fastest = LocalVelocity.Magnitude;
+				continue;
+			}
+
+			var message = (MoveObjectRequest)queued;
+
+			// A mismatch means this was measured before a reanchor, and the
+			// position in it is outdated.
+			if (message.AnchorGuid != AnchorGuid)
+			{
+				continue;
+			}
+
+			if (message.StabiliseToTargetGuid > 0 && Parent is Pivot stabilisePivot
+				&& Server.Instance.GetVessel(message.StabiliseToTargetGuid) is { } stabiliseTarget)
+			{
+				SpaceObjectVessel refVessel = stabiliseTarget.MainVessel;
+				if (refVessel.StabilizeToTargetObj != null)
 				{
-					pl.SubscribeTo(pivot2);
+					refVessel = refVessel.StabilizeToTargetObj;
+				}
+				stabilisePivot.AdjustPositionAndVelocity(Vector3D.Zero, refVessel.Velocity - stabilisePivot.Velocity);
+				stabilisePivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
+			}
+
+			if (!Server.Instance.TryGetSpaceObject(AnchorGuid, out SpaceObject anchorObject)
+				|| anchorObject is not ArtificialBody anchor)
+			{
+				continue;
+			}
+
+			Vector3D reportedPosition = SpatialMath.ToLocalPosition(message.Position.ToVector3D(),
+				anchor.Position, Parent.Position, Parent.Rotation);
+			QuaternionD reportedRotation = SpatialMath.ToLocalRotation(message.Rotation.ToQuaternionD(),
+				Parent.Rotation);
+			Vector3D newVelocity = SpatialMath.ToLocalVelocity(message.Velocity.ToVector3D(),
+				anchor.Velocity, Parent.Velocity, Parent.Rotation);
+
+			// What the client believes, whether or not we go on to accept it. The movement message
+			// compares this against where the player really is to decide whether we owe it a correction.
+			LastReportedPosition = message.Position.ToVector3D();
+			LastReportedVelocity = message.Velocity.ToVector3D();
+
+			fastest = System.Math.Max(fastest, newVelocity.Magnitude);
+			if (gateArmed)
+			{
+				double allowedDistance = fastest * deltaTime * 2.0 + ResimPositionSlack;
+
+				if ((reportedPosition - drainStartPosition).Magnitude > allowedDistance)
+				{
+					Debug.LogWarning("Refused implausible movement", Guid, Name, "reported", reportedPosition,
+						"previous", drainStartPosition, "dt", deltaTime, "allowed", allowedDistance,
+						"parent", Parent.Guid);
+					continue;
+				}
+
+				float impactSpeed = (float)(newVelocity - LocalVelocity).Magnitude;
+				if (impactSpeed > 0f)
+				{
+					await DoCollisionDamage(impactSpeed, "move-impact");
 				}
 			}
-			Parent = pivot2;
-		}
-		else if (Parent is SpaceObjectVessel && Parent.Guid != message.ParentGUID)
-		{
 
-			if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(message.ParentGUID))
+			double acceptedJump = (reportedPosition - LocalPosition).Magnitude;
+			if (acceptedJump > AcceptedJumpWarningDistance)
 			{
-				Parent = Server.Instance.GetVessel(message.ParentGUID);
-			}
-			else
-			{
-				Debug.LogError("Unable to find new parent", Guid, Name, "new parent", message.ParentType, message.ParentGUID);
-			}
-		}
-		else if (Parent is Pivot && message.ParentType != SpaceObjectType.PlayerPivot)
-		{
-			Pivot pivot3 = Parent as Pivot;
-			if (message.ParentType is SpaceObjectType.Ship or SpaceObjectType.Asteroid or SpaceObjectType.Station && Server.Instance.DoesObjectExist(message.ParentGUID))
-			{
-				Parent = Server.Instance.GetVessel(message.ParentGUID);
-				SubscribeTo(Parent);
-				await pivot3.Destroy();
-			}
-			else
-			{
-				Debug.LogError("Unable to find new parent", Guid, Name, "new parent", message.ParentType, message.ParentGUID);
-			}
-		}
-		else if (Parent is Pivot && _pivotPositionCorrection.IsEpsilonZero() && Server.Instance.RunTime.TotalSeconds - _lastPivotResetTime > 1.0)
-		{
-			Pivot pivot = Parent as Pivot;
-			SpaceObjectVessel nearestVessel = message.NearestVesselGUID > 0 ? Server.Instance.GetVessel(message.NearestVesselGUID) : null;
-			SpaceObjectVessel refVessel = nearestVessel.MainVessel;
-
-			if (refVessel.StabilizeToTargetObj != null)
-			{
-				refVessel = refVessel.StabilizeToTargetObj;
+				Debug.LogWarning("Accepted large movement", Guid, Name, "jump", acceptedJump, "reported",
+					reportedPosition, "previous", LocalPosition, "dt", deltaTime, "gate",
+					gateArmed ? "armed" : "disarmed", "parent", Parent.Guid);
 			}
 
-			// Stick to vessel if requested or if within 50m. If not, and if far enough away, reset pivot to zero local position.
-			if (nearestVessel is { IsDebrisFragment: false } && (pivot.Position - refVessel.Position).IsNotEpsilonZero() && (message.StickToVessel || message.NearestVesselDistance <= 50f))
+			LocalPosition = reportedPosition;
+			LocalRotation = reportedRotation;
+			LocalVelocity = newVelocity;
+			acceptedAny = true;
+
+			if (message.HitDebrisField)
 			{
-				Vector3D oldPivotPos = pivot.Position;
-				Vector3D oldPivotVel = pivot.Velocity;
-				pivot.Orbit.CopyDataFrom(refVessel.Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
-				pivot.Orbit.SetLastChangeTime(Server.Instance.SolarSystem.CurrentTime);
-				_pivotPositionCorrection += pivot.Position - oldPivotPos;
-				_pivotVelocityCorrection = pivot.Velocity - oldPivotVel;
-				UpdateArtificialBodyMovement.Add(pivot.Guid);
-				UpdateArtificialBodyMovement.Add(refVessel.Guid);
+				await DoCollisionDamage(9f, "debris-field");
 			}
-			else if ((nearestVessel == null || (message.NearestVesselDistance > 50f && (nearestVessel.FTL is not
-					 {
-						 Status: SystemStatus.OnLine
-					 } || (nearestVessel.Velocity - Parent.Velocity).SqrMagnitude < 900.0))) && LocalPosition.SqrMagnitude > 25000000.0 && !message.StickToVessel)
-			{
-				_pivotPositionCorrection = LocalPosition;
-				pivot.AdjustPositionAndVelocity(_pivotPositionCorrection, _pivotVelocityCorrection);
-				UpdateArtificialBodyMovement.Add(pivot.Guid);
-			}
-			if (_pivotPositionCorrection.IsNotEpsilonZero())
-			{
-				_lastPivotResetTime = Server.Instance.RunTime.TotalSeconds;
-				LocalPosition -= _pivotPositionCorrection;
-			}
+
+			PlayerReady = true;
 		}
-		PlayerReady = true;
+
+		if (acceptedAny)
+		{
+			_lastMoveRequestTime = Server.SolarSystemTime;
+		}
+	}
+
+	/// <summary>
+	/// 	If the player has moved in a way that warrants a transform correction.
+	/// </summary>
+	public bool NeedsTransformCorrection(ArtificialBody anchor, Vector3D playerPosition, Vector3D playerVelocity)
+	{
+		if (LastReportedPosition is not { } reportedPosition || LastReportedVelocity is not { } reportedVelocity)
+		{
+			return true;
+		}
+
+		// Capped, or a client that stops reporting would widen its own tolerance without limit.
+		double gap = System.Math.Min(Server.SolarSystemTime - _lastMoveRequestTime, MaxResimDeltaTime);
+		double separation = gap > 0.0 ? (Parent.Velocity - anchor.Velocity).Magnitude * gap : 0.0;
+
+		return (playerPosition - reportedPosition).Magnitude > TransformCorrectionEpsilon + separation
+			|| (playerVelocity - reportedVelocity).Magnitude > TransformCorrectionEpsilon;
+	}
+
+	private async void CharacterAnimationMessageListener(NetworkData data)
+	{
+		var message = data as CharacterAnimationMessage;
+		if (message.Guid != FakeGuid || message.Sender != Guid)
+		{
+			return;
+		}
+
+		AnimationData = message.AnimationData;
+		MouseLook = message.MouseLook;
+		FreeLookX = message.FreeLookX;
+		FreeLookY = message.FreeLookY;
+		JetpackDirection = message.JetpackDirection;
+		RagdollData = message.RagdollData;
+
+		// The nozzle directions are the only report that the jetpack is firing, so propellant is spent
+		// over the interval this message covers.
+		double burnTime = _lastAnimationMessageTime >= 0.0 ? Server.SolarSystemTime - _lastAnimationMessageTime : 0.0;
+		_lastAnimationMessageTime = Server.SolarSystemTime;
+		if (burnTime > 0.0 && CurrentJetpack != null && JetpackDirection != null
+			&& JetpackDirection.Any(nozzle => nozzle != 0))
+		{
+			await CurrentJetpack.ConsumeResources(CurrentJetpack.PropellantConsumption * (float)burnTime);
+		}
 	}
 
 	public override async Task UpdateTimers(double deltaTime)
@@ -879,7 +991,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			return;
 		}
-		updateTemperature(deltaTime);
+		UpdateTemperature(deltaTime);
 		if (CoreTemperature is < 20f or > 45f)
 		{
 		}
@@ -899,7 +1011,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 					suffocateDamage = 1f * (float)deltaTime;
 				}
 			}
-			else if (CurrentRoom == null)
+			else if (CurrentRoom == null && Parent is not Ship)
 			{
 				suffocateDamage = 1f * (float)deltaTime;
 			}
@@ -908,29 +1020,25 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				suffocateDamage = 1f * (1f - CurrentRoom.Breathability) * (float)deltaTime;
 			}
 		}
-		if ((CurrentRoom == null || CurrentRoom.AirPressure < 0.3f) && (PlayerInventory.CurrOutfit == null || CurrentHelmet == null || (CurrentHelmet.IsVisorToggleable && !CurrentHelmet.IsVisorActive)))
+		if (((CurrentRoom == null && Parent is not Ship) || CurrentRoom is { AirPressure: < 0.3f }) && (PlayerInventory.CurrOutfit == null || CurrentHelmet == null || (CurrentHelmet.IsVisorToggleable && !CurrentHelmet.IsVisorActive)))
 		{
 			pressureDamage = 2f * (float)deltaTime;
 		}
 		if (!Initialize && (suffocateDamage > float.Epsilon || pressureDamage > float.Epsilon || exposureDamage > float.Epsilon))
 		{
-			await TakeDamage((float)deltaTime, new PlayerDamage
+			await TakeDamage((float)deltaTime, "environment", new PlayerDamage
 			{
 				HurtType = HurtType.Suffocate,
 				Amount = suffocateDamage
 			}, new PlayerDamage
 			{
-				HurtType = HurtType.Suffocate,
+				HurtType = HurtType.Pressure,
 				Amount = pressureDamage
 			}, new PlayerDamage
 			{
 				HurtType = HurtType.SpaceExposure,
 				Amount = exposureDamage
 			});
-		}
-		if (CurrentJetpack != null && _jetpackDirection != null && (_jetpackDirection[0] != 0 || _jetpackDirection[1] != 0 || _jetpackDirection[2] != 0 || _jetpackDirection[3] != 0))
-		{
-			await CurrentJetpack.ConsumeResources(CurrentJetpack.PropellantConsumption * (float)deltaTime);
 		}
 		if (CurrentHelmet == null && CurrentJetpack == null && ItemInHands == null)
 		{
@@ -988,38 +1096,38 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public void SubscribeTo(SpaceObject spaceObject)
 	{
 		lock (_subscribedToSpaceObjects)
 		{
 			_subscribedToSpaceObjects.Add(spaceObject.Guid);
-			if (spaceObject is not SpaceObjectVessel ves)
+			if (spaceObject is SpaceObjectVessel ves)
 			{
-				return;
-			}
-
-			if (ves.IsDocked)
-			{
-				_subscribedToSpaceObjects.Add(ves.DockedToMainVessel.Guid);
+				if (ves.IsDocked)
 				{
-					foreach (SpaceObjectVessel obj2 in ves.DockedToMainVessel.AllDockedVessels)
+					_subscribedToSpaceObjects.Add(ves.DockedToMainVessel.Guid);
 					{
-						_subscribedToSpaceObjects.Add(obj2.Guid);
+						foreach (SpaceObjectVessel obj2 in ves.DockedToMainVessel.AllDockedVessels)
+						{
+							_subscribedToSpaceObjects.Add(obj2.Guid);
+						}
+						return;
 					}
+				}
+				if (ves.AllDockedVessels is not { Count: > 0 })
+				{
 					return;
 				}
-			}
-			if (ves.AllDockedVessels is not { Count: > 0 })
-			{
-				return;
-			}
-			foreach (SpaceObjectVessel obj in ves.AllDockedVessels)
-			{
-				_subscribedToSpaceObjects.Add(obj.Guid);
+				foreach (SpaceObjectVessel obj in ves.AllDockedVessels)
+				{
+					_subscribedToSpaceObjects.Add(obj.Guid);
+				}
 			}
 		}
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public void UnsubscribeFrom(SpaceObject spaceObject)
 	{
 		lock (_subscribedToSpaceObjects)
@@ -1028,6 +1136,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public void UnsubscribeFromAll()
 	{
 		lock (_subscribedToSpaceObjects)
@@ -1036,6 +1145,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public bool IsSubscribedTo(SpaceObject spaceObject, bool checkParent)
 	{
 		lock (_subscribedToSpaceObjects)
@@ -1048,6 +1158,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
+	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public bool IsSubscribedTo(long guid)
 	{
 		lock (_subscribedToSpaceObjects)
@@ -1081,117 +1192,30 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		CurrentRoom = newRoom;
 	}
 
-	public CharacterMovementMessage GetCharacterMovementMessage()
+	public ObjectsInfoResponse.PlayerData GetPlayerData(Player pl)
 	{
-		CharacterMovementMessage message = new CharacterMovementMessage();
-		message.GUID = FakeGuid;
-		if (Parent != null)
+		int spawnPointId = 0;
+		if (!IsAlive && CurrentSpawnPoint != null)
 		{
-			message.ParentGUID = Parent.Guid;
-			message.ParentType = Parent.ObjectType;
+			spawnPointId = CurrentSpawnPoint.SpawnPointID;
 		}
-		else
-		{
-			message.ParentGUID = -1L;
-			message.ParentType = SpaceObjectType.None;
-		}
-		message.TransformData = new CharacterTransformData
-		{
-			LocalPosition = LocalPosition.ToFloatArray(),
-			LocalRotation = LocalRotation.ToFloatArray(),
-			MouseLook = MouseLook,
-			FreeLookX = FreeLookX,
-			FreeLookY = FreeLookY
-		};
-		message.Gravity = _gravity;
-		message.AnimationData = new CharacterAnimationData();
-		message.AnimationData.VelocityForward = AnimationData.VelocityForward;
-		message.AnimationData.VelocityRight = AnimationData.VelocityRight;
-		message.AnimationData.ZeroGForward = AnimationData.ZeroGForward;
-		message.AnimationData.ZeroGRight = AnimationData.ZeroGRight;
-		message.AnimationData.PlayerStance = AnimationData.PlayerStance;
-		message.AnimationData.InteractType = AnimationData.InteractType;
-		message.AnimationData.TurningDirection = AnimationData.TurningDirection;
-		message.AnimationData.EquipOrDeEquip = AnimationData.EquipOrDeEquip;
-		message.AnimationData.EquipItemId = AnimationData.EquipItemId;
-		message.AnimationData.EmoteType = AnimationData.EmoteType;
-		message.AnimationData.ReloadItemType = AnimationData.ReloadItemType;
-		message.AnimationData.MeleeAttackType = AnimationData.MeleeAttackType;
-		message.AnimationData.LadderDirection = AnimationData.LadderDirection;
-		message.AnimationData.PlayerStanceFloat = AnimationData.PlayerStanceFloat;
-		message.AnimationData.GetUpType = AnimationData.GetUpType;
-		message.AnimationData.FireMode = AnimationData.FireMode;
-		message.AnimationData.AirTime = AnimationData.AirTime;
-		if (RagdollData is { Count: > 0 })
-		{
-			message.RagdollData = new Dictionary<byte, RagdollItemData>(RagdollData);
-		}
-		if (_jetpackDirection != null)
-		{
-			message.JetpackDirection = new sbyte[4]
-			{
-				_jetpackDirection[0],
-				_jetpackDirection[1],
-				_jetpackDirection[2],
-				_jetpackDirection[3]
-			};
-		}
-		message.PivotReset = _pivotPositionCorrection.IsNotEpsilonZero();
-		message.PivotPositionCorrection = _pivotPositionCorrection.ToFloatArray();
-		message.PivotVelocityCorrection = _pivotVelocityCorrection.ToFloatArray();
-		if (_collisionImpactVelocity > 0f)
-		{
-			message.ImpactVelocity = _collisionImpactVelocity;
-		}
-		return message;
-	}
 
-	public override SpawnObjectResponseData GetSpawnResponseData(Player pl)
-	{
-		return new SpawnCharacterResponseData
+		return new ObjectsInfoResponse.PlayerData
 		{
-			GUID = Guid,
-			Details = GetDetails(checkAlive: true)
-		};
-	}
-
-	public CharacterDetails GetDetails(bool checkAlive = false)
-	{
-		List<DynamicObjectDetails> dods = new List<DynamicObjectDetails>();
-		foreach (DynamicObject dobj in DynamicObjects.Values)
-		{
-			dods.Add(dobj.GetDetails());
-		}
-		CharacterDetails details = new CharacterDetails
-		{
-			GUID = FakeGuid,
-			Name = Name,
+			Guid = FakeGuid,
+			Position = LocalPosition.ToFloatArray(),
+			Rotation = LocalRotation.ToFloatArray(),
+			ParentId = Parent != null ? Parent.Guid : -1,
+			PlayerId = PlayerId,
+			SpawnPointId = spawnPointId,
 			Gender = Gender,
 			HeadType = HeadType,
 			HairType = HairType,
-			PlayerId = PlayerId,
-			ParentID = Parent != null ? Parent.Guid : -1,
-			ParentType = Parent != null ? Parent.ObjectType : SpaceObjectType.None,
-			DynamicObjects = dods,
+			Name = Name,
+			DynamicObjects = DynamicObject.GetCarriedDetails(this),
 			AnimationStatsMask = AnimationStatsMask,
 			LockedToTriggerID = LockedToTriggerID
 		};
-		if (IsAlive || !checkAlive || CurrentSpawnPoint == null)
-		{
-			details.TransformData = new CharacterTransformData
-			{
-				LocalPosition = LocalPosition.ToFloatArray(),
-				LocalRotation = LocalRotation.ToFloatArray(),
-				MouseLook = MouseLook,
-				FreeLookX = FreeLookX,
-				FreeLookY = FreeLookY
-			};
-		}
-		else
-		{
-			details.SpawnPointID = CurrentSpawnPoint.SpawnPointID;
-		}
-		return details;
 	}
 
 	public override async Task Destroy()
@@ -1199,7 +1223,15 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		DisconnectFromNetworkController();
 		while (DynamicObjects.Count > 0)
 		{
-			await DynamicObjects.First().Value.DestroyDynamicObject();
+			long dobjGuid = DynamicObjects.First();
+			if (Server.Instance.TryGetDynamicObject(dobjGuid, out DynamicObject dobj))
+			{
+				await dobj.Destroy();
+			}
+			else
+			{
+				DynamicObjects.Remove(dobjGuid);
+			}
 		}
 		foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 		{
@@ -1212,9 +1244,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		await base.Destroy();
 	}
 
-	private void updateTemperature(double deltaTime)
+	private void UpdateTemperature(double deltaTime)
 	{
-		updateOutfitTemperature(deltaTime);
+		UpdateOutfitTemperature(deltaTime);
 		if (AmbientTemperature.HasValue)
 		{
 			CoreTemperature += (float)((AmbientTemperature - CoreTemperature) * 0.01 * deltaTime).Value;
@@ -1225,7 +1257,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	private void updateOutfitTemperature(double deltaTime)
+	private void UpdateOutfitTemperature(double deltaTime)
 	{
 		Outfit outfit = PlayerInventory.CurrOutfit;
 		if (outfit != null)
@@ -1252,6 +1284,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public async Task KillPlayer(HurtType causeOfDeath, bool createCorpse = true)
 	{
 		IsAlive = false;
+		SpaceObject killParent = Parent;
 		Corpse corpse = null;
 		if (createCorpse)
 		{
@@ -1261,18 +1294,26 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			while (DynamicObjects.Count > 0)
 			{
-				await DynamicObjects.First().Value.DestroyDynamicObject();
+				long dobjGuid = DynamicObjects.First();
+				if (Server.Instance.TryGetDynamicObject(dobjGuid, out DynamicObject dobj))
+				{
+					await dobj.Destroy();
+				}
+				else
+				{
+					DynamicObjects.Remove(dobjGuid);
+				}
 			}
 		}
 		PlayerInventory = new Inventory(this);
 		CurrentJetpack = null;
 		CurrentHelmet = null;
-		if (!DynamicObjects.IsEmpty)
+		if (DynamicObjects.Count > 0)
 		{
 			string error = "Player had some dynamic objects that are not moved to corpse:";
-			foreach (DynamicObject dobj in DynamicObjects.Values)
+			foreach (long dobjGuid in DynamicObjects)
 			{
-				error = error + " " + dobj.Guid + ",";
+				error = error + " " + dobjGuid + ",";
 			}
 			DynamicObjects.Clear();
 		}
@@ -1299,32 +1340,24 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			CurrentSpawnPoint.IsPlayerInSpawnPoint = false;
 			CurrentSpawnPoint = null;
 		}
-		if (RagdollData != null)
-		{
-			RagdollData.Clear();
-			RagdollData = null;
-		}
-		await NetworkController.SendToClientsSubscribedToParents(new KillPlayerMessage
-		{
-			GUID = FakeGuid,
-			CauseOfDeath = causeOfDeath,
-			VesselDamageType = vesselDamageType,
-			CorpseDetails = corpse?.GetDetails()
-		}, this, Guid);
 		Parent = null;
 		CurrentRoom = null;
 		isOutsideRoom = false;
+		var killMsg = new KillPlayerMessage
+		{
+			Guid = FakeGuid,
+			CauseOfDeath = causeOfDeath,
+			VesselDamageType = vesselDamageType
+		};
 		if (NetworkController.IsPlayerConnected(Guid))
 		{
-			await NetworkController.SendAsync(Guid, new KillPlayerMessage
-			{
-				GUID = FakeGuid,
-				CauseOfDeath = causeOfDeath,
-				VesselDamageType = vesselDamageType
-			});
-			_lateDisconnectWait = 0.0;
-			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, LateDisconnect);
-			NetworkController.DisconnectClient(Guid);
+			await NetworkController.SendAsync(Guid, killMsg);
+			_deathDisconnectWait = 0.0;
+			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, DisconnectAfterDeath);
+		}
+		if (killParent != null)
+		{
+			await NetworkController.SendToClientsSubscribedToParents(killMsg, killParent, Guid);
 		}
 		foreach (var q in Quests.Where(q => q.Status == QuestStatus.Active))
 		{
@@ -1354,14 +1387,23 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	private void LateDisconnect(double dbl)
+	private void DisconnectAfterDeath(double deltaTime)
 	{
-		_lateDisconnectWait += dbl;
-		if (_lateDisconnectWait > 1.0)
+		// The client closed it first, which is the normal path.
+		if (!NetworkController.IsPlayerConnected(Guid))
 		{
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, DisconnectAfterDeath);
+			_deathDisconnectWait = 0.0;
+			return;
+		}
+
+		_deathDisconnectWait += deltaTime;
+		if (_deathDisconnectWait > DeathDisconnectGraceSeconds)
+		{
+			Debug.LogInfo("Reclaiming the connection of a dead player that never closed it.", Name, Guid);
 			NetworkController.DisconnectClient(Guid);
-			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, LateDisconnect);
-			_lateDisconnectWait = 0.0;
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, DisconnectAfterDeath);
+			_deathDisconnectWait = 0.0;
 		}
 	}
 
@@ -1375,15 +1417,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		EnvironmentReady = false;
 		PlayerReady = false;
 		LastMovementMessageSolarSystemTime = -1.0;
+		_lastMoveRequestTime = -1.0;
+		_lastAnimationMessageTime = -1.0;
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		try
 		{
 			if (Parent is Ship && isOutsideRoom)
 			{
-				Pivot pivot = new Pivot(this, Parent as SpaceObjectVessel);
-				pivot.Orbit.CopyDataFrom((Parent as Ship).Orbit, Server.Instance.SolarSystem.CurrentTime, exactCopy: true);
-				pivot.Orbit.RelativePosition += LocalPosition;
-				pivot.Orbit.InitFromCurrentStateVectors(Server.Instance.SolarSystem.CurrentTime);
+				Pivot pivot = new Pivot(this, Position, Velocity);
 				pivot.StabilizeToTarget(Parent as Ship, forceStabilize: true);
 				LocalPosition = Vector3D.Zero;
 				Parent = pivot;
@@ -1426,7 +1467,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		data.MaxHealth = MaxHealth;
 		data.AnimationData = ObjectCopier.DeepCopy(AnimationData);
 		data.AnimationStatsMask = AnimationStatsMask;
-		data.Gravity = _gravity;
 		data.Velocity = LocalVelocity.ToArray();
 		if (CurrentRoom != null)
 		{
@@ -1434,12 +1474,13 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		data.CoreTemperature = CoreTemperature;
 		data.ChildObjects = new List<PersistenceObjectData>();
-		DynamicObject outfitItem = DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item is { Slot.SlotID: -2 });
+		List<DynamicObject> dynamicObjects = DynamicObjects.Select(Server.Instance.GetDynamicObject).Where((DynamicObject m) => m != null).ToList();
+		DynamicObject outfitItem = dynamicObjects.FirstOrDefault(m => m.Item is { Slot.SlotID: -2 });
 		if (outfitItem != null)
 		{
 			data.ChildObjects.Add(outfitItem.Item != null ? outfitItem.Item.GetPersistenceData() : outfitItem.GetPersistenceData());
 		}
-		foreach (DynamicObject dobj in DynamicObjects.Values)
+		foreach (DynamicObject dobj in dynamicObjects)
 		{
 			if (dobj != outfitItem)
 			{
@@ -1448,7 +1489,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		data.Quests = Quests.Select((Quest m) => m.GetDetails()).ToList();
 		data.Blueprints = Blueprints;
-		data.NavMapDetails = NavMapDetails;
 		return data;
 	}
 
@@ -1474,7 +1514,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		Health = data.Health;
 		AnimationData = ObjectCopier.DeepCopy(data.AnimationData);
 		AnimationStatsMask = data.AnimationStatsMask;
-		_gravity = data.Gravity;
 		LocalVelocity = data.Velocity.ToVector3D();
 		CoreTemperature = data.CoreTemperature;
 		SpaceObject parent = null;
@@ -1484,7 +1523,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		else if (data.ParentGUID != -1)
 		{
-			parent = Server.Instance.GetObject(data.ParentGUID);
+			parent = Server.Instance.GetSpaceObject(data.ParentGUID);
 		}
 		if (parent != null)
 		{
@@ -1535,7 +1574,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			Blueprints = data.Blueprints;
 		}
-		NavMapDetails = data.NavMapDetails;
 		Server.Instance.Add(this);
 	}
 
@@ -1546,6 +1584,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			AuthorizedSpawnPoint = spawnPoint;
 		}
 		CurrentSpawnPoint = spawnPoint;
+		if (spawnPoint != null && !IsAlive)
+		{
+			LocalPosition = spawnPoint.Ship.StructureToLocalPosition(spawnPoint.RelativePosition);
+			LocalRotation = spawnPoint.RelativeRotation;
+		}
 	}
 
 	public void ClearAuthorizedSpawnPoint()
@@ -1564,43 +1607,82 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		};
 	}
 
-	private void NavigationMapDetailsMessageListener(NetworkData data)
+	private async void ScanForObjectsRequestListener(NetworkData data)
 	{
-		var message = data as NavigationMapDetailsMessage;
-		if (message.Sender == Guid)
+		ScanForObjectsRequest request = data as ScanForObjectsRequest;
+		if (request.Sender != Guid)
 		{
-			NavMapDetails = message.NavMapDetails;
+			return;
+		}
+
+		SubSystemRadar radar = (Parent as SpaceObjectVessel)?.MainVessel.MainDistributionManager?.GetSubSystems()
+			.OfType<SubSystemRadar>().FirstOrDefault();
+		if (radar == null)
+		{
+			return;
+		}
+
+		List<long> detected;
+		if (request.ScanDirection != null)
+		{
+			// Directional active scan: power the radar (this starts the active-scan cooldown) and sweep the cone.
+			await radar.GoOnLine();
+			detected = radar.ActiveScan(request.ScanDirection.ToVector3D(), request.ScanAngle);
+		}
+		else
+		{
+			detected = radar.PassiveScan();
+		}
+
+		foreach (long guid in detected)
+		{
+			DiscoveredVessels.Add(guid);
 		}
 	}
 
-	public Task TakeDamage(HurtType hurtType, float amount)
+	public Task TakeDamage(HurtType hurtType, float amount, string source = null)
 	{
-		return TakeDamage(1f, new PlayerDamage
+		return TakeDamage(1f, source, new PlayerDamage
 		{
 			HurtType = hurtType,
 			Amount = amount
 		});
 	}
 
-	public Task TakeDamage(float deltaTime, params PlayerDamage[] damages)
+	public Task TakeDamage(float deltaTime, string source, params PlayerDamage[] damages)
 	{
-		return TakeDamage(null, deltaTime, damages);
+		return TakeDamage(null, deltaTime, source, damages);
 	}
 
-	public async Task TakeDamage(Vector3D? shotDirection, float deltaTime, params PlayerDamage[] damages)
+	/// <summary>
+	/// 	Make the player lose health.
+	/// </summary>
+	public async Task TakeDamage(Vector3D? shotDirection, float deltaTime, string source,
+		params PlayerDamage[] damages)
 	{
 		if (GodMode || CurrentSpawnPoint is { Executor: not null, IsPlayerInSpawnPoint: true })
 		{
 			return;
 		}
-		float amount = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType is HurtType.Suffocate or HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
-		float hurt = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType != HurtType.Suffocate && m.HurtType != HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
-		amount = PlayerInventory.CurrOutfit == null ? amount + hurt : amount + MathHelper.Clamp(hurt - PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue);
+
+		float unarmoured = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType is HurtType.Suffocate or HurtType.Pressure).Sum((PlayerDamage m) => m.Amount);
+		float armoured = damages.Where((PlayerDamage m) => m.Amount > 0f && m.HurtType is not (HurtType.Suffocate or HurtType.Pressure)).Sum((PlayerDamage m) => m.Amount);
+		if (PlayerInventory.CurrOutfit != null)
+		{
+			armoured = MathHelper.Clamp(armoured - PlayerInventory.CurrOutfit.Armor * deltaTime, 0f, float.MaxValue);
+		}
+		float amount = unarmoured + armoured;
 		if (amount <= float.Epsilon)
 		{
 			return;
 		}
-		HurtType causeOfDeath = damages.OrderBy((PlayerDamage m) => m.Amount).Reverse().FirstOrDefault()?.HurtType ?? HurtType.None;
+
+		bool unarmouredDominates = armoured <= unarmoured;
+		HurtType causeOfDeath = damages
+			.Where((PlayerDamage m) => m.Amount > 0f
+				&& (m.HurtType is HurtType.Suffocate or HurtType.Pressure) == unarmouredDominates)
+			.MaxBy((PlayerDamage m) => m.Amount)?.HurtType ?? HurtType.None;
+		float tmpHealthBefore = Health;
 		Health = MathHelper.Clamp(Health - amount, 0f, MaxHealth);
 		if (Health <= float.Epsilon)
 		{
@@ -1676,7 +1758,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	public Task DoCollisionDamage(float speed)
+	public Task DoCollisionDamage(float speed, string source)
 	{
 		double threshold = 6.5;
 		float hp = 0f;
@@ -1684,10 +1766,10 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		{
 			hp = (float)((speed - threshold) * (speed - threshold) / 10.0 + speed) * (PlayerInventory.CurrOutfit != null ? PlayerInventory.CurrOutfit.CollisionResistance : 1f);
 		}
-		return TakeDamage(HurtType.Impact, hp);
+		return TakeDamage(HurtType.Impact, hp, source);
 	}
 
-	public async Task<float> TakeHitDamage(float damage, HitBoxType hitType, bool isMelee, Vector3D? direction = null, float duration = 1f)
+	public async Task<float> TakeHitDamage(float damage, HitBoxType hitType, bool isMelee, Vector3D? direction = null, float duration = 1f, string source = "shot")
 	{
 		Outfit outfit = PlayerInventory.CurrOutfit;
 		Helmet helmet = CurrentHelmet;
@@ -1746,7 +1828,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			bodyDmgMulti = 1f;
 		}
 		float amount = (damage - reductionValue * duration) * resistanceMulti * bodyDmgMulti;
-		await TakeDamage(direction, duration, new PlayerDamage
+		await TakeDamage(direction, duration, source, new PlayerDamage
 		{
 			HurtType = HurtType.Shot,
 			Amount = amount

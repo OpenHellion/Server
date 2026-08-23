@@ -22,10 +22,6 @@ public class Persistence
 
 	private static void SaveVesselPersistence(ref PersistenceObject per, SpaceObjectVessel ves)
 	{
-		if (ves.IsDebrisFragment)
-		{
-			return;
-		}
 		if (ves.ObjectType == SpaceObjectType.Ship)
 		{
 			per.Ships.Add((ves as IPersistantObject).GetPersistenceData());
@@ -62,8 +58,7 @@ public class Persistence
 			ParentGUID = obj.Parent.Guid,
 			ParentType = obj.Parent.ObjectType,
 			Position = obj.Data.Position,
-			Forward = obj.Data.Forward,
-			Up = obj.Data.Up,
+			Rotation = QuaternionD.LookRotation(obj.Data.Forward.ToVector3D(), obj.Data.Up.ToVector3D()).ToFloatArray(),
 			AuxData = obj.Data.AuxData,
 			RespawnTime = obj.Data.SpawnSettings.Length != 0 ? obj.Data.SpawnSettings[0].RespawnTime : -1f,
 			Timer = obj.Timer
@@ -148,7 +143,7 @@ public class Persistence
 		per.SpawnManagerData = SpawnManager.GetPersistenceData();
 		DirectoryInfo d = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Server.ConfigDir));
 		FileInfo[] Files = d.GetFiles("*.save");
-		if (Files.Length >= Server.MaxNumberOfSaveFiles)
+		if (Server.MaxNumberOfSaveFiles > 0 && Files.Length >= Server.MaxNumberOfSaveFiles)
 		{
 			Array.Sort(Files, (FileInfo file1, FileInfo file2) => file2.CreationTimeUtc.CompareTo(file1.CreationTimeUtc));
 			for (int i = Server.MaxNumberOfSaveFiles - 1; i < Files.Length; i++)
@@ -162,14 +157,14 @@ public class Persistence
 			filename = string.Format(PersistanceFileName, DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss"));
 		}
 
-		// TODO: FIX
+		// TODO: Fix saving
 		// JsonSerialiser.SerializeToFile(per, Path.Combine(Server.ConfigDir, filename), JsonSerialiser.Formatting.None);
 		Debug.Log("Saved world...");
 	}
 
 	private static void LoadRespawnObjectPersistence(PersistenceObjectDataRespawnObject data)
 	{
-		SpaceObject parentObj = Server.Instance.GetObject(data.ParentGUID);
+		SpaceObject parentObj = Server.Instance.GetSpaceObject(data.ParentGUID);
 		if (parentObj == null)
 		{
 			Debug.LogError("Could not find parent object for respawn object persistence", data.ItemID);
@@ -187,8 +182,8 @@ public class Persistence
 		{
 			ItemID = data.ItemID,
 			Position = data.Position,
-			Forward = data.Forward,
-			Up = data.Up,
+			Forward = (data.Rotation.ToQuaternionD() * Vector3D.Forward).ToFloatArray(),
+			Up = (data.Rotation.ToQuaternionD() * Vector3D.Up).ToFloatArray(),
 			AttachPointInSceneId = data.AttachPointID.HasValue ? data.AttachPointID.Value : -1,
 			AuxData = data.AuxData,
 			SpawnSettings = new DynaminObjectSpawnSettings[1]
@@ -251,17 +246,29 @@ public class Persistence
 			{
 				await Parallel.ForEachAsync(persistence.Asteroids, async (asteroidData, ct) =>
 				{
-					Asteroid ast = new Asteroid(asteroidData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
+					Asteroid ast = new Asteroid(asteroidData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, QuaternionD.Identity);
 					await ast.LoadPersistenceData(asteroidData);
 				});
 			}
 			if (persistence.Ships != null)
 			{
+				// Load all ships in parallel so every vessel is registered before docking.
 				await Parallel.ForEachAsync(persistence.Ships, async (shipData, ct) =>
 				{
-					Ship sh = new Ship(shipData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, Vector3D.Forward, Vector3D.Up);
+					Ship sh = new Ship(shipData.GUID, initializeOrbit: false, Vector3D.Zero, Vector3D.One, QuaternionD.Identity);
 					await sh.LoadPersistenceData(shipData);
 				});
+
+				// Restore docking and stabilization links sequentially.
+				foreach (PersistenceObjectDataShip shipData in persistence.Ships.Cast<PersistenceObjectDataShip>())
+				{
+					if (!shipData.DockedToShipGUID.HasValue && !shipData.StabilizeToTargetGUID.HasValue)
+					{
+						continue;
+					}
+					Ship sh = Server.Instance.GetVessel(shipData.GUID) as Ship;
+					await sh.RestoreDocking(shipData);
+				}
 			}
 			if (persistence.Players != null)
 			{
@@ -335,8 +342,8 @@ public class Persistence
 		{
 			ItemID = persistenceData.ItemID,
 			Position = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnPosition : persistenceData.LocalPosition,
-			Forward = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnForward : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Forward).ToFloatArray(),
-			Up = persistenceData.RespawnTime.HasValue ? persistenceData.RespawnUp : (persistenceData.LocalRotation.ToQuaternionD() * Vector3D.Up).ToFloatArray(),
+			Forward = ((persistenceData.RespawnTime.HasValue ? persistenceData.RespawnRotation.ToQuaternionD() : persistenceData.LocalRotation.ToQuaternionD()) * Vector3D.Forward).ToFloatArray(),
+			Up = ((persistenceData.RespawnTime.HasValue ? persistenceData.RespawnRotation.ToQuaternionD() : persistenceData.LocalRotation.ToQuaternionD()) * Vector3D.Up).ToFloatArray(),
 			AttachPointInSceneId = apInSceneID,
 			AuxData = persistenceData.RespawnAuxData != null ? persistenceData.RespawnAuxData : auxData,
 			SpawnSettings = !persistenceData.RespawnTime.HasValue ? null : new DynaminObjectSpawnSettings[1]
@@ -360,9 +367,9 @@ public class Persistence
 			if (dobj.Parent is SpaceObjectVessel)
 			{
 				PersistenceObjectDataItem persistenceObjectDataItem = data;
-				if (persistenceObjectDataItem is { AttachPointID: not null } && dobj.Parent.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item?.AttachPointID != null && m.Item.AttachPointID.InSceneID == data.AttachPointID.Value) != null)
+				if (persistenceObjectDataItem is { AttachPointID: not null } && dobj.Parent.DynamicObjects.Select(Server.Instance.GetDynamicObject).FirstOrDefault((DynamicObject m) => m?.Item?.AttachPointID != null && m.Item.AttachPointID.InSceneID == data.AttachPointID.Value) != null)
 				{
-					await dobj.DestroyDynamicObject();
+					await dobj.Destroy();
 					return null;
 				}
 			}

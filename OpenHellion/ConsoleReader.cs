@@ -1,6 +1,6 @@
 // ConsoleReader.cs
 //
-// Copyright (C) 2025, OpenHellion contributors
+// Copyright (C) 2026, OpenHellion contributors
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
@@ -89,7 +89,7 @@ class ConsoleReader
 							case "ship":
 								if (long.TryParse(parts[2].Trim(), out long shipId))
 								{
-									if (server.GetObject(shipId) is Ship ship)
+									if (server.GetSpaceObject(shipId) is Ship ship)
 									{
 										JsonSerialiser.SerializeToFile(ship.GetPersistenceData(), "ship_" + shipId + ".json", JsonSerialiser.Formatting.Indented);
 										Console.WriteLine($"Ship data saved to ship_{shipId}.json");

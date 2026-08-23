@@ -6,6 +6,10 @@ public class SpawnPointData : ISceneData
 {
 	public int InSceneID;
 
+	public float[] Position;
+
+	public float[] Rotation;
+
 	public TagAction TagAction;
 
 	public string Tags;

@@ -12,7 +12,7 @@ public class UpdateTimer
 		Step_1_0_hr
 	}
 
-	public delegate void TimeStepDelegate(double dbl);
+	public delegate void TimeStepDelegate(double deltaTime);
 
 	private double timePassed;
 

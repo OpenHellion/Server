@@ -45,13 +45,13 @@ public class SpawnRule
 
 	public double CurrTimerSec = 0.0;
 
-	public List<SpaceObjectVessel> SpawnedVessels = new List<SpaceObjectVessel>();
+	public List<SpaceObjectVessel> SpawnedVessels = [];
 
 	private int maxScenesPerCluster;
 
-	private SpawnRange<int> totalScenes = default(SpawnRange<int>);
+	private SpawnRange<int> totalScenes = default;
 
-	private Dictionary<int, int> clusterVesselsCount = new Dictionary<int, int>();
+	private Dictionary<int, int> clusterVesselsCount = [];
 
 	private bool vesselsRemoved;
 
@@ -251,7 +251,7 @@ public class SpawnRule
 						SpawnRange<float>[] angularVelocity = AngularVelocity;
 						if (angularVelocity is { Length: 3 })
 						{
-							firstVessel.Rotation = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
+							firstVessel.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						firstVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(firstVessel);
@@ -276,7 +276,7 @@ public class SpawnRule
 						SpawnRange<float>[] angularVelocity2 = AngularVelocity;
 						if (angularVelocity2 is { Length: 3 })
 						{
-							currVessel.Rotation = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
+							currVessel.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						currVessel.StabilizeToTarget(firstVessel, forceStabilize: true);
 						currVessel.IsPartOfSpawnSystem = true;
@@ -385,7 +385,7 @@ public class SpawnRule
 				mainVessel.IsPrefabStationVessel = true;
 				mainVessel.IsAlwaysVisible = IsVisibleOnRadar;
 				mainVessel.IsPartOfSpawnSystem = true;
-				mainVessel.VesselData.SpawnRuleID = (GetHashCode() << 10) + count++;
+				mainVessel.SpawnRuleId = (GetHashCode() << 10) + count++;
 				SpawnedVessels.Add(mainVessel);
 				SpawnManager.SpawnedVessels.TryAdd(mainVessel.Guid, new Tuple<SpawnRule, SpawnRuleScene, int>(this, null, 0));
 				foreach (SpaceObjectVessel vessel in mainVessel.AllDockedVessels)
@@ -537,8 +537,8 @@ public class SpawnRule
 		ves.IsInvulnerable = false;
 		ves.DockingControlsDisabled = false;
 		ves.AutoStabilizationDisabled = false;
-		ves.VesselData.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(ves.ObjectType, ves.Orbit.Parent.CelestialBody, ves.VesselData.SceneID);
-		ves.VesselData.SpawnRuleID = 0L;
+		ves.UpdateVesselData(vesselRegistration: Server.NameGenerator.GenerateObjectRegistration(ves.ObjectType, ves.Orbit.Parent.CelestialBody, ves.SceneId));
+		ves.SpawnRuleId = 0L;
 		vesselsRemoved = true;
 		return true;
 	}

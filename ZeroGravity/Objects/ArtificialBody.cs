@@ -17,23 +17,19 @@ public class ArtificialBody : SpaceObject
 
 	public double LastOrientationChangeTime;
 
-	private Vector3D _forward = Vector3D.Forward;
-
-	private Vector3D _up = Vector3D.Up;
+	private QuaternionD _rotation = QuaternionD.Identity;
 
 	public double Radius;
 
 	public Vector3D AngularVelocity;
 
-	public Vector3D Rotation;
+	public Vector3D AngularVelocityPerAxis;
 
 	protected Vector3D PhysicsVelocityDifference;
 
 	protected Vector3D PhysicsRotationDifference;
 
 	private bool _markForDestruction;
-
-	private float _radarSignature;
 
 	private bool _updateAngularVelocity = true;
 
@@ -79,57 +75,23 @@ public class ArtificialBody : SpaceObject
 		}
 	}
 
-	public bool IsDistressSignalActive { get; set; }
-
-	public bool IsAlwaysVisible { get; set; }
-
 	public override Vector3D Position => Orbit.Position;
 
 	public override Vector3D Velocity => Orbit.Velocity;
 
-	public virtual Vector3D Forward
+	public override QuaternionD Rotation
 	{
 		get
 		{
-			if (this is SpaceObjectVessel && !(this as SpaceObjectVessel).IsMainVessel)
-			{
-				return QuaternionD.LookRotation((this as SpaceObjectVessel).MainVessel.Forward, (this as SpaceObjectVessel).MainVessel.Up) * (this as SpaceObjectVessel).RelativeRotationFromMainParent * Vector3D.Forward;
-			}
-			return _forward;
+			return _rotation;
 		}
 		set
 		{
-			if (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10))
-			{
-			}
-			if (!_forward.IsEpsilonEqual(value, 9.9999997473787516E-06))
+			if (_rotation != value)
 			{
 				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
 			}
-			_forward = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _forward : value;
-		}
-	}
-
-	public virtual Vector3D Up
-	{
-		get
-		{
-			if (this is SpaceObjectVessel && !(this as SpaceObjectVessel).IsMainVessel)
-			{
-				return QuaternionD.LookRotation((this as SpaceObjectVessel).MainVessel.Forward, (this as SpaceObjectVessel).MainVessel.Up) * (this as SpaceObjectVessel).RelativeRotationFromMainParent * Vector3D.Up;
-			}
-			return _up;
-		}
-		set
-		{
-			if (value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10))
-			{
-			}
-			if (!_up.IsEpsilonEqual(value, 9.9999997473787516E-06))
-			{
-				LastOrientationChangeTime = Server.Instance.SolarSystem.CurrentTime;
-			}
-			_up = value.IsEpsilonEqual(Vector3D.Zero, 1.000000013351432E-10) ? _up : value;
+			_rotation = value;
 		}
 	}
 
@@ -146,43 +108,29 @@ public class ArtificialBody : SpaceObject
 		}
 	}
 
-	public virtual float RadarSignature
-	{
-		get
-		{
-			return _radarSignature;
-		}
-		protected set
-		{
-			_radarSignature = value;
-		}
-	}
-
 	public SpaceObjectVessel StabilizeToTargetObj { get; private set; }
 
 	public Vector3D StabilizeToTargetRelPosition { get; protected set; }
 
 	public double StabilizeToTargetTime { get; private set; }
 
-	public ArtificialBody(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, Vector3D forward, Vector3D up)
+	public ArtificialBody(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, QuaternionD rotation)
 		: base(guid)
 	{
 		if (initializeOrbit)
 		{
 			Orbit.SetArtificialBody(this);
 			InitializeFromStateVectors(position, velocity);
-			Forward = forward;
-			Up = up;
+			Rotation = rotation;
 			Server.Instance.SolarSystem.AddArtificialBody(this);
 		}
 	}
 
-	public void InitializeOrbit(Vector3D position, Vector3D velocity, Vector3D forward, Vector3D up, OrbitParameters orbit = null)
+	public void InitializeOrbit(Vector3D position, Vector3D velocity, QuaternionD rotation, OrbitParameters orbit = null)
 	{
 		Orbit.SetArtificialBody(this);
 		InitializeFromStateVectors(position, velocity, orbit);
-		Forward = forward;
-		Up = up;
+		Rotation = rotation;
 		Server.Instance.SolarSystem.AddArtificialBody(this);
 	}
 
@@ -213,7 +161,7 @@ public class ArtificialBody : SpaceObject
 		CelestialBody cbParent = Server.Instance.SolarSystem.FindCelestialBodyParent(position);
 		if (velocity.SqrMagnitude < double.Epsilon)
 		{
-			velocity = Forward * cbParent.Orbit.CircularOrbitVelocityMagnitudeAtDistance(Vector3D.Distance(cbParent.Position, position));
+			velocity = Rotation * Vector3D.Forward * cbParent.Orbit.CircularOrbitVelocityMagnitudeAtDistance(Vector3D.Distance(cbParent.Position, position));
 		}
 		if (orbit != null)
 		{
@@ -230,12 +178,10 @@ public class ArtificialBody : SpaceObject
 	{
 		if (ObjectType is SpaceObjectType.Player or SpaceObjectType.Ship or SpaceObjectType.Asteroid)
 		{
-			Rotation.X = MathHelper.Clamp(Rotation.X, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			Rotation.Y = MathHelper.Clamp(Rotation.Y, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			Rotation.Z = MathHelper.Clamp(Rotation.Z, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			QuaternionD rot = QuaternionD.LookRotation(Forward, Up) * QuaternionD.Euler(Rotation * deltaTime);
-			Forward = rot * Vector3D.Forward;
-			Up = rot * Vector3D.Up;
+			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
+			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
+			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
+			Rotation = Rotation * QuaternionD.Euler(AngularVelocityPerAxis * deltaTime);
 		}
 	}
 
@@ -368,9 +314,12 @@ public class ArtificialBody : SpaceObject
 			Orbit.RelativeVelocity = relativeVelocity;
 			if (CurrentCourse.Type is ManeuverType.Engine or ManeuverType.Transfer)
 			{
-				Vector3D right = Vector3D.Cross(Forward, Up);
-				Forward = Vector3D.Lerp(Forward, Orbit.RelativeVelocity.Normalized, Server.Instance.DeltaTime).Normalized;
-				Up = Vector3D.Cross(right, Forward);
+				Vector3D forward = Rotation * Vector3D.Forward;
+				Vector3D up = Rotation * Vector3D.Up;
+				Vector3D right = Vector3D.Cross(forward, up);
+				forward = Vector3D.Lerp(forward, Orbit.RelativeVelocity.Normalized, Server.Instance.DeltaTime).Normalized;
+				up = Vector3D.Cross(right, forward);
+				Rotation = QuaternionD.LookRotation(forward, up);
 			}
 			if (CurrentCourse.EndSolarSystemTime <= Server.Instance.SolarSystem.CurrentTime)
 			{
@@ -405,7 +354,7 @@ public class ArtificialBody : SpaceObject
 
 	private async Task<bool> CheckThrustAndRotation(double timeDelta)
 	{
-		Vector3D prevAngularVelocity = Rotation;
+		Vector3D prevAngularVelocity = AngularVelocityPerAxis;
 		bool recalculateOrbit = false;
 		if (this is Ship)
 		{
@@ -428,7 +377,7 @@ public class ArtificialBody : SpaceObject
 			if (sh.CalculateRotationThrust(timeDelta))
 			{
 				_updateAngularVelocity = true;
-				Rotation += sh.RotationThrustVelocityDifference;
+				AngularVelocityPerAxis += sh.RotationThrustVelocityDifference;
 				sh.RotationThrustVelocityDifference = Vector3D.Zero;
 			}
 			if (sh.CalculateRotationDampen(timeDelta))
@@ -442,20 +391,20 @@ public class ArtificialBody : SpaceObject
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
 				_updateAngularVelocity = true;
-				Rotation += PhysicsRotationDifference;
+				AngularVelocityPerAxis += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
 			if (_updateAngularVelocity)
 			{
-				QuaternionD oldRotation2 = QuaternionD.LookRotation(Forward, Up);
-				if (Rotation.IsNotEpsilonZero())
+				QuaternionD oldRotation2 = Rotation;
+				if (AngularVelocityPerAxis.IsNotEpsilonZero())
 				{
 					ApplyRotation(timeDelta);
 				}
-				AngularVelocity = (QuaternionD.LookRotation(Forward, Up) * oldRotation2.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
+				AngularVelocity = (Rotation * oldRotation2.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
 				_updateAngularVelocity = false;
 			}
-			else if (Rotation.IsNotEpsilonZero())
+			else if (AngularVelocityPerAxis.IsNotEpsilonZero())
 			{
 				ApplyRotation(timeDelta);
 			}
@@ -471,20 +420,20 @@ public class ArtificialBody : SpaceObject
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
 				_updateAngularVelocity = true;
-				Rotation += PhysicsRotationDifference;
+				AngularVelocityPerAxis += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
 			if (_updateAngularVelocity)
 			{
-				QuaternionD oldRotation = QuaternionD.LookRotation(Forward, Up);
-				if (Rotation.IsNotEpsilonZero())
+				QuaternionD oldRotation = Rotation;
+				if (AngularVelocityPerAxis.IsNotEpsilonZero())
 				{
 					ApplyRotation(timeDelta);
 				}
-				AngularVelocity = (QuaternionD.LookRotation(Forward, Up) * oldRotation.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
+				AngularVelocity = (Rotation * oldRotation.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
 				_updateAngularVelocity = false;
 			}
-			else if (Rotation.IsNotEpsilonZero())
+			else if (AngularVelocityPerAxis.IsNotEpsilonZero())
 			{
 				ApplyRotation(timeDelta);
 			}
@@ -524,17 +473,17 @@ public class ArtificialBody : SpaceObject
 
 	public async Task Update()
 	{
-		if (this is Ship)
+		if (this is Ship ship)
 		{
-			if (!(this as Ship).IsMainVessel)
+			if (!ship.IsMainVessel)
 			{
 				return;
 			}
-			(this as Ship).ExtraRcsThrustVelocityDifference = Vector3D.Zero;
-			(this as Ship).ExtraRotationThrustVelocityDifference = Vector3D.Zero;
-			foreach (Ship ship in (this as Ship).AllDockedVessels.Cast<Ship>())
+			ship.ExtraRcsThrustVelocityDifference = Vector3D.Zero;
+			ship.ExtraRotationThrustVelocityDifference = Vector3D.Zero;
+			foreach (Ship docked in ship.AllDockedVessels.Cast<Ship>())
 			{
-				await ship.UpdatePosition();
+				await docked.UpdatePosition();
 			}
 			await UpdatePosition();
 		}
@@ -554,6 +503,7 @@ public class ArtificialBody : SpaceObject
 		{
 			await UpdateStabilization();
 		}
+
 	}
 
 	public bool StabilizeToTarget(SpaceObjectVessel vessel, bool forceStabilize = false)
@@ -661,14 +611,5 @@ public class ArtificialBody : SpaceObject
 			_stabilizationDisableRelativePositionExtra = relativePositionExtra;
 			_stabilizationDisableRelativeVelocityExtra = relativeVelocityExtra;
 		}
-	}
-
-	public float GetCompoundRadarSignature()
-	{
-		if (this is SpaceObjectVessel)
-		{
-			return (this as SpaceObjectVessel).AllVessels.Sum((SpaceObjectVessel m) => m.RadarSignature);
-		}
-		return RadarSignature;
 	}
 }

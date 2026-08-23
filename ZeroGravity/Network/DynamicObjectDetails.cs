@@ -10,6 +10,10 @@ public class DynamicObjectDetails
 
 	public short ItemID;
 
+	public DynamicObjectAttachData AttachData;
+
+	public DynamicObjectStats StatsData;
+
 	public float[] LocalPosition;
 
 	public float[] LocalRotation;
@@ -18,9 +22,5 @@ public class DynamicObjectDetails
 
 	public float[] AngularVelocity;
 
-	public DynamicObjectAttachData AttachData;
-
-	public DynamicObjectStats StatsData;
-
-	public List<DynamicObjectDetails> ChildObjects;
+	public DynamicObjectDetails[] ChildObjects;
 }

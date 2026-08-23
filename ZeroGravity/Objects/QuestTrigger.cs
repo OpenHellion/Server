@@ -29,12 +29,20 @@ public class QuestTrigger
 
 		public static bool operator ==(QuestTriggerID x, QuestTriggerID y)
 		{
+			if (ReferenceEquals(x, y))
+			{
+				return true;
+			}
+			if (x is null || y is null)
+			{
+				return false;
+			}
 			return x.PlayerGUID == y.PlayerGUID && x.QuestID == y.QuestID && x.ID == y.ID;
 		}
 
 		public static bool operator !=(QuestTriggerID x, QuestTriggerID y)
 		{
-			return x.PlayerGUID != y.PlayerGUID || x.QuestID != y.QuestID || x.ID != y.ID;
+			return !(x == y);
 		}
 	}
 

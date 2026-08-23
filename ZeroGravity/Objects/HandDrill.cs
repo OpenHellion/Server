@@ -40,7 +40,7 @@ internal class HandDrill : Item
 		{
 			if (value > 0)
 			{
-				_inAsteroidObj = Server.Instance.GetObject(value) as Asteroid;
+				_inAsteroidObj = Server.Instance.GetSpaceObject(value) as Asteroid;
 			}
 			else
 			{

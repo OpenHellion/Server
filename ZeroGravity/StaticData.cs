@@ -10,7 +10,7 @@ public static class StaticData
 {
 	private static SolarSystemData _SolarSystem;
 
-	private static Dictionary<string, ServerCollisionData> _CollisionDataList;
+	private static Dictionary<string, ServerCollisionData> _collisionDataList;
 
 	private static List<StructureSceneData> _StructuresDataList;
 
@@ -40,11 +40,11 @@ public static class StaticData
 	{
 		get
 		{
-			if (CollisionDataList == null)
+			if (_collisionDataList == null)
 			{
 				LoadData();
 			}
-			return _CollisionDataList;
+			return _collisionDataList;
 		}
 	}
 
@@ -120,13 +120,12 @@ public static class StaticData
 		}
 	}
 
-	// TODO: Load from nakama.
 	public static void LoadData()
 	{
 		string dir = !Server.ConfigDir.IsNullOrEmpty() && Directory.Exists(Server.ConfigDir + "Data") ? Server.ConfigDir : "";
 		_SolarSystem = JsonSerialiser.Load<SolarSystemData>(dir + "Data/SolarSystem.json");
 		_StructuresDataList = JsonSerialiser.Load<List<StructureSceneData>>(dir + "Data/Structures.json");
-		_CollisionDataList = new Dictionary<string, ServerCollisionData>();
+		_collisionDataList = new Dictionary<string, ServerCollisionData>();
 		_AsteroidDataList = JsonSerialiser.Load<List<CelestialSceneData>>(dir + "Data/Asteroids.json");
 		_ItemsIngredients = JsonSerialiser.Load<List<ItemIngredientsData>>(dir + "Data/ItemsIngredients.json");
 		_QuestsData = JsonSerialiser.Load<List<QuestData>>(dir + "Data/Quests.json");
@@ -143,18 +142,18 @@ public static class StaticData
 		}
 		foreach (StructureSceneData a2 in _StructuresDataList)
 		{
-			if (!_CollisionDataList.ContainsKey(a2.Collision))
+			if (!_collisionDataList.ContainsKey(a2.Collision))
 			{
 				a2.Colliders = JsonSerialiser.Load<ServerCollisionData>(dir + "Data/Collision/" + a2.Collision + ".json");
-				_CollisionDataList.Add(a2.Collision, a2.Colliders);
+				_collisionDataList.Add(a2.Collision, a2.Colliders);
 			}
 		}
 		foreach (CelestialSceneData a in _AsteroidDataList)
 		{
-			if (a is { Collision: not null } && !_CollisionDataList.ContainsKey(a.Collision))
+			if (a is { Collision: not null } && !_collisionDataList.ContainsKey(a.Collision))
 			{
 				a.Colliders = JsonSerialiser.Load<ServerCollisionData>(dir + "Data/Collision/" + a.Collision + ".json");
-				_CollisionDataList.Add(a.Collision, a.Colliders);
+				_collisionDataList.Add(a.Collision, a.Colliders);
 			}
 		}
 

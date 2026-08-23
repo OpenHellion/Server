@@ -8,8 +8,4 @@ public class RagdollItemData
 	public float[] Position;
 
 	public float[] LocalRotation;
-
-	public float[] Velocity;
-
-	public float[] AngularVelocity;
 }

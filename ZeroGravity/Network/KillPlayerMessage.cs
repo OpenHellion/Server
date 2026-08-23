@@ -5,11 +5,9 @@ namespace ZeroGravity.Network;
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
 public class KillPlayerMessage : NetworkData
 {
-	public long GUID;
+	public long Guid;
 
 	public HurtType CauseOfDeath;
 
 	public VesselDamageType VesselDamageType;
-
-	public CorpseDetails CorpseDetails;
 }

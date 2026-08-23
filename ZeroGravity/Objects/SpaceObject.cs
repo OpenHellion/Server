@@ -12,11 +12,9 @@ public abstract class SpaceObject
 {
 	public long Guid;
 
-	private double _scanningRange = -1.0;
+	public readonly HashSet<long> DynamicObjects = [];
 
-	public readonly ConcurrentDictionary<long, DynamicObject> DynamicObjects = new ConcurrentDictionary<long, DynamicObject>();
-
-	public readonly ConcurrentDictionary<long, Corpse> Corpses = new ConcurrentDictionary<long, Corpse>();
+	public readonly HashSet<long> Corpses = [];
 
 	private const double BaseSunHeatTransferPerSec = 9.4E+21;
 
@@ -26,39 +24,23 @@ public abstract class SpaceObject
 
 	public bool IsPartOfSpawnSystem;
 
-	public double ScanningRange
-	{
-		get
-		{
-			return _scanningRange;
-		}
-		set
-		{
-			_scanningRange = value < 10000.0 ? 10000.0 : value;
-		}
-	}
-
 	public virtual SpaceObjectType ObjectType => SpaceObjectType.None;
 
 	public virtual SpaceObject Parent { get; set; }
 
 	public virtual Vector3D Position => Vector3D.Zero;
 
+	public virtual QuaternionD Rotation
+	{
+		get => QuaternionD.Identity;
+		set => Debug.LogError("Tried to rotate an object that has no orientation of its own", Guid);
+	}
+
 	public virtual Vector3D Velocity => Vector3D.Zero;
 
 	public SpaceObject(long guid)
 	{
 		Guid = guid;
-	}
-
-	public virtual InitializeSpaceObjectMessage GetInitializeMessage()
-	{
-		return null;
-	}
-
-	public virtual SpawnObjectResponseData GetSpawnResponseData(Player pl)
-	{
-		return null;
 	}
 
 	public virtual Task UpdateTimers(double deltaTime)
@@ -70,9 +52,20 @@ public abstract class SpaceObject
 
 	public virtual async Task Destroy()
 	{
-		foreach (DynamicObject dynamicObject in new List<DynamicObject>(DynamicObjects.Values))
+		foreach (long dynamicObject in new List<long>(DynamicObjects))
 		{
-			await dynamicObject.Destroy();
+			if (Server.Instance.SpaceObjects.TryRemove(dynamicObject, out SpaceObject spaceObject))
+			{
+				await spaceObject.Destroy();
+			}
+		}
+
+		foreach (long corpse in new List<long>(Corpses))
+		{
+			if (Server.Instance.SpaceObjects.TryRemove(corpse, out SpaceObject spaceObject))
+			{
+				await spaceObject.Destroy();
+			}
 		}
 
 		DestroyObjectMessage message = new DestroyObjectMessage
@@ -107,9 +100,10 @@ public abstract class SpaceObject
 			Server.Instance.Remove(this as Corpse);
 		}
 
-		if (Parent is Pivot)
+		if (Parent is Pivot pivot)
 		{
-			Server.Instance.SolarSystem.RemoveArtificialBody(Parent as Pivot);
+			pivot.Child = null;
+			Server.Instance.SolarSystem.RemoveArtificialBody(pivot);
 		}
 
 		Parent = null;

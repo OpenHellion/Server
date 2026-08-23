@@ -461,7 +461,7 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public virtual async Task DestroyItem()
 	{
-		await DynamicObj.DestroyDynamicObject();
+		await DynamicObj.Destroy();
 	}
 
 	public virtual async Task LoadPersistenceData(PersistenceObjectData persistenceData)

@@ -123,7 +123,7 @@ internal class RepairTool : Item, ICargo
 
 	public async Task RepairItem(long guid)
 	{
-		SpaceObject obj = Server.Instance.GetObject(guid);
+		SpaceObject obj = Server.Instance.GetSpaceObject(guid);
 		if (obj is not DynamicObject dynamicObject)
 		{
 			return;

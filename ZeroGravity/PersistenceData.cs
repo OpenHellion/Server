@@ -4,7 +4,6 @@ using Newtonsoft.Json.Linq;
 
 namespace ZeroGravity;
 
-// TODO: Got some very strange logic going on here.
 public abstract class PersistenceData
 {
 	public string __ObjectType => GetType().ToString();
@@ -18,7 +17,7 @@ public abstract class PersistenceData
 		}
 		catch
 		{
-			Debug.LogError("Could not deseralize data", objectType);
+			Debug.LogError("Could not deseralise data", objectType);
 		}
 		return null;
 	}

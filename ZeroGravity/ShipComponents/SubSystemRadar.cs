@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -68,9 +69,13 @@ public class SubSystemRadar : SubSystem
 		}
 	}
 
-	public void PassiveScan()
+	/// <summary>
+	/// 	Returns the guids of all vessels this radar passively detects from its parent vessel,
+	/// 	based on distance versus each vessel's compound radar signature.
+	/// </summary>
+	public List<long> PassiveScan()
 	{
-		List<long> list = new List<long>();
+		ConcurrentBag<long> detected = new ConcurrentBag<long>();
 		List<SpaceObjectVessel> vessels = (from m in Server.Instance.SolarSystem.GetArtificialBodies()
 			where m is SpaceObjectVessel
 			select m as SpaceObjectVessel).ToList();
@@ -79,38 +84,38 @@ public class SubSystemRadar : SubSystem
 			double magnitude = (ParentVessel.Position - vessel.Position).Magnitude;
 			if (magnitude <= PassiveScanSensitivity * 1000.0 * vessel.GetCompoundRadarSignature())
 			{
-				list.Add(vessel.Guid);
+				detected.Add(vessel.Guid);
 			}
 		});
+		return detected.ToList();
 	}
 
-	public void ActiveScan(Vector3D direction, float angle)
+	/// <summary>
+	/// 	Returns the guids of all vessels detected within the active-scan cone (<paramref name="direction"/>
+	/// 	with full opening <paramref name="angle"/> degrees), out to the radar's active-scan range.
+	/// </summary>
+	public List<long> ActiveScan(Vector3D direction, float angle)
 	{
-		List<long> active = new List<long>();
-		List<long> fuzzy = new List<long>();
+		// TODO: vessels between active and fuzzy range (ActiveScanFuzzySensitivity) should surface as
+		// approximate contacts, but the rebuilt map has no fuzzy representation yet, so they stay hidden.
+		ConcurrentBag<long> detected = new ConcurrentBag<long>();
 		List<SpaceObjectVessel> vessels = (from m in Server.Instance.SolarSystem.GetArtificialBodies()
 			where m is SpaceObjectVessel
 			select m as SpaceObjectVessel).ToList();
 		Parallel.ForEach(vessels, delegate(SpaceObjectVessel vessel)
 		{
 			Vector3D vector3D = vessel.Position - ParentVessel.Position;
-			float num = (float)Vector3D.Angle(direction, vector3D.Normalized);
-			if (num <= angle / 2f)
+			if ((float)Vector3D.Angle(direction, vector3D.Normalized) <= angle / 2f)
 			{
 				double magnitude = vector3D.Magnitude;
-				double num2 = vessel.GetCompoundRadarSignature();
-				if (magnitude > PassiveScanSensitivity * 1000.0 * num2)
+				double signature = vessel.GetCompoundRadarSignature();
+				if (magnitude > PassiveScanSensitivity * 1000.0 * signature &&
+				    magnitude <= ActiveScanSensitivity * 1000.0 * signature)
 				{
-					if (magnitude <= ActiveScanSensitivity * 1000.0 * num2)
-					{
-						active.Add(vessel.Guid);
-					}
-					else if (magnitude <= ActiveScanFuzzySensitivity * 1000.0 * num2)
-					{
-						fuzzy.Add(vessel.Guid);
-					}
+					detected.Add(vessel.Guid);
 				}
 			}
 		});
+		return detected.ToList();
 	}
 }

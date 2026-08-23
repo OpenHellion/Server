@@ -124,7 +124,7 @@ public class StationBlueprint
 			{
 				string vesselTag2 = tag != "" && str.Key.Tag != "" ? tag + ";" + str.Key.Tag : tag + str.Key.Tag;
 				vessel = mainVessel != null ? await SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, nearArtificialBodyGUIDs: new List<long> { mainVessel.Guid }, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: false, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier) : await SpaceObjectVessel.CreateNew(str.Value, "", -1L, localRotation: MathHelper.RandomRotation(), vesselTag: vesselTag2, spawnRuleOrbit: spawnRuleOrbit, nearArtificialBodyGUIDs: spawnRuleOrbit == null ? new List<long> { nearArtificialBodyGUID.Value } : null, celestialBodyGUIDs: null, positionOffset: null, velocityAtPosition: null, checkPosition: spawnRuleOrbit == null, AsteroidResourcesMultiplier: AsteroidResourcesMultiplier);
-				vessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
+				vessel.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
 				spawnedVessels[str.Key] = vessel;
 			}
 			else
@@ -154,7 +154,7 @@ public class StationBlueprint
 					{
 						otherVessel = spawnedVessels[otherStr.Key];
 					}
-					otherVessel.VesselData.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
+					otherVessel.VesselRegistration = !name.IsNullOrEmpty() ? name : Server.NameGenerator.GenerateStationRegistration();
 
 					VesselDockingPort shipPort = vessel.DockingPorts.First(m => m.OrderID == dp.OrderID);
 					DockingPort dp2 = otherStr.Key.DockingPorts.First((DockingPort m) => m.DockedStructureID == str.Key.StructureID);
@@ -181,16 +181,16 @@ public class StationBlueprint
 		}
 		else if (nearArtificialBodyGUID.HasValue && LocalPosition is { Length: 3 })
 		{
-			ArtificialBody ab = Server.Instance.GetObject(nearArtificialBodyGUID.Value) as ArtificialBody;
+			ArtificialBody ab = Server.Instance.GetSpaceObject(nearArtificialBodyGUID.Value) as ArtificialBody;
 			mainVessel.Orbit = new OrbitParameters();
 			mainVessel.Orbit.CopyDataFrom(ab.Orbit, Server.SolarSystemTime, exactCopy: true);
-			mainVessel.Orbit.RelativePosition += QuaternionD.LookRotation(ab.Forward, ab.Up) * LocalPosition.ToVector3D();
+			mainVessel.Orbit.RelativePosition += ab.Rotation * LocalPosition.ToVector3D();
 			mainVessel.Orbit.InitFromCurrentStateVectors(Server.SolarSystemTime);
 		}
 		mainVessel.Orbit.UpdateOrbit();
 		if (LocalAngularVelocity is { Length: 3 })
 		{
-			mainVessel.Rotation = LocalAngularVelocity.ToVector3D();
+			mainVessel.AngularVelocityPerAxis = LocalAngularVelocity.ToVector3D();
 		}
 		return mainVessel;
 	}

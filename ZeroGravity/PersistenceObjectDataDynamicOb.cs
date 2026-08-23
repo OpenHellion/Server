@@ -25,9 +25,7 @@ public class PersistenceObjectDataDynamicObject : PersistenceObjectData
 
 	public float[] RespawnPosition;
 
-	public float[] RespawnForward;
-
-	public float[] RespawnUp;
+	public float[] RespawnRotation;
 
 	public DynamicObjectAuxData RespawnAuxData;
 

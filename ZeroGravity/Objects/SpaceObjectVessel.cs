@@ -1626,50 +1626,26 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public void UpdateVesselData(string vesselName = null, string vesselRegistration = null)
 	{
-		VesselDataUpdate vdu = new VesselDataUpdate
-		{
-			Guid = Guid
-		};
-		bool update = false;
 		if (vesselName != null)
 		{
 			VesselName = vesselName;
-			vdu.VesselName = vesselName;
-			update = true;
 		}
 		if (vesselRegistration != null)
 		{
 			VesselRegistration = vesselRegistration;
-			vdu.VesselRegistration = vesselRegistration;
-			update = true;
 		}
-		float newRadarSignature = GetCompoundRadarSignature();
-		if (RadarSignature != newRadarSignature)
-		{
-			RadarSignature = newRadarSignature;
-			vdu.RadarSignature = newRadarSignature;
-			update = true;
-		}
+		IsAlwaysVisible = AllVessels.Any((SpaceObjectVessel m) => m.IsAlwaysVisible);
+		IsDistressSignalActive = AllVessels.Any((SpaceObjectVessel m) => m.IsDistressSignalActive);
 
-		bool newAlwaysVisible = AllVessels.FirstOrDefault((SpaceObjectVessel m) => m.IsAlwaysVisible) != null;
-		if (IsAlwaysVisible != newAlwaysVisible)
+		Server.Instance.VesselsDataUpdate[Guid] = new VesselDataUpdate
 		{
-			IsAlwaysVisible = newAlwaysVisible;
-			vdu.IsAlwaysVisible = newAlwaysVisible;
-			update = true;
-		}
-		bool newDistress = AllVessels.FirstOrDefault((SpaceObjectVessel m) => m.IsDistressSignalActive) != null;
-		if (IsDistressSignalActive != newDistress)
-		{
-			IsDistressSignalActive = newDistress;
-			vdu.IsDistressSignalActive = newDistress;
-			update = true;
-		}
-
-		if (update)
-		{
-			vdu.ExposureDamage = ExposureDamage;
-			Server.Instance.VesselsDataUpdate[Guid] = vdu;
-		}
+			Guid = Guid,
+			VesselName = vesselName,
+			VesselRegistration = vesselRegistration,
+			RadarSignature = GetCompoundRadarSignature(),
+			IsAlwaysVisible = IsAlwaysVisible,
+			IsDistressSignalActive = IsDistressSignalActive,
+			ExposureDamage = ExposureDamage
+		};
 	}
 }

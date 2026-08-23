@@ -1394,8 +1394,8 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		foreach (long guid in DynamicObjects)
 		{
 			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj)
-				&& dobj.Item.AttachPointType == AttachPointType.BatteryRechargePoint
-				&& dobj.Item is Battery bat)
+				&& dobj.Item is Battery bat
+				&& bat.AttachPointType == AttachPointType.BatteryRechargePoint)
 			{
 				await bat.ChangeQuantity(bat.ChargeAmount);
 			}

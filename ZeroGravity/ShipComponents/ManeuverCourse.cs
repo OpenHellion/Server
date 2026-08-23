@@ -179,7 +179,7 @@ public class ManeuverCourse
 			await Invalidate();
 			return;
 		}
-		double angle = Vector3D.Angle(parentShip.Forward, startDir);
+		double angle = Vector3D.Angle(parentShip.Rotation * Vector3D.Forward, startDir);
 		if (!activate || (!(StartSolarSystemTime - Server.SolarSystemTime > _activationTimeDifference) && !(angle > _activationDirectionDifference)))
 		{
 			isActivated = activate;
@@ -231,13 +231,13 @@ public class ManeuverCourse
 	{
 		targetOrbit.UpdateOrbit();
 		double stopDist = 0.0;
-		ArtificialBody[] artificialBodies = (from m in Server.Instance.SolarSystem.GetArtificialBodieslsInRange(targetOrbit.Parent.CelestialBody, targetOrbit.RelativePosition, 5000.0)
-			where m is not SpaceObjectVessel vessel || vessel.MainVessel != parentShip.MainVessel
-			select m).ToArray();
+		ArtificialBody[] artificialBodies = [.. from m in Server.Instance.SolarSystem.GetNearbySpaceObjects(targetOrbit.RelativePosition, 5000.0)
+			where m is not SpaceObjectVessel vessel || vessel.MainVessel != parentShip.MainVessel && vessel.Orbit.Parent.CelestialBody == targetOrbit.Parent.CelestialBody
+			select m as ArtificialBody];
 		Vector3D endPos;
 		while (true)
 		{
-			endPos = targetOrbit.RelativePosition + endPosDeviation - parentShip.Forward * stopDist;
+			endPos = targetOrbit.RelativePosition + endPosDeviation - parentShip.Rotation * Vector3D.Forward * stopDist;
 			bool clear = true;
 			ArtificialBody[] array = artificialBodies;
 			foreach (ArtificialBody ab in array)
@@ -349,7 +349,7 @@ public class ManeuverCourse
 		{
 			return false;
 		}
-		if (!isActivated || Vector3D.Angle(parentShip.Forward, startDir) > _activationDirectionDifference || !await CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
+		if (!isActivated || Vector3D.Angle(parentShip.Rotation * Vector3D.Forward, startDir) > _activationDirectionDifference || !await CheckManeuverStartData(courseItems[currentCourseDataIndex], checkSystems: true, consumeResources: true))
 		{
 			await Invalidate();
 			return false;
@@ -379,7 +379,7 @@ public class ManeuverCourse
 				{
 					return false;
 				}
-				if (parentShip.SceneID == GameScenes.SceneId.AltCorp_Shuttle_SARA && parentShip.DockingPorts.First((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
+				if (parentShip.SceneId == GameScenes.SceneId.AltCorp_Shuttle_SARA && parentShip.DockingPorts.First((VesselDockingPort m) => m.OrderID == 1)?.DockedVessel != null)
 				{
 					return false;
 				}

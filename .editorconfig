@@ -14,6 +14,13 @@ dotnet_diagnostic.IDE0018.severity = none
 dotnet_diagnostic.IDE0030.severity = none
 dotnet_diagnostic.IDE0350.severity = none
 
+# IDE0290: Use primary constructor
+dotnet_diagnostic.IDE0290.severity = none
+
+[**.ini]
+indent_style = space
+indent_size = 4
+
 [**.json]
 indent_style = space
 indent_size = 2

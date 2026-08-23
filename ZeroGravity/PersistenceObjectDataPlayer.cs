@@ -41,8 +41,6 @@ public class PersistenceObjectDataPlayer : PersistenceObjectData
 
 	public int AnimationStatsMask;
 
-	public float[] Gravity;
-
 	public double[] Velocity;
 
 	public double[] AngularVelocity;
@@ -56,6 +54,4 @@ public class PersistenceObjectDataPlayer : PersistenceObjectData
 	public List<QuestDetails> Quests;
 
 	public List<ItemCompoundType> Blueprints;
-
-	public NavigationMapDetails NavMapDetails;
 }

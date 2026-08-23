@@ -33,9 +33,13 @@ public class QuestTrigger
 		// killed the exception escapes an async void path and takes the whole server down.
 		public static bool operator ==(QuestTriggerID x, QuestTriggerID y)
 		{
+			if (ReferenceEquals(x, y))
+			{
+				return true;
+			}
 			if (x is null || y is null)
 			{
-				return x is null && y is null;
+				return false;
 			}
 			return x.PlayerGUID == y.PlayerGUID && x.QuestID == y.QuestID && x.ID == y.ID;
 		}

@@ -78,41 +78,25 @@ public static class Program
 
 	private static void CheckIniFields()
 	{
-		try
+		if (!Server.Properties.TryGetProperty<int>("game_port", out var _))
 		{
-			Server.Properties.GetProperty<int>("game_port");
+			Debug.LogError("Missing or invalid 'game_port' field.");
+			Environment.Exit(1);
 		}
-		catch
+		if (!Server.Properties.TryGetProperty<int>("status_port", out var _))
 		{
-			Debug.LogError("Invalid 'game_port' field.");
-			Environment.Exit(0);
+			Debug.LogError("Missing or invalid 'status_port' field.");
+			Environment.Exit(1);
 		}
-		try
+		if (!Server.Properties.TryGetProperty<string>("auth_key", out var _))
 		{
-			Server.Properties.GetProperty<int>("status_port");
+			Debug.LogError("Missing or invalid 'auth_key' field.");
+			Environment.Exit(1);
 		}
-		catch
+		if (!Server.Properties.TryGetProperty<string>("http_key", out var _))
 		{
-			Debug.LogError("Invalid 'status_port' field.");
-			Environment.Exit(0);
-		}
-		try
-		{
-			Server.Properties.GetProperty<string>("auth_key");
-		}
-		catch
-		{
-			Debug.LogError("Invalid 'auth_key' field.");
-			Environment.Exit(0);
-		}
-		try
-		{
-			Server.Properties.GetProperty<string>("http_key");
-		}
-		catch
-		{
-			Debug.LogError("Invalid 'http_key' field.");
-			Environment.Exit(0);
+			Debug.LogError("Missing or invalid 'http_key' field.");
+			Environment.Exit(1);
 		}
 	}
 
@@ -192,8 +176,7 @@ public static class Program
 	// Sends a request to the status listener that we should shutdown.
 	private static async Task ShutdownServerInstance()
 	{
-		int StatusPort = Server.Properties.GetProperty<int>("status_port");
-		if (StatusPort <= 0)
+		if (!Server.Properties.TryGetProperty("status_port", out int StatusPort))
 		{
 			return;
 		}

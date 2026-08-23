@@ -4,25 +4,6 @@ namespace ZeroGravity;
 
 public static class GUIDFactory
 {
-	public static class Range
-	{
-		public const long PlayerFakeFrom = 1000000000000L;
-
-		public const long PlayerFakeTo = long.MaxValue;
-
-		public const long VesselFrom = 1000000L;
-
-		public const long VesselTo = 999999999999L;
-
-		public const long ObjectFrom = 1000L;
-
-		public const long ObjectTo = 999999L;
-
-		public const long SystemFrom = 100L;
-
-		public const long SystemTo = 999L;
-	}
-
 	private static Random rand = new Random();
 
 	public static long NextLongRandom(long min, long max)

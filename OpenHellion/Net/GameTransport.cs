@@ -1,6 +1,6 @@
 // GameTransport.cs
 //
-// Copyright (C) 2024, OpenHellion contributors
+// Copyright (C) 2026, OpenHellion contributors
 //
 // Inspiration taken from WatsonTcp.
 //
@@ -19,7 +19,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -27,7 +26,6 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenHellion.IO;
-using ProtoBuf;
 using ZeroGravity.Network;
 
 namespace OpenHellion.Net;
@@ -36,9 +34,8 @@ namespace OpenHellion.Net;
 /// 	Lightweight single-connection game transport with framing.
 /// </summary>
 /// <remarks>
-/// 	Largely decoupled from the program, but it does contain som references to <c>EventSystem</c>
-/// 	to invoke received messages. Might move these into callbacks, but it really isn't necessary.
 /// 	Needs TLS support. Depends upon <c>ProtoSerialiser</c> and <c>NetworkData</c>.
+/// 	Insipred by WatsonTcp.
 /// </remarks>
 internal sealed class GameTransport
 {
@@ -46,7 +43,10 @@ internal sealed class GameTransport
 
 	private const int MAX_MESSAGE_SIZE = 16000000;
 
-	private readonly Dictionary<long, ConnectionData> _connections = new();
+	// How long a closing socket keeps reading before it is forced shut.
+	private const int DrainTimeoutMs = 500;
+
+	private readonly Dictionary<long, ConnectionData> _connections = [];
 
 	private Socket _server;
 
@@ -114,7 +114,6 @@ internal sealed class GameTransport
 				var stream = new NetworkStream(handler, true);
 				long guid = await _onConnected(stream, _connections.Keys.ToArray(), MAX_MESSAGE_SIZE);
 
-				// TODO: There may be a chance someone could get -1 as guid.
 				if (guid is -1)
 				{
 					Debug.LogWarning("Got connection with guid of -1.");
@@ -178,7 +177,7 @@ internal sealed class GameTransport
 			{
 				if (data.stream.DataAvailable)
 				{
-					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream, MAX_MESSAGE_SIZE, data.cancellationToken.Token);
+					NetworkData networkData = await ProtoSerialiser.Unpack(data.stream, MAX_MESSAGE_SIZE, guid, data.cancellationToken.Token);
 					if (networkData != null)
 					{
 						networkData.Sender = guid;
@@ -200,24 +199,39 @@ internal sealed class GameTransport
 						}
 						else
 						{
-							Debug.LogWarningFormat("Received expired message from client {0}: {1}.", guid, networkData.GetType());
+							Debug.LogWarning($"Discarding expired messages from client {guid}; the loop is behind, or the clocks disagree");
 						}
 					}
 				}
 			}
-			catch (IOException)
+			catch (ProtoSerialiser.ZeroDataException ex)
 			{
-				Debug.Log("Socket terminated, disconnecting client.");
+				Debug.Log("Client closed the connection, disconnecting", guid, ex.Message);
+				DisconnectInternal(guid);
+				break;
+			}
+			catch (IOException ex)
+			{
+				Debug.Log("Socket terminated in the receive loop, disconnecting client", guid, ex.Message);
 				DisconnectInternal(guid);
 				break;
 			}
 			catch (ObjectDisposedException)
 			{
+				// Our own DisconnectInternal closed the stream; nothing to report.
 				break;
 			}
 			catch (ArgumentException ex)
 			{
+				// Unpack throws this for a frame declaring more than MAX_MESSAGE_SIZE.
 				Debug.LogException(ex);
+			}
+			catch (Exception ex)
+			{
+				// Connection reset (IOException/SocketException) or closed by the remote host.
+				Debug.LogError("Unhandled fault in the receive loop, disconnecting client", guid, ex);
+				DisconnectInternal(guid);
+				break;
 			}
 		}
 	}
@@ -235,12 +249,18 @@ internal sealed class GameTransport
 			{
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				var packedData = await ProtoSerialiser.Pack(data);
+				if (packedData == null)
+				{
+					Debug.LogError($"Dropping a {data.GetType().Name} for client {guid} that could not be serialised.");
+					return;
+				}
+
 				await connectionData.stream.WriteAsync(packedData, connectionData.cancellationToken.Token).ConfigureAwait(false);
 			}
 		}
-		catch (IOException)
+		catch (IOException ex)
 		{
-			Debug.Log("Socket terminated, disconnecting client.");
+			Debug.Log("Socket terminated during a send, disconnecting client", guid, ex.Message);
 			DisconnectInternal(guid);
 		}
 	}
@@ -259,6 +279,11 @@ internal sealed class GameTransport
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				data.SyncRequest = true;
 				var packedData = await ProtoSerialiser.Pack(data);
+				if (packedData == null)
+				{
+					Debug.LogError($"Dropping a {data.GetType().Name} for client {guid} that could not be serialised.");
+					return null;
+				}
 
 				NetworkData response = null;
 				CancellationTokenSource responseCancel = new();
@@ -287,9 +312,9 @@ internal sealed class GameTransport
 				}
 			}
 		}
-		catch (IOException)
+		catch (IOException ex)
 		{
-			Debug.Log("Socket terminated, disconnecting client.");
+			Debug.Log("Socket terminated during a synchronous send, disconnecting client", guid, ex.Message);
 			DisconnectInternal(guid);
 		}
 
@@ -302,17 +327,23 @@ internal sealed class GameTransport
 		if (_connections.Count == 0) return;
 		data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 		var packedData = await ProtoSerialiser.Pack(data);
+		if (packedData == null)
+		{
+			Debug.LogError($"Dropping a broadcast {data.GetType().Name} that could not be serialised.");
+			return;
+		}
 
 		await Parallel.ForEachAsync(_connections, async (connection, _) =>
 		{
 			try
 			{
 				if (connection.Key == skipPlayerGuid) return;
+
 				await connection.Value.stream.WriteAsync(packedData, _mainCancellationToken.Token).ConfigureAwait(false);
 			}
-			catch (IOException)
+			catch (IOException ex)
 			{
-				Debug.Log("Socket terminated, disconnecting client.");
+				Debug.Log("Socket terminated during a broadcast, disconnecting client", connection.Key, ex.Message);
 				DisconnectInternal(connection.Key);
 			}
 		});
@@ -327,6 +358,12 @@ internal sealed class GameTransport
 
 				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
 				var packedData = await ProtoSerialiser.Pack(data);
+				if (packedData == null)
+				{
+					Debug.LogError($"Dropping a priority {data.GetType().Name} for client {guid} that could not be serialised.");
+					return;
+				}
+
 				await handler.stream.FlushAsync().ConfigureAwait(false);
 				await handler.stream.WriteAsync(packedData).ConfigureAwait(false);
 			}
@@ -335,10 +372,9 @@ internal sealed class GameTransport
 				Debug.LogWarning("Priority send to disconnected client.");
 			}
 		}
-		catch (IOException)
+		catch (IOException ex)
 		{
-			Debug.Log("Socket terminated, disconnecting client.");
-			Debugger.Break();
+			Debug.Log("Socket terminated during a priority send, disconnecting client", guid, ex.Message);
 			DisconnectInternal(guid);
 		}
 	}
@@ -348,7 +384,7 @@ internal sealed class GameTransport
 		return _connections.ContainsKey(guid);
 	}
 
-	internal long[] GetConnectionsGUIDAsync()
+	internal long[] GetConnectionsGuidAsync()
 	{
 		return _connections.Keys.ToArray();
 	}
@@ -356,36 +392,43 @@ internal sealed class GameTransport
 	// Disconnect a client with the provided id.
 	internal void DisconnectInternal(long guid)
 	{
-		// Both the read loop and the socket error path reach this for the same client, so the entry is
-		// taken out first and everything below runs exactly once. Previously the second call threw on
-		// the already disposed socket before the entry could be removed, leaving the client marked as
-		// connected forever and the server refusing its next login as a duplicate.
-		if (!_connections.Remove(guid, out ConnectionData connection))
-		{
-			return;
-		}
+		if (!_connections.TryGetValue(guid, out ConnectionData connection)) return;
 
+		_connections.Remove(guid);
 		_onDisconnected(guid);
-		try
+		connection.cancellationToken.Cancel();
+
+		Task.Run(() =>
 		{
-			connection.socket.Shutdown(SocketShutdown.Both);
-		}
-		catch (Exception ex)
-		{
-			// The socket is already gone; there is nothing left to shut down cleanly.
-			Debug.Log("Socket was already closed when disconnecting client", guid, ex.Message);
-		}
-		finally
-		{
-			connection.stream.Close();
-			connection.cancellationToken.Cancel();
-		}
+			try
+			{
+				connection.socket.Shutdown(SocketShutdown.Send);
+				connection.socket.ReceiveTimeout = DrainTimeoutMs;
+
+				byte[] drain = new byte[4096];
+				long deadline = Environment.TickCount64 + DrainTimeoutMs;
+				while (Environment.TickCount64 < deadline && connection.socket.Receive(drain) > 0)
+				{
+				}
+			}
+			catch (Exception)
+			{
+				// The peer is already gone, which is the state this was closing towards anyway.
+			}
+			finally
+			{
+				try { connection.stream.Close(); } catch (Exception) { }
+				try { connection.socket.Close(); } catch (Exception) { }
+			}
+		});
 	}
 
-	// Disconnects all clients.
+	/// <summary>
+	/// 	Disconnects all clients.
+	/// </summary>
 	internal void DisconnectAll()
 	{
-		foreach (var guid in _connections.Keys)
+		foreach (var guid in _connections.Keys.ToArray())
 		{
 			DisconnectInternal(guid);
 		}

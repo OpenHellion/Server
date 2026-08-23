@@ -409,7 +409,7 @@ public class DistributionManager
 	{
 		isCompoundDM = linkDockedVessels;
 		InitInstance();
-		AddShipDataStructure(vessel, vessel.VesselData.SceneID);
+		AddShipDataStructure(vessel, vessel.SceneId);
 		if (isCompoundDM)
 		{
 			LinkNodesInDockedVessels(vessel, new List<SpaceObjectVessel>());
@@ -870,7 +870,7 @@ public class DistributionManager
 			{
 				if (port.DockingStatus && !_distributionNodes.ContainsKey(port.DockedVessel.Guid))
 				{
-					AddShipDataStructure(port.DockedVessel, port.DockedVessel.VesselData.SceneID);
+					AddShipDataStructure(port.DockedVessel, port.DockedVessel.SceneId);
 				}
 			}
 		}

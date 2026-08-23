@@ -12,8 +12,6 @@ public class CargoCompartmentData : ISceneData
 
 	public float Capacity;
 
-	public string Name;
-
 	public CargoCompartmentType Type;
 
 	public List<CargoResourceData> Resources;

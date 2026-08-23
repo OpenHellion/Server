@@ -81,7 +81,7 @@ public class AsteroidMiningPoint : IPersistantObject
 	{
 		if (Quantity > float.Epsilon && gasBurstSolarSystemTime < Server.SolarSystemTime)
 		{
-			double angle = Vector3D.Angle(-Parent.Position, QuaternionD.LookRotation(Parent.Forward, Parent.Up) * LocalPosition);
+			double angle = Vector3D.Angle(-Parent.Position, Parent.Rotation * LocalPosition);
 			if (angle > 90.0)
 			{
 				return false;

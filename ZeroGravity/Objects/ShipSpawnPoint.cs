@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenHellion.Net;
 using ZeroGravity.Data;
+using ZeroGravity.Math;
 using ZeroGravity.Network;
 
 namespace ZeroGravity.Objects;
@@ -9,6 +10,10 @@ namespace ZeroGravity.Objects;
 public class ShipSpawnPoint
 {
 	public int SpawnPointID;
+
+	public Vector3D RelativePosition;
+
+	public QuaternionD RelativeRotation;
 
 	public SpawnPointType Type;
 
@@ -118,7 +123,7 @@ public class ShipSpawnPoint
 				{
 					sender.AuthorizedSpawnPoint.State = SpawnPointState.Locked;
 					ShipStatsMessage retMsg = new ShipStatsMessage();
-					retMsg.GUID = sender.AuthorizedSpawnPoint.Ship.Guid;
+					retMsg.Guid = sender.AuthorizedSpawnPoint.Ship.Guid;
 					retMsg.Temperature = sender.AuthorizedSpawnPoint.Ship.Temperature;
 					retMsg.Health = sender.AuthorizedSpawnPoint.Ship.Health;
 					retMsg.Armor = sender.AuthorizedSpawnPoint.Ship.Armor;
@@ -160,7 +165,7 @@ public class ShipSpawnPoint
 			if (sendMessage)
 			{
 				ShipStatsMessage retMsg = new ShipStatsMessage();
-				retMsg.GUID = Ship.Guid;
+				retMsg.Guid = Ship.Guid;
 				retMsg.Temperature = Ship.Temperature;
 				retMsg.Health = Ship.Health;
 				retMsg.Armor = Ship.Armor;
@@ -193,7 +198,7 @@ public class ShipSpawnPoint
 			if (sendMessage)
 			{
 				ShipStatsMessage retMsg = new ShipStatsMessage();
-				retMsg.GUID = Ship.Guid;
+				retMsg.Guid = Ship.Guid;
 				retMsg.Temperature = Ship.Temperature;
 				retMsg.Health = Ship.Health;
 				retMsg.Armor = Ship.Armor;

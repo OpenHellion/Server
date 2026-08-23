@@ -57,7 +57,7 @@ public struct QuaternionD
 		}
 		set
 		{
-			this = Internal_FromEulerRad(value * (System.Math.PI / 180.0));
+			this = FromEulerRad(value * (System.Math.PI / 180.0));
 		}
 	}
 
@@ -223,12 +223,12 @@ public struct QuaternionD
 
 	public static QuaternionD Euler(double x, double y, double z)
 	{
-		return Internal_FromEulerRad(new Vector3D(x, y, z) * (System.Math.PI / 180.0));
+		return FromEulerRad(new Vector3D(x, y, z) * (System.Math.PI / 180.0));
 	}
 
 	public static QuaternionD Euler(Vector3D euler)
 	{
-		return Internal_FromEulerRad(euler * (System.Math.PI / 180.0));
+		return FromEulerRad(euler * (System.Math.PI / 180.0));
 	}
 
 	private static Vector3D Internal_ToEulerRad(QuaternionD rotation)
@@ -237,10 +237,24 @@ public struct QuaternionD
 		return vector3;
 	}
 
-	private static QuaternionD Internal_FromEulerRad(Vector3D euler)
+	// Expanded form of qZ * qX * qY.
+	private static QuaternionD FromEulerRad(Vector3D euler)
 	{
-		INTERNAL_CALL_FromEulerRad(ref euler, out var quaternion);
-		return quaternion;
+		double halfXAngle = euler.X * 0.5;
+		double halfYAngle = euler.Y * 0.5;
+		double halfZAngle = euler.Z * 0.5;
+		double cx = System.Math.Cos(halfXAngle);
+		double sx = System.Math.Sin(halfXAngle);
+		double cy = System.Math.Cos(halfYAngle);
+		double sy = System.Math.Sin(halfYAngle);
+		double cz = System.Math.Cos(halfZAngle);
+		double sz = System.Math.Sin(halfZAngle);
+		return new QuaternionD(
+			w: cx * cy * cz - sx * sy * sz,
+			x: sx * cy * cz - cx * sy * sz,
+			y: cx * sy * cz + sx * cy * sz,
+			z: cx * cy * sz + sx * sy * cz
+			);
 	}
 
 	private static void Internal_ToAxisAngleRad(QuaternionD q, out Vector3D axis, out double angle)
@@ -292,26 +306,6 @@ public struct QuaternionD
 			angle = 0.0;
 			axis = new Vector3D(1.0, 0.0, 0.0);
 		}
-	}
-
-	private static void INTERNAL_CALL_FromEulerRad(ref Vector3D euler, out QuaternionD value)
-	{
-		double halfXAngle = euler.X * 0.5;
-		double halfYAngle = euler.Y * 0.5;
-		double halfZAngle = euler.Z * 0.5;
-		double cx = System.Math.Cos(halfXAngle);
-		double sx = System.Math.Sin(halfXAngle);
-		double cy = System.Math.Cos(halfYAngle);
-		double sy = System.Math.Sin(halfYAngle);
-		double cz = System.Math.Cos(halfZAngle);
-		double sz = System.Math.Sin(halfZAngle);
-		QuaternionD[] quats = new QuaternionD[3]
-		{
-			new QuaternionD(sx, 0.0, 0.0, cx),
-			new QuaternionD(0.0, sy, 0.0, cy),
-			new QuaternionD(0.0, 0.0, sz, cz)
-		};
-		value = quats[2] * quats[0] * quats[1];
 	}
 
 	private static void INTERNAL_CALL_ToEulerRad(ref QuaternionD rotation, out Vector3D value)
@@ -484,5 +478,15 @@ public struct QuaternionD
 		value.Y *= val3;
 		value.Z *= val3;
 		value.W *= val3;
+	}
+
+	public static QuaternionD operator-(QuaternionD lhs, QuaternionD rhs)
+	{
+		return new QuaternionD(lhs.X - rhs.X, lhs.Y - rhs.Y, lhs.Z - rhs.Z, lhs.W - rhs.W);
+	}
+
+	public static QuaternionD operator+(QuaternionD lhs, QuaternionD rhs)
+	{
+		return new QuaternionD(lhs.X + rhs.X, lhs.Y + rhs.Y, lhs.Z + rhs.Z, lhs.W + rhs.W);
 	}
 }

@@ -1,0 +1,14 @@
+[x] Remove VesselData
+[x] Make sure inventory is sent to the player on spawn
+[x] Make all rotations be quaternion
+[x] Implement server-side resimulation of jetpack movement to properly verify consumption.
+[x] Check ObjectMoveRequest if valid
+[x] Only send MovementMessage when positions were changed
+[x] Fix main loop watcher
+[ ] Rewrite EventSystem to fix weaknesses
+[ ] Collect all network messages and flush on tick
+[ ] Merge similar network messages in same tick
+[ ] Dispose all known syncrequests on delete
+
+Long-term
+[ ] Remove subscribe/unsubscribe, send to players in range

@@ -1,8 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ProtoBuf;
@@ -15,73 +13,16 @@ namespace OpenHellion.IO;
 /// </summary>
 public static class ProtoSerialiser
 {
-	private class ZeroDataException : Exception
+	/// <summary>
+	/// 	The peer closed the connection. An <see cref="IOException" /> so the transport's existing handling
+	/// 	holds it, and public so a caller can tell a close apart from a broken pipe.
+	/// </summary>
+	public sealed class ZeroDataException : IOException
 	{
 		public ZeroDataException(string message)
 			: base(message)
 		{
 		}
-	}
-
-	private class StatisticsHelper
-	{
-		public long ByteSum;
-
-		public int PacketNumber;
-
-		public long BytesSinceLastCheck;
-
-		public StatisticsHelper(long bytes)
-		{
-			ByteSum = bytes;
-			PacketNumber = 1;
-			BytesSinceLastCheck = bytes;
-		}
-	}
-
-	private static DateTime _statisticUpdateResetTime = DateTime.UtcNow;
-
-	private static DateTime _lastStatisticUpdateTime;
-
-	private static readonly double _statisticsLogUpdateTime = 1.0;
-
-	private static readonly Dictionary<Type, StatisticsHelper> _sentStatistics =
-		new Dictionary<Type, StatisticsHelper>();
-
-	private static readonly Dictionary<Type, StatisticsHelper> _receivedStatistics =
-		new Dictionary<Type, StatisticsHelper>();
-
-	/// <summary>
-	/// 	For deserialisation of data not sent through network.
-	/// </summary>
-	private static NetworkData Deserialize(Stream ms)
-	{
-		NetworkData networkData;
-		try
-		{
-			networkData = Serializer.Deserialize<NetworkData>(ms);
-		}
-		catch
-		{
-			return null;
-		}
-
-		ms.Position = 0L;
-
-		if (_statisticsLogUpdateTime > 0.0)
-		{
-			try
-			{
-				ProcessStatistics(networkData, ms, _receivedStatistics);
-				return networkData;
-			}
-			catch
-			{
-				return networkData;
-			}
-		}
-
-		return networkData;
 	}
 
 	/// <summary>
@@ -90,10 +31,12 @@ public static class ProtoSerialiser
 	/// </summary>
 	/// <param name="stream">The stream to read from.</param>
 	/// <param name="maxMessageSize">Max number of bytes to accept.</param>
-	/// <returns></returns>
+	/// <param name="guid">Client the message came from, for tracing. Zero before a client has one.</param>
+	/// <param name="cancellationToken"></param>
+	/// <returns>The message, or null if the frame arrived intact but could not be read.</returns>
 	/// <exception cref="ArgumentException">If message is too large.</exception>
-	/// <exception cref="ZeroDataException">If message is empty.</exception>
-	public static async Task<NetworkData> Unpack(Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
+	/// <exception cref="ZeroDataException">If the peer closed the connection.</exception>
+	public static async Task<NetworkData> Unpack(Stream stream, int maxMessageSize, long guid = 0, CancellationToken cancellationToken = default)
 	{
 		int dataRead = 0;
 		int readSize;
@@ -104,7 +47,9 @@ public static class ProtoSerialiser
 			readSize = await stream.ReadAsync(dataLengthBuffer.AsMemory(dataRead, dataLengthBuffer.Length - dataRead), cancellationToken);
 			if (readSize == 0)
 			{
-				throw new ZeroDataException("Received zero data message.");
+				throw new ZeroDataException(dataRead == 0
+					? "Peer closed the connection between messages."
+					: $"Peer closed the connection inside a message header, after {dataRead} of 4 bytes.");
 			}
 
 			dataRead += readSize;
@@ -126,7 +71,8 @@ public static class ProtoSerialiser
 			readSize = await stream.ReadAsync(buffer.AsMemory(dataRead, buffer.Length - dataRead), cancellationToken);
 			if (readSize == 0)
 			{
-				throw new ZeroDataException("Received zero data message.");
+				throw new ZeroDataException(
+					$"Peer closed the connection inside a message body, after {dataRead} of {dataLength} bytes.");
 			}
 
 			dataRead += readSize;
@@ -134,14 +80,28 @@ public static class ProtoSerialiser
 
 		// Make the stream into NetworkData.
 		MemoryStream ms = new MemoryStream(buffer, 0, buffer.Length);
-		return Deserialize(ms);
+
+		NetworkData networkData;
+		try
+		{
+			networkData = Serializer.Deserialize<NetworkData>(ms);
+		}
+		catch (Exception ex)
+		{
+			// The frame was whole, so the connection is still in sync; only this message is lost.
+			Debug.LogWarning($"Discarding an unreadable {dataLength} byte message from client {guid}: {ex.GetType().Name}: {ex.Message}");
+			return null;
+		}
+
+		return networkData;
 	}
 
 	/// <summary>
 	/// 	Pack NetworkData into a binary array.
 	/// </summary>
 	/// <param name="data">NetworkData to serialise.</param>
-	/// <returns>Data as a binary array.</returns>
+	/// <param name="cancellationToken"></param>
+	/// <returns>Data as a binary array, or null if it could not be serialised.</returns>
 	public static async Task<byte[]> Pack(NetworkData data, CancellationToken cancellationToken = default)
 	{
 		await using MemoryStream ms = new MemoryStream();
@@ -154,18 +114,6 @@ public static class ProtoSerialiser
 		{
 			Debug.LogException(ex);
 			return null;
-		}
-
-		if (_statisticsLogUpdateTime > 0.0)
-		{
-			try
-			{
-				ProcessStatistics(data, ms, _sentStatistics);
-			}
-			catch
-			{
-				// Ignored.
-			}
 		}
 
 		await using MemoryStream outMs = new MemoryStream();
@@ -210,57 +158,5 @@ public static class ProtoSerialiser
 			}
 			remaining -= read;
 		}
-	}
-
-	private static void ProcessStatistics(NetworkData data, Stream ms,
-		Dictionary<Type, StatisticsHelper> stat)
-	{
-		Type type = data.GetType();
-		if (stat.TryGetValue(type, out var value))
-		{
-			value.ByteSum += ms.Length;
-			value.PacketNumber++;
-			value.BytesSinceLastCheck += ms.Length;
-		}
-		else
-		{
-			stat[type] = new StatisticsHelper(ms.Length);
-		}
-
-		if (!(DateTime.UtcNow.Subtract(_lastStatisticUpdateTime).TotalSeconds >= _statisticsLogUpdateTime))
-		{
-			return;
-		}
-
-		TimeSpan timeSpan = DateTime.UtcNow.Subtract(_statisticUpdateResetTime);
-		string text = (stat != _sentStatistics)
-			? ("Received packets statistics (" + timeSpan.ToString("h':'mm':'ss") + "): \n")
-			: ("Sent packets statistics (" + timeSpan.ToString("h':'mm':'ss") + "): \n");
-		long num = 0L;
-		string text2;
-		foreach (KeyValuePair<Type, StatisticsHelper> item in stat
-						.OrderBy((KeyValuePair<Type, StatisticsHelper> m) => m.Value.ByteSum).Reverse())
-		{
-			text2 = text;
-			text = text2 + item.Key.Name + ": " + item.Value.PacketNumber + " (" +
-					(item.Value.ByteSum / 1000f).ToString("##,0") + " kB), \n";
-			item.Value.BytesSinceLastCheck = 0L;
-			num += item.Value.ByteSum;
-		}
-
-		text2 = text;
-		text = text2 + "-----------------------------------------\nTotal: " +
-				(num / 1000f).ToString("##,0") + " kB (avg: " +
-				(num / timeSpan.TotalSeconds / 1000.0).ToString("##,0") + " kB/s)";
-
-		_lastStatisticUpdateTime = DateTime.UtcNow;
-	}
-
-	public static void ResetStatistics()
-	{
-		_sentStatistics.Clear();
-		_receivedStatistics.Clear();
-		_statisticUpdateResetTime = DateTime.UtcNow;
-		_lastStatisticUpdateTime = DateTime.UtcNow;
 	}
 }

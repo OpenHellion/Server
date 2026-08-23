@@ -94,7 +94,7 @@ public class VesselDockingPort : IPersistantObject
 			DockingStatus = DockingStatus,
 			RelativePosition = ParentVessel.RelativePositionFromParent.ToFloatArray(),
 			RelativeRotation = ParentVessel.RelativeRotationFromParent.ToFloatArray(),
-			CollidersCenterOffset = ParentVessel.IsDocked ? ParentVessel.DockedToMainVessel.VesselData.CollidersCenterOffset : ParentVessel.VesselData.CollidersCenterOffset,
+			CollidersCenterOffset = ParentVessel.IsDocked ? ParentVessel.DockedToMainVessel.CollidersCenterOffset : ParentVessel.CollidersCenterOffset,
 			ExecutorsMerge = GetMergedExecutors(null),
 			PairedDoors = ParentVessel.GetPairedDoors(this)
 		};

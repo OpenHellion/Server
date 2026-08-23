@@ -55,6 +55,7 @@ public class StatusConnectionListener
 			{
 				// Ignored
 			}
+			Thread.Sleep(20);
 		}
 
 		Debug.Log("Shutting down status connection listener.");

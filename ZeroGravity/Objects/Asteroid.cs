@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using OpenHellion.Net;
+using OpenHellion.Net.Message;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -20,8 +21,8 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.Asteroid;
 
-	public Asteroid(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, Vector3D forward, Vector3D up)
-		: base(guid, initializeOrbit, position, velocity, forward, up)
+	public Asteroid(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, QuaternionD rotation)
+		: base(guid, initializeOrbit, position, velocity, rotation)
 	{
 		Mass = 100000000000.0;
 	}
@@ -30,29 +31,25 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 	{
 		Vector3D astPos = Vector3D.Zero;
 		Vector3D astVel = Vector3D.Zero;
-		Vector3D astForward = Vector3D.Forward;
-		Vector3D astUp = Vector3D.Up;
+		QuaternionD astRotation = QuaternionD.Identity;
 		OrbitParameters orbit = null;
-		Asteroid asteroid = new Asteroid(asteroidGUID < 0 ? GUIDFactory.NextVesselGUID() : asteroidGUID, initializeOrbit: false, astPos, astVel, astForward, astUp);
-		asteroid.VesselData = new VesselData
+		Asteroid asteroid = new Asteroid(asteroidGUID < 0 ? GUIDFactory.NextVesselGUID() : asteroidGUID, initializeOrbit: false, astPos, astVel, astRotation)
 		{
-			SceneID = sceneID,
+			SceneId = sceneID,
 			VesselRegistration = registration,
 			VesselName = "",
-			Tag = vesselTag,
+			VesselTag = vesselTag,
 			CollidersCenterOffset = Vector3D.Zero.ToFloatArray(),
 			IsDebrisFragment = isDebrisFragment,
 			CreationSolarSystemTime = Server.SolarSystemTime
 		};
-		asteroid.IsDebrisFragment = isDebrisFragment;
 		asteroid.ReadInfoFromJson();
-		asteroid.VesselData.RadarSignature = asteroid.RadarSignature;
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(asteroid);
-		Server.Instance.SolarSystem.GetSpawnPosition(SpaceObjectType.Asteroid, asteroid.Radius, checkPosition, out astPos, out astVel, out astForward, out astUp, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out orbit);
-		asteroid.InitializeOrbit(astPos, astVel, astForward, astUp, orbit);
+		Server.Instance.SolarSystem.GetSpawnPosition(asteroid.Radius, checkPosition, out astPos, out astVel, out astRotation, nearArtificialBodyGUIDs, celestialBodyGUIDs, positionOffset, velocityAtPosition, localRotation, distanceFromSurfacePercMin, distanceFromSurfacePercMax, spawnRuleOrbit, celestialBodyDeathDistanceMultiplier, artificialBodyDistanceCheck, out orbit);
+		asteroid.InitializeOrbit(astPos, astVel, astRotation, orbit);
 		if (registration.IsNullOrEmpty())
 		{
-			asteroid.VesselData.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(SpaceObjectType.Asteroid, asteroid.Orbit.Parent.CelestialBody, sceneID);
+			asteroid.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(SpaceObjectType.Asteroid, asteroid.Orbit.Parent.CelestialBody, sceneID);
 		}
 		if (asteroid.MiningPoints.Count > 0)
 		{
@@ -148,7 +145,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 
 	public void ReadInfoFromJson()
 	{
-		CelestialSceneData asd = StaticData.AsteroidDataList.Find((CelestialSceneData x) => x.ItemID == (short)SceneID);
+		CelestialSceneData asd = StaticData.AsteroidDataList.Find((CelestialSceneData x) => x.ItemID == (short)SceneId);
 		Radius = asd.Radius;
 		RadarSignature = asd.RadarSignature;
 		foreach (AsteroidMiningPointData ampd in asd.MiningPoints)
@@ -217,76 +214,58 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 	{
 	}
 
-	public override SpawnObjectResponseData GetSpawnResponseData(Player pl)
+	public ObjectsInfoResponse.AsteroidData GetAsteroidData(Vector3D anchorPosition)
 	{
-		bool isDummy = (pl.Position - Position).SqrMagnitude > 100000000.0;
-		return new SpawnAsteroidResponseData
+		return new ObjectsInfoResponse.AsteroidData
 		{
-			GUID = Guid,
-			Data = VesselData,
+			Guid = Guid,
+			Position = (Position - anchorPosition).ToFloatArray(),
+			Rotation = Rotation.ToFloatArray(),
 			Radius = Radius,
-			IsDummy = isDummy,
-			MiningPoints = MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList()
+			VesselRegistration = VesselRegistration,
+			VesselName = VesselName,
+			Tag = VesselTag,
+			SceneId = SceneId,
+			IsDebrisFragment = IsDebrisFragment,
+			IsAlwaysVisible = IsAlwaysVisible,
+			MiningPoints = MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToArray()
 		};
-	}
-
-	public override InitializeSpaceObjectMessage GetInitializeMessage()
-	{
-		InitializeSpaceObjectMessage msg = new InitializeSpaceObjectMessage();
-		msg.GUID = Guid;
-		msg.DynamicObjects = new List<DynamicObjectDetails>();
-		foreach (DynamicObject dobj in DynamicObjects.Values)
-		{
-			msg.DynamicObjects.Add(dobj.GetDetails());
-		}
-		msg.Corpses = new List<CorpseDetails>();
-		foreach (Corpse cobj in Corpses.Values)
-		{
-			msg.Corpses.Add(cobj.GetDetails());
-		}
-		msg.Characters = new List<CharacterDetails>();
-		foreach (Player pl in VesselCrew)
-		{
-			msg.Characters.Add(pl.GetDetails());
-		}
-		return msg;
 	}
 
 	public PersistenceObjectData GetPersistenceData()
 	{
-		PersistenceObjectDataAsteroid data = new PersistenceObjectDataAsteroid();
-		data.GUID = Guid;
-		data.OrbitData = new OrbitData();
-		Orbit.FillOrbitData(ref data.OrbitData);
-		data.Name = VesselData.VesselRegistration;
-		data.Tag = VesselData.Tag;
-		data.SceneID = SceneID;
-		data.IsAlwaysVisible = IsAlwaysVisible;
-		data.Forward = Forward.ToArray();
-		data.Up = Up.ToArray();
-		data.Rotation = Rotation.ToArray();
-		data.MiningPoints = MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList();
-		return data;
+		var orbitData = new OrbitData();
+		Orbit.FillOrbitData(ref orbitData);
+		return new PersistenceObjectDataAsteroid
+		{
+			GUID = Guid,
+			OrbitData = orbitData,
+			Name = VesselRegistration,
+			Tag = VesselTag,
+			SceneID = SceneId,
+			IsAlwaysVisible = IsAlwaysVisible,
+			Rotation = Rotation.ToArray(),
+			AngularVelocity = AngularVelocityPerAxis.ToArray(),
+			MiningPoints = MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList()
+		};
 	}
 
 	public async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		PersistenceObjectDataAsteroid data = persistenceData as PersistenceObjectDataAsteroid;
-		VesselData = new VesselData();
-		VesselData.CollidersCenterOffset = Vector3D.Zero.ToFloatArray();
-		VesselData.VesselRegistration = data.Name;
-		VesselData.Tag = data.Tag;
-		VesselData.SceneID = data.SceneID;
+		CollidersCenterOffset = Vector3D.Zero.ToFloatArray();
+		VesselRegistration = data.Name;
+		VesselTag = data.Tag;
+		SceneId = data.SceneID;
 		IsAlwaysVisible = data.IsAlwaysVisible;
 		ReadInfoFromJson();
-		VesselData.RadarSignature = RadarSignature;
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(this);
-		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Forward.ToVector3D(), data.Up.ToVector3D());
+		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Rotation.ToQuaternionD());
 		if (data.OrbitData != null)
 		{
 			Orbit.ParseNetworkData(data.OrbitData, resetOrbit: true);
 		}
-		Rotation = data.Rotation.ToVector3D();
+		AngularVelocityPerAxis = data.AngularVelocity.ToVector3D();
 		await Task.Run(() => {
 			foreach (var det in data.MiningPoints)
 			{

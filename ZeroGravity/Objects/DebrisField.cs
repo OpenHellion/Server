@@ -214,7 +214,7 @@ public class DebrisField
 		await ship.SetHealthAsync((float)(ttl * ship.ExposureDamage * Server.VesselDecayRateMultiplier));
 		Vector3D thrust = velocityDirection * Data.LargeFragmentsVelocity;
 		Vector3D offset2 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * Data.LargeFragmentsZoneRadius * 2.0;
-		ship.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
+		ship.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
 		ship.Orbit.InitFromStateVectors(ship.Orbit.Parent, ship.Orbit.Position + offset2, ship.Orbit.Velocity + thrust, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 	}
 

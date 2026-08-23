@@ -32,19 +32,26 @@ public class Pivot : ArtificialBody
 	}
 
 	public Pivot(Player child, SpaceObjectVessel vessel)
-		: base(child.FakeGuid, initializeOrbit: true, vessel.Position, vessel.Velocity, Vector3D.Forward, Vector3D.Up)
+		: base(child.FakeGuid, initializeOrbit: true, vessel.Position, vessel.Velocity, QuaternionD.Identity)
 	{
 		Child = child;
 	}
 
 	public Pivot(SpaceObjectTransferable child, ArtificialBody abody)
-		: base(child.Guid, initializeOrbit: true, abody.Position, abody.Velocity, Vector3D.Forward, Vector3D.Up)
+		: base(child.Guid, initializeOrbit: true, abody.Position, abody.Velocity, QuaternionD.Identity)
 	{
 		Child = child;
 	}
 
 	public Pivot(SpaceObjectTransferable child, Vector3D position, Vector3D velocity)
-		: base(child.Guid, initializeOrbit: true, position, velocity, Vector3D.Forward, Vector3D.Up)
+		: base(child.Guid, initializeOrbit: true, position, velocity, QuaternionD.Identity)
+	{
+		Child = child;
+	}
+
+	// A player is known to the world by its fake guid, so its pivot must share that instead.
+	public Pivot(Player child, Vector3D position, Vector3D velocity)
+		: base(child.FakeGuid, initializeOrbit: true, position, velocity, QuaternionD.Identity)
 	{
 		Child = child;
 	}

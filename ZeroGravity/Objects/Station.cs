@@ -20,8 +20,8 @@ public class Station : SpaceObjectVessel
 
 	public bool CanSpawnShips => playerSpawnPoints.Count > 0;
 
-	public Station(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, Vector3D forward, Vector3D up)
-		: base(guid, initializeOrbit, position, velocity, forward, up)
+	public Station(long guid, bool initializeOrbit, Vector3D position, Vector3D velocity, QuaternionD rotation)
+		: base(guid, initializeOrbit, position, velocity, rotation)
 	{
 	}
 

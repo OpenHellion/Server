@@ -70,9 +70,9 @@ public class BulletPhysicsController
 			}
 		}
 		baseCompound.UserObject = vessel;
-		Matrix offset = BulletHelper.AffineTransformation(1f, Quaternion.Identity, -vessel.VesselData.CollidersCenterOffset.ToVector3D().ToVector3());
+		Matrix offset = BulletHelper.AffineTransformation(1f, Quaternion.Identity, -vessel.CollidersCenterOffset.ToVector3D().ToVector3());
 		compound.AddChildShape(offset, baseCompound);
-		Quaternion qua = BulletHelper.LookRotation(vessel.Forward.ToVector3(), vessel.Up.ToVector3());
+		Quaternion qua = vessel.Rotation.ToQuaternion();
 		Matrix position = BulletHelper.AffineTransformation(1f, qua, vessel.Position.ToVector3());
 		double AdditionalMass = 0.0;
 		if (vessel.AllDockedVessels.Count > 0)
@@ -81,7 +81,7 @@ public class BulletPhysicsController
 			{
 				AdditionalMass += p.Mass;
 				CompoundShape newCompound = new CompoundShape();
-				Matrix relative = BulletHelper.AffineTransformation(1f, p.RelativeRotationFromMainParent.ToQuaternion(), p.RelativePositionFromMainParent.ToVector3() - vessel.VesselData.CollidersCenterOffset.ToVector3D().ToVector3());
+				Matrix relative = BulletHelper.AffineTransformation(1f, p.RelativeRotationFromMainParent.ToQuaternion(), p.RelativePositionFromMainParent.ToVector3() - vessel.CollidersCenterOffset.ToVector3D().ToVector3());
 				foreach (VesselPrimitiveColliderData data2 in p.PrimitiveCollidersData)
 				{
 					CollisionShape shape2 = null;

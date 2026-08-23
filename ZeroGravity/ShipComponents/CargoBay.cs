@@ -125,7 +125,7 @@ public class CargoBay : ICargo, IPersistantObject
 		}
 		await NetworkController.SendToClientsSubscribedTo(new ShipStatsMessage
 		{
-			GUID = ParentVessel.Guid,
+			Guid = ParentVessel.Guid,
 			Temperature = ParentVessel.Temperature,
 			Health = ParentVessel.Health,
 			Armor = ParentVessel.Armor,

@@ -102,6 +102,12 @@ public struct Vector3D
 		return System.Math.Sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z);
 	}
 
+	public static double DistanceSquared(Vector3D a, Vector3D b)
+	{
+		Vector3D vector = new Vector3D(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+		return vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z;
+	}
+
 	public static double Dot(Vector3D lhs, Vector3D rhs)
 	{
 		return lhs.X * rhs.X + lhs.Y * rhs.Y + lhs.Z * rhs.Z;
@@ -126,6 +132,16 @@ public struct Vector3D
 	public static Vector3D Min(Vector3D lhs, Vector3D rhs)
 	{
 		return new Vector3D(System.Math.Min(lhs.X, rhs.X), System.Math.Min(lhs.Y, rhs.Y), System.Math.Min(lhs.Z, rhs.Z));
+	}
+
+	/// <summary>
+	/// 	Returns a vector that is made from the absolute value of each of the components of the input vector (makes all values positive).
+	/// </summary>
+	/// <param name="value">Value to make absolute.</param>
+	/// <returns></returns>
+	public static Vector3D Abs(Vector3D value)
+	{
+		return new Vector3D(System.Math.Abs(value.X), System.Math.Abs(value.Y), System.Math.Abs(value.Z));
 	}
 
 	public static Vector3D MoveTowards(Vector3D current, Vector3D target, double maxDistanceDelta)

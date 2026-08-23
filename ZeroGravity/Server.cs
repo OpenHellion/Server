@@ -12,6 +12,7 @@ using BulletSharp;
 using OpenHellion;
 using OpenHellion.IO;
 using OpenHellion.Net;
+using OpenHellion.Net.Message;
 using OpenHellion.Social;
 using OpenHellion.Social.Message;
 using ZeroGravity.BulletPhysics;
@@ -24,7 +25,7 @@ using ZeroGravity.Spawn;
 
 namespace ZeroGravity;
 
-public class Server
+public sealed class Server
 {
 	public class DynamicObjectsRespawn
 	{
@@ -269,12 +270,6 @@ public class Server
 		}
 	}
 
-	public const double RcsThrustMultiplier = 1.0;
-
-	public const double RcsRotationMultiplier = 1.0;
-
-	public const double CelestialBodyRadiusMultiplier = 1.0;
-
 	public static Properties Properties;
 
 	public static string ConfigDir = "";
@@ -289,13 +284,13 @@ public class Server
 
 	public const double CelestialBodyDeathDistance = 10000.0;
 
-	private readonly ConcurrentDictionary<long, SpaceObject> _spaceObjects = new();
+	public SpatialCollection<SpaceObject> SpaceObjects { get; private set; } = new(100000);
 
 	private readonly ConcurrentDictionary<long, Player> _players = new();
 
-	private ConcurrentBag<Player> _playersToAdd = new ConcurrentBag<Player>();
+	private readonly ConcurrentBag<Player> _playersToAdd = [];
 
-	private ConcurrentBag<Player> _playersToRemove = new ConcurrentBag<Player>();
+	private readonly ConcurrentBag<Player> _playersToRemove = [];
 
 	private readonly ConcurrentDictionary<long, SpaceObjectVessel> _vessels = new();
 
@@ -306,8 +301,6 @@ public class Server
 	private readonly List<UpdateTimer> _timers = new List<UpdateTimer>();
 
 	public readonly SolarSystem SolarSystem;
-
-	private static Server _serverInstance;
 
 	public static bool IsRunning;
 
@@ -359,11 +352,7 @@ public class Server
 
 	public static double ActivateRepairPointChanceMultiplier = 1.0;
 
-	public const double DamageUpgradePartChanceMultiplier = 1.0;
-
 	public static float StartingSetDespawnTimeSec = 900f;
-
-	private bool _updateDataInSeparateThread;
 
 	public static int JunkItemsCleanupScope = 1;
 
@@ -390,8 +379,6 @@ public class Server
 	private const double MovementMessageSendInterval = 1;
 
 	private static double _movementMessageTimer;
-
-	public static volatile int MainThreadId;
 
 	public readonly BulletPhysicsController PhysicsController;
 
@@ -433,26 +420,50 @@ public class Server
 
 	public ImmutableList<Player> AllPlayers => [.. _players.Values];
 
-	public ImmutableList<SpaceObject> AllSpaceObjects => [.. _spaceObjects.Values];
-
-	public static Server Instance => _serverInstance;
+	public static Server Instance { get; private set; }
 
 	public TimeSpan RunTime => DateTime.UtcNow - _serverStartTime;
 
 	public static double SolarSystemTime => Instance.SolarSystem.CurrentTime;
 
+	[Obsolete]
 	public bool DoesObjectExist(long guid)
 	{
-		return _spaceObjects.ContainsKey(guid);
+		return SpaceObjects.Contains(guid);
 	}
 
-	public SpaceObject GetObject(long guid)
+	public SpaceObject GetSpaceObject(long guid)
 	{
-		if (_spaceObjects.TryGetValue(guid, out var o))
+		if (SpaceObjects.TryGet(guid, out var spaceObject))
 		{
-			return o;
+			return spaceObject;
 		}
 		return null;
+	}
+
+	public bool TryGetSpaceObject(long guid, out SpaceObject spaceObject)
+	{
+		return SpaceObjects.TryGet(guid, out spaceObject);
+	}
+
+	public DynamicObject GetDynamicObject(long guid)
+	{
+		if (SpaceObjects.TryGet(guid, out var spaceObject) && spaceObject is DynamicObject obj)
+		{
+			return obj;
+		}
+		return null;
+	}
+
+	public bool TryGetDynamicObject(long guid, out DynamicObject dynamicObject)
+	{
+		dynamicObject = null;
+		if (SpaceObjects.TryGet(guid, out var spaceObject) && spaceObject is DynamicObject obj)
+		{
+			dynamicObject = obj;
+			return true;
+		}
+		return false;
 	}
 
 	/// <summary>
@@ -479,7 +490,7 @@ public class Server
 
 	public Item GetItem(long guid)
 	{
-		if (_spaceObjects.TryGetValue(guid, out SpaceObject value) && value is DynamicObject obj)
+		if (SpaceObjects.TryGet(guid, out SpaceObject value) && value is DynamicObject obj)
 		{
 			return obj.Item;
 		}
@@ -494,7 +505,7 @@ public class Server
 			return;
 		}
 		_players[player.Guid] = player;
-		_spaceObjects[player.FakeGuid] = player;
+		SpaceObjects.TryAdd(player.FakeGuid, player);
 	}
 
 	public void Add(SpaceObjectVessel vessel)
@@ -506,12 +517,12 @@ public class Server
 		}
 
 		_vessels[vessel.Guid] = vessel;
-		_spaceObjects[vessel.Guid] = vessel;
+		SpaceObjects.TryAdd(vessel.Guid, vessel, vessel.Position);
 	}
 
 	public void Add(DynamicObject dynamicObject)
 	{
-		_spaceObjects[dynamicObject.Guid] = dynamicObject;
+		SpaceObjects.TryAdd(dynamicObject.Guid, dynamicObject);
 		if (dynamicObject.Item is IUpdateable)
 		{
 			_updateableDynamicObjects[dynamicObject.Guid] = dynamicObject;
@@ -520,7 +531,7 @@ public class Server
 
 	public void Add(Corpse corpse)
 	{
-		_spaceObjects[corpse.Guid] = corpse;
+		SpaceObjects.TryAdd(corpse.Guid, corpse);
 	}
 
 	public void Remove(Player player)
@@ -531,31 +542,30 @@ public class Server
 			return;
 		}
 		_players.TryRemove(player.Guid, out _);
-		_spaceObjects.TryRemove(player.FakeGuid, out _);
+		SpaceObjects.TryRemove(player.FakeGuid, out _);
 	}
 
 	public void Remove(SpaceObjectVessel vessel)
 	{
 		_vessels.TryRemove(vessel.Guid, out _);
-		_spaceObjects.TryRemove(vessel.Guid, out _);
+		SpaceObjects.TryRemove(vessel.Guid, out _);
 	}
 
 	public void Remove(DynamicObject dobj)
 	{
-		_spaceObjects.TryRemove(dobj.Guid, out _);
+		SpaceObjects.TryRemove(dobj.Guid, out _);
 		_updateableDynamicObjects.TryRemove(dobj.Guid, out _);
 	}
 
 	public void Remove(Corpse corpse)
 	{
-		_spaceObjects.TryRemove(corpse.Guid, out _);
+		SpaceObjects.TryRemove(corpse.Guid, out _);
 	}
 
 	public Server()
 	{
-		MainThreadId = Environment.CurrentManagedThreadId;
 		IsRunning = true;
-		_serverInstance = this;
+		Instance = this;
 		PhysicsController = new BulletPhysicsController();
 		SolarSystem = new SolarSystem();
 		LoadServerSettings();
@@ -665,46 +675,46 @@ public class Server
 
 	private void LoadServerSettings()
 	{
-		Properties.GetProperty("server_tick_count", ref _numberOfTicks);
-		Properties.GetProperty("game_port", ref GamePort);
-		Properties.GetProperty("status_port", ref StatusPort);
-		Properties.GetProperty("http_key", ref SocialServerConnection.HttpKey);
-		Properties.GetProperty("main_server_ip", ref SocialServerConnection.IpAddress);
-		Properties.GetProperty("main_server_port", ref SocialServerConnection.Port);
-		string admins = "";
-		Properties.GetProperty("server_admins", ref admins);
-		string[] adminsArray = admins.Split(',');
-		_serverAdmins = adminsArray.Where((string m) => m != "").ToList();
-		Properties.GetProperty("solar_system_time", ref _solarSystemStartTime);
-		Properties.GetProperty("save_interval", ref PersistenceSaveInterval);
-		Properties.GetProperty("max_players", ref NetworkController.MaxPlayers);
-		Properties.GetProperty("number_of_save_files", ref MaxNumberOfSaveFiles);
+		Properties.TryGetPropertySafe("server_tick_count", ref _numberOfTicks);
+		Properties.TryGetPropertySafe("game_port", ref GamePort);
+		Properties.TryGetPropertySafe("status_port", ref StatusPort);
+		Properties.TryGetPropertySafe("http_key", ref SocialServerConnection.HttpKey);
+		Properties.TryGetPropertySafe("main_server_ip", ref SocialServerConnection.IpAddress);
+		Properties.TryGetPropertySafe("main_server_port", ref SocialServerConnection.Port);
+		if (Properties.TryGetProperty("server_admins", out string admins))
+		{
+			string[] adminsArray = admins.Split(',');
+			_serverAdmins = adminsArray.Where((string m) => m != "").ToList();
+		}
+		Properties.TryGetPropertySafe("solar_system_time", ref _solarSystemStartTime);
+		Properties.TryGetPropertySafe("save_interval", ref PersistenceSaveInterval);
+		Properties.TryGetPropertySafe("max_players", ref NetworkController.MaxPlayers);
+		Properties.TryGetPropertySafe("number_of_save_files", ref MaxNumberOfSaveFiles);
 		MaxNumberOfSaveFiles = MathHelper.Clamp(MaxNumberOfSaveFiles, 1, 100);
-		Properties.GetProperty("vessel_decay_rate_multiplier", ref VesselDecayRateMultiplier);
-		Properties.GetProperty("vessel_decay_grace_period", ref VesselDecayGracePeriod);
-		Properties.GetProperty("vessel_explosion_radius_multiplier", ref VesselExplosionRadiusMultiplier);
-		Properties.GetProperty("vessel_explosion_damage_multiplier", ref VesselExplosionDamageMultiplier);
-		Properties.GetProperty("self_destruct_explosion_radius_multiplier", ref SelfDestructExplosionRadiusMultiplier);
-		Properties.GetProperty("self_destruct_explosion_damage_multiplier", ref SelfDestructExplosionDamageMultiplier);
-		Properties.GetProperty("vessel_collision_damage_multiplier", ref VesselCollisionDamageMultiplier);
-		Properties.GetProperty("debris_vessel_explosion_radius_multiplier", ref DebrisVesselExplosionRadiusMultiplier);
-		Properties.GetProperty("debris_vessel_explosion_damage_multiplier", ref DebrisVesselExplosionDamageMultiplier);
-		Properties.GetProperty("debris_vessel_collision_damage_multiplier", ref DebrisVesselCollisionDamageMultiplier);
-		Properties.GetProperty("activate_repair_point_chance_multiplier", ref ActivateRepairPointChanceMultiplier);
-		Properties.GetProperty("starting_set_despawn_time", ref StartingSetDespawnTimeSec);
-		Properties.GetProperty("server_restart_time", ref ServerRestartTimeSec);
-		Properties.GetProperty("update_data_in_separate_thread", ref _updateDataInSeparateThread);
-		Properties.GetProperty("junk_items_cleanup_scope", ref JunkItemsCleanupScope);
-		Properties.GetProperty("junk_items_time_to_live", ref JunkItemsTimeToLive);
-		Properties.GetProperty("junk_items_cleanup_interval", ref JunkItemsCleanupInterval);
-		Properties.GetProperty("can_warp_through_celestial_bodies", ref CanWarpThroughCelestialBodies);
-		Properties.GetProperty("max_angular_velocity_per_axis", ref MaxAngularVelocityPerAxis);
-		Properties.GetProperty("arena_ship_respawn_timer", ref SpaceObjectVessel.ArenaRescueTime);
-		Properties.GetProperty("print_debug_objects", ref _printDebugObjects);
-		Properties.GetProperty("spawn_manager_print_categories", ref SpawnManager.Settings.PrintCategories);
-		Properties.GetProperty("spawn_manager_print_spawn_rules", ref SpawnManager.Settings.PrintSpawnRules);
-		Properties.GetProperty("spawn_manager_print_item_attach_points", ref SpawnManager.Settings.PrintItemAttachPoints);
-		Properties.GetProperty("spawn_manager_print_item_type_ids", ref SpawnManager.Settings.PrintItemTypeIDs);
+		Properties.TryGetPropertySafe("vessel_decay_rate_multiplier", ref VesselDecayRateMultiplier);
+		Properties.TryGetPropertySafe("vessel_decay_grace_period", ref VesselDecayGracePeriod);
+		Properties.TryGetPropertySafe("vessel_explosion_radius_multiplier", ref VesselExplosionRadiusMultiplier);
+		Properties.TryGetPropertySafe("vessel_explosion_damage_multiplier", ref VesselExplosionDamageMultiplier);
+		Properties.TryGetPropertySafe("self_destruct_explosion_radius_multiplier", ref SelfDestructExplosionRadiusMultiplier);
+		Properties.TryGetPropertySafe("self_destruct_explosion_damage_multiplier", ref SelfDestructExplosionDamageMultiplier);
+		Properties.TryGetPropertySafe("vessel_collision_damage_multiplier", ref VesselCollisionDamageMultiplier);
+		Properties.TryGetPropertySafe("debris_vessel_explosion_radius_multiplier", ref DebrisVesselExplosionRadiusMultiplier);
+		Properties.TryGetPropertySafe("debris_vessel_explosion_damage_multiplier", ref DebrisVesselExplosionDamageMultiplier);
+		Properties.TryGetPropertySafe("debris_vessel_collision_damage_multiplier", ref DebrisVesselCollisionDamageMultiplier);
+		Properties.TryGetPropertySafe("activate_repair_point_chance_multiplier", ref ActivateRepairPointChanceMultiplier);
+		Properties.TryGetPropertySafe("starting_set_despawn_time", ref StartingSetDespawnTimeSec);
+		Properties.TryGetPropertySafe("server_restart_time", ref ServerRestartTimeSec);
+		Properties.TryGetPropertySafe("junk_items_cleanup_scope", ref JunkItemsCleanupScope);
+		Properties.TryGetPropertySafe("junk_items_time_to_live", ref JunkItemsTimeToLive);
+		Properties.TryGetPropertySafe("junk_items_cleanup_interval", ref JunkItemsCleanupInterval);
+		Properties.TryGetPropertySafe("can_warp_through_celestial_bodies", ref CanWarpThroughCelestialBodies);
+		Properties.TryGetPropertySafe("max_angular_velocity_per_axis", ref MaxAngularVelocityPerAxis);
+		Properties.TryGetPropertySafe("arena_ship_respawn_timer", ref SpaceObjectVessel.ArenaRescueTime);
+		Properties.TryGetPropertySafe("print_debug_objects", ref _printDebugObjects);
+		Properties.TryGetPropertySafe("spawn_manager_print_categories", ref SpawnManager.Settings.PrintCategories);
+		Properties.TryGetPropertySafe("spawn_manager_print_spawn_rules", ref SpawnManager.Settings.PrintSpawnRules);
+		Properties.TryGetPropertySafe("spawn_manager_print_item_attach_points", ref SpawnManager.Settings.PrintItemAttachPoints);
+		Properties.TryGetPropertySafe("spawn_manager_print_item_type_ids", ref SpawnManager.Settings.PrintItemTypeIDs);
 	}
 
 	public async Task<Player> GetOrCreateConnectedPlayerAsync(long guid, string playerId, CharacterData characterData)
@@ -855,10 +865,8 @@ public class Server
 	{
 		EventSystem.AddSyncRequestListener<PlayerSpawnRequest>(PlayerSpawnRequestListener);
 		EventSystem.AddSyncRequestListener<AvailableSpawnPointsRequest>(AvailableSpawnPointsRequestListener);
-		EventSystem.AddListener<PlayerRespawnRequest>(PlayerRespawnRequestListener);
-		EventSystem.AddListener<SpawnObjectsRequest>(SpawnObjectsRequestListener);
-		EventSystem.AddListener<SubscribeToObjectsRequest>(SubscribeToSpaceObjectListener);
-		EventSystem.AddListener<UnsubscribeFromObjectsRequest>(UnsubscribeFromSpaceObjectListener);
+		EventSystem.AddSyncRequestListener<ObjectsInfoRequest>(ObjectsInfoRequestListener);
+		EventSystem.AddSyncRequestListener<MapDataRequest>(MapDataRequestListener);
 		EventSystem.AddListener<TextChatMessage>(TextChatMessageListener);
 		EventSystem.AddListener<TransferResourceMessage>(TransferResourcesMessageListener);
 		EventSystem.AddListener<FabricateItemMessage>(FabricateItemMessageListener);
@@ -914,7 +922,7 @@ public class Server
 			{
 				toCargo2 = toVessel.MainDistributionManager.GetResourceContainer(new VesselObjectID(message.ToVesselGuid, message.ToInSceneID));
 			}
-			DynamicObject dobj2 = fromVessel.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item is
+			DynamicObject dobj2 = fromVessel.DynamicObjects.Select(Instance.GetDynamicObject).FirstOrDefault((DynamicObject m) => m?.Item is
 			{
 				AttachPointID: not null
 			} && m.Item.AttachPointID.InSceneID == message.FromInSceneID);
@@ -942,7 +950,7 @@ public class Server
 			{
 				fromCargo2 = fromVessel.MainDistributionManager.GetResourceContainer(new VesselObjectID(message.FromVesselGuid, message.FromInSceneID));
 			}
-			DynamicObject dobj = toVessel.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item is
+			DynamicObject dobj = toVessel.DynamicObjects.Select(Instance.GetDynamicObject).FirstOrDefault((DynamicObject m) => m?.Item is
 			{
 				AttachPointID: not null
 			} && m.Item.AttachPointID.InSceneID == message.ToInSceneID);
@@ -1104,7 +1112,7 @@ public class Server
 	{
 		var message = data as HurtPlayerMessage;
 		Player pl = GetPlayer(message.Sender);
-		await pl.TakeDamage(message.Duration, message.Damage);
+		await pl.TakeDamage(message.Duration, "hurt-trigger", message.Damage);
 	}
 
 	private async void ConsoleMessageListener(NetworkData data)
@@ -1221,21 +1229,11 @@ public class Server
 				Vector3D spawnItemPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
 				if (parts[1].ToLower() == "corpse")
 				{
-					Corpse corpse = new Corpse(player)
+					// TODO: This needs a parent.
+					_ = new Corpse(player)
 					{
 						LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward
 					};
-					await NetworkController.SendToClientsSubscribedTo(new SpawnObjectsResponse
-					{
-						Data =
-						[
-							new SpawnCorpseResponseData
-							{
-								GUID = corpse.Guid,
-								Details = corpse.GetDetails()
-							}
-						]
-					}, -1L, player.Parent);
 					return;
 				}
 				int tier = 1;
@@ -1316,7 +1314,7 @@ public class Server
 							Vector3D offset;
 							if (parent is SpaceObjectVessel vessel6)
 							{
-								offset = QuaternionD.LookRotation(vessel6.Forward, vessel6.Up) * (player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0);
+								offset = vessel6.Rotation * (player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0);
 							}
 							else
 							{
@@ -1325,12 +1323,12 @@ public class Server
 							if (GameScenes.Ranges.IsAsteroid(v6))
 							{
 								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, [parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid], null, offset * 10.0, null, null, tag, checkPosition: false);
-								asteroid.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
+								asteroid.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
 							}
 							else
 							{
 								Ship ship2 = await Ship.CreateNewShip(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid }, null, offset, null, null, tag, checkPosition: false);
-								ship2.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
+								ship2.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
 							}
 							break;
 						}
@@ -1351,11 +1349,11 @@ public class Server
 				double distance = 500.0;
 				double velocity = 50.0;
 				double radius2 = 10.0;
-				Vector3D offset3 = parent is not SpaceObjectVessel vessel ? player.LocalRotation * Vector3D.Forward * distance : QuaternionD.LookRotation(vessel.Forward, vessel.Up) * player.LocalRotation * Vector3D.Forward * distance;
+				Vector3D offset3 = parent is not SpaceObjectVessel vessel ? player.LocalRotation * Vector3D.Forward * distance : vessel.Rotation * player.LocalRotation * Vector3D.Forward * distance;
 				Ship ship3 = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_CorridorModule, "", -1L, [parent.Guid], null, offset3, null, null, checkPosition: false);
 				Vector3D thrust2 = -offset3.Normalized * velocity;
 				Vector3D offset4 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * radius2 * 2.0;
-				ship3.Rotation = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
+				ship3.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
 				ship3.Orbit.InitFromStateVectors(ship3.Orbit.Parent, ship3.Orbit.Position + offset4, ship3.Orbit.Velocity + thrust2, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 				return;
 			}
@@ -1396,16 +1394,16 @@ public class Server
 				long guid = player.Parent.Guid;
 				if (parent is SpaceObjectVessel vessel7)
 				{
-					offset2 = QuaternionD.LookRotation(vessel7.MainVessel.Forward, vessel7.MainVessel.Up) * (offset2 - vessel7.VesselData.CollidersCenterOffset.ToVector3D());
-					direction = QuaternionD.LookRotation(vessel7.MainVessel.Forward, vessel7.MainVessel.Up) * direction;
+					offset2 = vessel7.MainVessel.Rotation * (offset2 - vessel7.CollidersCenterOffset.ToVector3D());
+					direction = vessel7.MainVessel.Rotation * direction;
 					guid = vessel7.MainVessel.Guid;
 				}
 				Ship ship = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_DockableContainer, "PHTORP MK4", -1L, new List<long> { guid }, null, offset2, null, null, checkPosition: false);
-				ship.Forward = direction;
+				ship.Rotation = QuaternionD.LookRotation(direction);
 				Vector3D thrust = direction * 80.0;
 				ship.Orbit.InitFromStateVectors(ship.Orbit.Parent, ship.Orbit.Position, ship.Orbit.Velocity + thrust, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 				await ship.SetHealthAsync(5f);
-				ship.VesselData.VesselName = "Torpedo";
+				ship.VesselName = "Torpedo";
 				ship.Mass = 5000000.0;
 				ship.MaxHealth = 50000f;
 				if (parts.Length == 2)
@@ -1423,14 +1421,12 @@ public class Server
 			}
 			if ((parts[0] == "countships" || parts[0] == "countitems") && parts.Length is 1 or 2)
 			{
-				double radius = 2000.0;
+				double radius = 2000;
 				string msg = "";
-				List<SpaceObjectVessel> artificialBodies;
+				List<SpaceObjectVessel> vessels;
 				if (parts.Length == 1 || (parts.Length == 2 && double.TryParse(parts[1], out radius)))
 				{
-					artificialBodies = (from m in SolarSystem.GetArtificialBodieslsInRange(parent as ArtificialBody, radius)
-						where m is SpaceObjectVessel && m != parent
-						select m as SpaceObjectVessel).ToList();
+					vessels = [.. SolarSystem.GetVesselsInRange(parent.Position, radius, parent.Guid)];
 				}
 				else
 				{
@@ -1445,17 +1441,15 @@ public class Server
 					}
 					CelestialBody cb = SolarSystem.GetCelestialBodies().FirstOrDefault((CelestialBody m) => m.GUID == cbd.GUID);
 					radius = cb.Orbit.GravityInfluenceRadius;
-					artificialBodies = (from m in SolarSystem.GetArtificialBodieslsInRange(cb, Vector3D.Zero, radius)
-						where m is SpaceObjectVessel
-						select m as SpaceObjectVessel).ToList();
+					vessels = [.. from m in SolarSystem.GetNearbySpaceObjects(cb.Position, radius) where m is SpaceObjectVessel vessel && vessel.Orbit.Parent.CelestialBody == cb select m as SpaceObjectVessel];
 					msg = cbd.Name + ", r=" + (int)(radius / 1000.0) + "km";
 				}
-				Dictionary<string, int> count = new Dictionary<string, int>();
+				Dictionary<string, int> count = [];
 				if (parts[0] == "countships")
 				{
-					foreach (SpaceObjectVessel ves2 in artificialBodies)
+					foreach (SpaceObjectVessel ves2 in vessels)
 					{
-						string name2 = ves2.SceneID.ToString();
+						string name2 = ves2.SceneId.ToString();
 						if (!count.ContainsKey(name2))
 						{
 							count[name2] = 0;
@@ -1465,18 +1459,15 @@ public class Server
 				}
 				else if (parts[0] == "countitems")
 				{
-					foreach (SpaceObjectVessel ves in artificialBodies)
+					foreach (SpaceObjectVessel ves in vessels)
 					{
-						foreach (Item item in from m in _spaceObjects.Values
-							where m is DynamicObject dynamicObject && dynamicObject.Parent == ves && dynamicObject.Item != null
-							select (m as DynamicObject).Item)
+						foreach (long guid in ves.DynamicObjects)
 						{
-							string name = item.TypeName;
-							if (!count.ContainsKey(name))
+							if (TryGetDynamicObject(guid, out var dobj) && dobj.Parent == ves && dobj.Item != null)
 							{
-								count[name] = 0;
+								string name = dobj.Item.TypeName;
+								count[name] = count.GetValueOrDefault(name) + 1;
 							}
-							count[name]++;
 						}
 					}
 				}
@@ -1553,7 +1544,7 @@ public class Server
 					}
 					else
 					{
-						myAb.Orbit.RelativePosition -= myAb.Forward * (target.Radius + 100.0);
+						myAb.Orbit.RelativePosition -= myAb.Rotation * Vector3D.Forward * (target.Radius + 100.0);
 					}
 					myAb.Orbit.InitFromCurrentStateVectors(SolarSystem.CurrentTime);
 					myAb.Orbit.UpdateOrbit();
@@ -1645,7 +1636,7 @@ public class Server
 				if (parent is SpaceObjectVessel vessel3)
 				{
 					await vessel3.MainVessel.DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
-					vessel3.MainVessel.Orbit.RelativePosition += vessel3.Forward * dist * 1000.0;
+					vessel3.MainVessel.Orbit.RelativePosition += vessel3.Rotation * Vector3D.Forward * dist * 1000.0;
 					vessel3.MainVessel.Orbit.InitFromCurrentStateVectors(SolarSystemTime);
 					vessel3.MainVessel.Orbit.UpdateOrbit();
 				}
@@ -1655,7 +1646,7 @@ public class Server
 				string msg2;
 				if (parent is SpaceObjectVessel vessel)
 				{
-					msg2 = "Inside vessel '" + vessel.VesselData.VesselName + "' near " + (CelestialBodyGUID)vessel.Orbit.Parent.CelestialBody.GUID;
+					msg2 = "Inside vessel '" + vessel.VesselName + "' near " + (CelestialBodyGUID)vessel.Orbit.Parent.CelestialBody.GUID;
 					foreach (SpawnRule sr in SpawnManager.spawnRules)
 					{
 						if (sr.SpawnedVessels.FirstOrDefault((SpaceObjectVessel m) => m == vessel) != null)
@@ -1742,7 +1733,7 @@ public class Server
 				TimeSpan t = new TimeSpan(0, 0, (int)sh.TimeToLive);
 				tcm.MessageParam = new string[3]
 				{
-					sh.VesselData.VesselRegistration,
+					sh.VesselRegistration,
 					((CelestialBodyGUID)sh.Orbit.Parent.CelestialBody.GUID).ToString(),
 					t.ToString()
 				};
@@ -1803,99 +1794,22 @@ public class Server
 
 				ArtificialBody parentBody = pl.Parent as ArtificialBody;
 
-				spawnResponse.ParentID = parentBody.Guid;
-				spawnResponse.ParentType = parentBody.ObjectType;
-				spawnResponse.MainVesselID = parentBody.Guid;
+				spawnResponse.ParentGuid = parentBody.Guid;
 
-				SpaceObjectVessel mainVessel = parentBody as SpaceObjectVessel;
-				if (mainVessel is { IsDocked: true })
-				{
-					mainVessel = mainVessel.DockedToMainVessel;
-					spawnResponse.MainVesselID = mainVessel.Guid;
-				}
-
-				ArtificialBody mainAb = mainVessel != null ? mainVessel : parentBody;
-				spawnResponse.ParentTransform = new ObjectTransform
-				{
-					GUID = mainAb.Guid,
-					Type = mainAb.ObjectType,
-					Forward = mainAb.Forward.ToFloatArray(),
-					Up = mainAb.Up.ToFloatArray()
-				};
-
-				if (parentBody != null)
-				{
-					List<SpaceObjectVessel> nearbyVessels = [.. from m in SolarSystem.GetArtificialBodieslsInRange(parentBody, 10000.0)
-													where m is SpaceObjectVessel
-													select m as SpaceObjectVessel];
-					if (parentBody is SpaceObjectVessel parentVessel)
-					{
-						nearbyVessels.Add(parentVessel);
-					}
-
-					HashSet<GameScenes.SceneId> allNearbyVessels = [];
-					foreach (SpaceObjectVessel vessel in nearbyVessels)
-					{
-						allNearbyVessels.Add(vessel.SceneID);
-						foreach (SpaceObjectVessel dockedVessels in vessel.AllDockedVessels)
-						{
-							allNearbyVessels.Add(dockedVessels.SceneID);
-						}
-					}
-					spawnResponse.Scenes = [.. allNearbyVessels];
-				}
-
-				if (mainVessel is Ship mainShip)
-				{
-					spawnResponse.DockedVessels = mainShip.GetDockedVesselsData();
-					spawnResponse.VesselData = mainShip.VesselData;
-					spawnResponse.VesselObjects = mainShip.GetVesselObjects();
-				}
-				else if (mainVessel is Asteroid asteroid)
-				{
-					spawnResponse.VesselData = asteroid.VesselData;
-					spawnResponse.MiningPoints = asteroid.MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList();
-				}
-
-				if (mainAb.Orbit.IsOrbitValid)
-				{
-					spawnResponse.ParentTransform.Orbit = new OrbitData
-					{
-						ParentGUID = mainAb.Orbit.Parent.CelestialBody.GUID
-					};
-					mainAb.Orbit.FillOrbitData(ref spawnResponse.ParentTransform.Orbit);
-				}
-				else
-				{
-					spawnResponse.ParentTransform.Realtime = new RealtimeData
-					{
-						ParentGUID = mainAb.Orbit.Parent.CelestialBody.GUID,
-						Position = mainAb.Orbit.RelativePosition.ToArray(),
-						Velocity = mainAb.Orbit.Velocity.ToArray()
-					};
-				}
+				ArtificialBody mainVessel = parentBody is SpaceObjectVessel parentVessel ? parentVessel.MainVessel : parentBody;
+				spawnResponse.AllNearbySpaceObjects = [.. SolarSystem.BuildPlayerView(pl, mainVessel,
+					SolarSystem.GetArtificialBodiesInRange(pl.Position, SolarSystem.ViewRadius, pl.FakeGuid))];
 
 				if (pl.CurrentSpawnPoint != null
 					&& ((pl.CurrentSpawnPoint.IsPlayerInSpawnPoint && pl.CurrentSpawnPoint.Ship == pl.Parent)
 					|| (pl.CurrentSpawnPoint.Type == SpawnPointType.SimpleSpawn && pl.CurrentSpawnPoint.Executor == null && !pl.IsAlive)))
 				{
-					spawnResponse.SpawnPointID = pl.CurrentSpawnPoint.SpawnPointID;
+					spawnResponse.SpawnPointId = pl.CurrentSpawnPoint.SpawnPointID;
 				}
-				else
-				{
-					spawnResponse.CharacterTransform = new CharacterTransformData
-					{
-						LocalPosition = pl.LocalPosition.ToFloatArray(),
-						LocalRotation = pl.LocalRotation.ToFloatArray()
-					};
-				}
-
-				var playerObjects = pl.DynamicObjects.Values.Select(dobj => dobj.GetDetails()).ToList();
-				spawnResponse.DynamicObjects = playerObjects;
 
 				if (pl.AuthorizedSpawnPoint != null)
 				{
-					spawnResponse.HomeGUID = pl.AuthorizedSpawnPoint.Ship.MainVessel.Guid;
+					spawnResponse.HomeGuid = pl.AuthorizedSpawnPoint.Ship.MainVessel.Guid;
 				}
 
 				if (ServerRestartTimeSec > 0.0)
@@ -1905,15 +1819,23 @@ public class Server
 
 				spawnResponse.Quests = [.. pl.Quests.Select((Quest m) => m.GetDetails())];
 				spawnResponse.Blueprints = pl.Blueprints;
-				spawnResponse.NavMapDetails = pl.NavMapDetails;
 				spawnResponse.Health = (int)pl.Health;
 				spawnResponse.IsAdmin = pl.IsAdmin;
+				pl.UpdateAnchor();
+				Vector3D anchorPosition = TryGetSpaceObject(pl.AnchorGuid, out SpaceObject anchor)
+					? anchor.Position
+					: pl.Position;
+
+				spawnResponse.AnchorGuid = pl.AnchorGuid;
+				spawnResponse.OriginWorldPosition = anchorPosition.ToArray();
+				spawnResponse.Position = (pl.Position - anchorPosition).ToFloatArray();
+				spawnResponse.Rotation = pl.Rotation.ToFloatArray();
+				spawnResponse.DynamicObjects = DynamicObject.GetCarriedDetails(pl);
 			}
 			else
 			{
 				spawnResponse.Status = NetworkData.MessageStatus.Failure;
 			}
-			await SolarSystem.SendMovementMessageToPlayer(pl);
 			return spawnResponse;
 		}
 		catch (Exception ex)
@@ -1923,35 +1845,126 @@ public class Server
 		}
 	}
 
-	private void PlayerRespawnRequestListener(NetworkData data)
+	private Task<NetworkData> ObjectsInfoRequestListener(NetworkData data)
 	{
-	}
-
-	private async void SpawnObjectsRequestListener(NetworkData data)
-	{
-		var request = data as SpawnObjectsRequest;
-		if (request.GUIDs == null || request.GUIDs.Count == 0)
-		{
-			return;
-		}
+		var request = data as ObjectsInfoRequest;
+		var response = new ObjectsInfoResponse();
 		Player pl = GetPlayer(request.Sender);
-		if (pl == null)
+		if (request.Guids == null || request.Guids.Length == 0 || pl == null)
 		{
-			return;
+			Debug.LogWarning("Got empty objects info request.");
+			return Task.FromResult<NetworkData>(response);
 		}
 
-		var response = new SpawnObjectsResponse();
+		List<ObjectsInfoResponse.ShipData> ships = [];
+		List<ObjectsInfoResponse.AsteroidData> asteroids = [];
+		List<ObjectsInfoResponse.PivotData> pivots = [];
+		List<DynamicObjectDetails> dynamicObjects = [];
+		List<ObjectsInfoResponse.CorpseData> corpses = [];
+		List<ObjectsInfoResponse.PlayerData> players = [];
 
-		foreach (long guid in request.GUIDs)
+		Vector3D anchorPosition = TryGetSpaceObject(pl.AnchorGuid, out SpaceObject playerAnchor)
+			? playerAnchor.Position
+			: pl.Position;
+
+		foreach (long guid in request.Guids)
 		{
-			SpaceObject spaceObject = GetObject(guid);
-			if (spaceObject is not null && (spaceObject is not SpaceObjectVessel vessel || vessel.IsMainVessel))
+			switch (GetSpaceObject(guid))
 			{
-				response.Data.Add(spaceObject.GetSpawnResponseData(pl));
+				case Ship ship when ship.IsMainVessel:
+					ships.Add(ship.GetShipData(anchorPosition));
+					break;
+				case Asteroid asteroid when asteroid.IsMainVessel:
+					asteroids.Add(asteroid.GetAsteroidData(anchorPosition));
+					break;
+				case Pivot pivot:
+				{
+					pivots.Add(new ObjectsInfoResponse.PivotData
+					{
+						Guid = pivot.Guid,
+						Position = (pivot.Position - anchorPosition).ToFloatArray(),
+						Rotation = pivot.Rotation.ToFloatArray(),
+						PivotType = pivot.ObjectType,
+					});
+					switch (pivot.Child)
+					{
+						case DynamicObject dynamicObjectChild:
+							dynamicObjects.Add(dynamicObjectChild.GetDetails());
+							break;
+						case Corpse corpseChild:
+							corpses.Add(corpseChild.GetCorpseData(pl));
+							break;
+						case Player playerChild when playerChild != pl:
+							players.Add(playerChild.GetPlayerData(pl));
+							break;
+					}
+					break;
+				}
+				case DynamicObject dynamicObject:
+					dynamicObjects.Add(dynamicObject.GetDetails());
+					break;
+				case Corpse corpse:
+					corpses.Add(corpse.GetCorpseData(pl));
+					break;
+				case Player player when player != pl:
+					players.Add(player.GetPlayerData(pl));
+					break;
 			}
 		}
 
-		await NetworkController.SendAsync(request.Sender, response);
+		response.ShipObjects = [.. ships];
+		response.AsteroidObjects = [.. asteroids];
+		response.PivotObjects = [.. pivots];
+		response.DynamicObjects = [.. dynamicObjects];
+		response.CorpseObjects = [.. corpses];
+		response.Players = [.. players];
+		return Task.FromResult<NetworkData>(response);
+	}
+
+	private Task<NetworkData> MapDataRequestListener(NetworkData data)
+	{
+		var response = new MapDataResponse { Objects = [] };
+		Player pl = GetPlayer((data as MapDataRequest).Sender);
+		if (pl == null)
+		{
+			return Task.FromResult<NetworkData>(response);
+		}
+
+		long parentGuid = (pl.Parent as SpaceObjectVessel)?.MainVessel.Guid ?? 0L;
+		List<MapDataResponse.MapDetailsData> mapDetails = [];
+		foreach (SpaceObjectVessel vessel in AllVessels)
+		{
+			if (!vessel.IsMainVessel || vessel.IsDebrisFragment)
+			{
+				continue;
+			}
+
+			bool visible = vessel.IsAlwaysVisible || vessel.IsDistressSignalActive
+				|| vessel.Guid == parentGuid || pl.DiscoveredVessels.Contains(vessel.Guid);
+			if (!visible)
+			{
+				continue;
+			}
+
+			OrbitData orbit = new();
+			vessel.Orbit.FillOrbitData(ref orbit, vessel);
+
+			mapDetails.Add(new MapDataResponse.MapDetailsData
+			{
+				Guid = vessel.Guid,
+				Type = vessel is Asteroid ? SpaceObjectType.Asteroid : SpaceObjectType.Ship,
+				Name = vessel.VesselName,
+				Registration = vessel.VesselRegistration,
+				SpawnRuleId = vessel.SpawnRuleId,
+				Orbit = orbit,
+				RadarSignature = vessel.GetCompoundRadarSignature(),
+				IsAlwaysVisible = vessel.IsAlwaysVisible,
+				IsDistressSignalActive = vessel.IsDistressSignalActive,
+			});
+		}
+
+		response.Objects = [.. mapDetails];
+		return Task.FromResult<NetworkData>(response);
 	}
 
 	private async Task UpdateDynamicObjectsRespawnTimers(double deltaTime)
@@ -1974,10 +1987,10 @@ public class Server
 		}
 		foreach (DynamicObjectsRespawn dos in toRemove)
 		{
-			if (dos.Parent is SpaceObjectVessel && dos.Parent.DynamicObjects.Values.FirstOrDefault((DynamicObject m) => m.Item is
-			    {
-				    AttachPointID: not null
-			    } && dos.ApDetails != null && m.Item.AttachPointID.InSceneID == dos.ApDetails.InSceneID) != null)
+			if (dos.Parent is SpaceObjectVessel && dos.ApDetails != null && dos.Parent.DynamicObjects.Any((long guid)
+				=> TryGetDynamicObject(guid, out var m)
+				&& m.Item?.AttachPointID != null
+				&& m.Item.AttachPointID.InSceneID == dos.ApDetails.InSceneID))
 			{
 				dos.Timer = dos.RespawnTime;
 				continue;
@@ -1997,9 +2010,6 @@ public class Server
 					IDamageable idmg = dobj.Item;
 					idmg.Health = (int)(idmg.MaxHealth * MathHelper.Clamp(MathHelper.RandomRange(dos.MinHealth, dos.MaxHealth), 0f, 1f));
 				}
-				SpawnObjectsResponse res = new SpawnObjectsResponse();
-				res.Data.Add(dobj.GetSpawnResponseData(null));
-				await NetworkController.SendToClientsSubscribedTo(res, -1L, dos.Parent);
 			}
 		}
 		toRemove.Clear();
@@ -2008,10 +2018,21 @@ public class Server
 	private async Task UpdateData(double deltaTime)
 	{
 		SolarSystem.UpdateTime(deltaTime);
+
 		await SolarSystem.UpdatePositions();
+
+		foreach (Player player in AllPlayers)
+		{
+			await player.ApplyPendingMoveRequests();
+			player.UpdateAnchor();
+		}
+
 		PhysicsController.Update();
+
 		await UpdateDynamicObjectsRespawnTimers(deltaTime);
+
 		await UpdateObjectTimers(deltaTime);
+
 		UpdatePlayerInvitationTimers(deltaTime);
 
 		_movementMessageTimer += deltaTime;
@@ -2019,12 +2040,10 @@ public class Server
 		{
 			_movementMessageTimer = 0.0;
 			Player[] players = [.. AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive)];
-			if (players.Length < 1)
+			if (players.Length > 0)
 			{
-				return;
+				await Parallel.ForEachAsync(players, async (pl, ct) => await SolarSystem.SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
 			}
-
-			await Parallel.ForEachAsync(players, async (pl, ct) => await SolarSystem.SendMovementMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
 		}
 
 		if (!VesselsDataUpdate.IsEmpty)
@@ -2121,7 +2140,7 @@ public class Server
 
 	private void PrintObjectsDebug(double time)
 	{
-		Debug.LogInfo("Server stats, objects", _spaceObjects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+		Debug.LogInfo("Server stats, objects", SpaceObjects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
 	}
 
 	public async Task MainLoop()
@@ -2181,7 +2200,7 @@ public class Server
 				AddRemovePlayers();
 				if (_printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
 				{
-					Debug.LogInfoFormat("Server ticked without sleep. Time span ms {0}. Tick ms {1}. Objects {2}. Players {3}. Vessels {4}. Artificial bodies {5}.", (int)span.TotalMilliseconds, _tickMilliseconds, _spaceObjects.Count, _players.Count, _vessels.Count, SolarSystem.ArtificialBodiesCount);
+					Debug.LogInfoFormat("Server ticked without sleep. Time span ms {0}. Tick ms {1}. Objects {2}. Players {3}. Vessels {4}. Artificial bodies {5}.", (int)span.TotalMilliseconds, _tickMilliseconds, SpaceObjects.Count, _players.Count, _vessels.Count, SolarSystem.ArtificialBodiesCount);
 					lastServerTickedWithoutSleepTime = currentTime;
 				}
 				hadSleep = false;
@@ -2262,24 +2281,26 @@ public class Server
 		}
 	}
 
+	/// <summary>
+	/// 	Watches how long it has been since the last tick.
+	/// </summary>
 	private void StartMainLoopWatcher()
 	{
-		double lastSolarSystemTime = SolarSystemTime;
-		bool logEvent = true;
+		double warnedAtSeconds = 0.0;
 		while (IsRunning)
 		{
-			if (SolarSystemTime - lastSolarSystemTime > 5.0)
+			double stalledSeconds = (DateTime.UtcNow - _lastTime).TotalSeconds;
+			if (stalledSeconds > 5.0)
 			{
-				if (logEvent)
+				if (stalledSeconds > warnedAtSeconds * 2.0)
 				{
-					Debug.LogWarning("Main loop stuck for more than 5 sec.");
+					Debug.LogWarning($"Main loop has not completed a tick for {stalledSeconds:F1} sec.");
+					warnedAtSeconds = stalledSeconds;
 				}
-				logEvent = false;
 			}
 			else
 			{
-				lastSolarSystemTime = SolarSystemTime;
-				logEvent = true;
+				warnedAtSeconds = 0.0;
 			}
 			Thread.Sleep(1000);
 		}
@@ -2287,18 +2308,17 @@ public class Server
 
 	private void AddRemovePlayers()
 	{
-		foreach (Player player2 in _playersToAdd)
+		while (_playersToAdd.TryTake(out Player player))
 		{
-			_players[player2.Guid] = player2;
-			_spaceObjects[player2.FakeGuid] = player2;
+			_players[player.Guid] = player;
+			SpaceObjects.TryAdd(player.FakeGuid, player);
 		}
-		_playersToAdd = new ConcurrentBag<Player>();
-		foreach (Player player in _playersToRemove)
+
+		while (_playersToRemove.TryTake(out Player player))
 		{
 			_players.TryRemove(player.Guid, out _);
-			_spaceObjects.TryRemove(player.FakeGuid, out _);
+			SpaceObjects.TryRemove(player.FakeGuid, out _);
 		}
-		_playersToRemove = new ConcurrentBag<Player>();
 	}
 
 	public static void RestartServer(bool clean)
@@ -2323,46 +2343,6 @@ public class Server
 		}
 		Process.Start(fileName, arguments);
 		Process.GetCurrentProcess().Kill();
-	}
-
-	private async void SubscribeToSpaceObjectListener(NetworkData data)
-	{
-		var message = data as SubscribeToObjectsRequest;
-		Player player = GetPlayer(message.Sender);
-		if (player == null)
-		{
-			return;
-		}
-		await Parallel.ForEachAsync(message.GUIDs, async (guid, ct) =>
-		{
-			SpaceObject so = GetObject(guid);
-			if (so != null)
-			{
-				player.SubscribeTo(so);
-				await NetworkController.SendAsync(message.Sender, so.GetInitializeMessage());
-				if (so is ArtificialBody)
-				{
-					player.UpdateArtificialBodyMovement.Add(so.Guid);
-				}
-			}
-		});
-	}
-
-	private void UnsubscribeFromSpaceObjectListener(NetworkData data)
-	{
-		var req = data as UnsubscribeFromObjectsRequest;
-		foreach (long guid in req.GUIDs)
-		{
-			SpaceObject so = GetObject(guid);
-			if (so == null)
-			{
-				break;
-			}
-			if (_players.TryGetValue(req.Sender, out var player))
-			{
-				player.UnsubscribeFrom(so);
-			}
-		}
 	}
 
 	public void SubscribeToTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
@@ -2725,12 +2705,12 @@ public class Server
 			long[] affectedGuiDs = message.AffectedGUIDs;
 			foreach (long affectedGuid in affectedGuiDs)
 			{
-				SpaceObject tmpSp = Instance.GetObject(affectedGuid);
+				SpaceObject tmpSp = Instance.GetSpaceObject(affectedGuid);
 				if ((tmpSp.Position - item.DynamicObj.Position).Magnitude < item.ExplosionRadius * 1.5f && affectedObjects.Add(tmpSp.Guid))
 				{
 					if (tmpSp is Player player)
 					{
-						await player.TakeDamage(HurtType.Explosion, item.ExplosionDamage);
+						await player.TakeDamage(HurtType.Explosion, item.ExplosionDamage, "item-explosion");
 					}
 					if (tmpSp is DynamicObject { Item: not null } dynamicObject)
 					{

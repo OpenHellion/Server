@@ -33,8 +33,6 @@ public class AABB
 	public Vector3D Min { get; private set; }
 	public Vector3D Max { get; private set; }
 
-	public static readonly AABB Empty = new AABB();
-
 	public AABB()
 	{
 		Min = new Vector3D(double.PositiveInfinity, double.PositiveInfinity, double.PositiveInfinity);

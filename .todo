@@ -9,6 +9,8 @@
 [ ] Collect all network messages and flush on tick
 [ ] Merge similar network messages in same tick
 [ ] Dispose all known syncrequests on delete
+[ ] Fix Euler - Radians conversion
+[ ] Fix server constantly being over tick time budget
 
 Long-term
 [ ] Remove subscribe/unsubscribe, send to players in range

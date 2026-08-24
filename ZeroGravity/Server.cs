@@ -414,8 +414,6 @@ public sealed class Server
 
 	private static string _loadPersistenceFromFile;
 
-	private ConsoleReader _consoleReader;
-
 	public ImmutableList<SpaceObjectVessel> AllVessels => [.. _vessels.Values];
 
 	public ImmutableList<Player> AllPlayers => [.. _players.Values];
@@ -787,7 +785,7 @@ public sealed class Server
 				break;
 			default:
 				await ResetSpawnPointsForPlayerAsync(pl, null);
-				foundShip = await SpawnManager.SpawnStartingSetup(setupType.ToString());
+				foundShip = await SpawnManager.SpawnStartingSetup(setupType);
 				if (foundShip != null)
 				{
 					foundSpawnPoint = SpawnManager.SetStartingSetupSpawnPoints(foundShip, pl);
@@ -2183,10 +2181,6 @@ public sealed class Server
 		}
 		SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, UpdateShipSystemsTimer);
 		_mainLoopStarted = true;
-
-		_consoleReader = new();
-		_ = Task.Run(() => _consoleReader.ReadLoopAsync(this, Program.CancelToken.Token));
-
 		new Thread(StartMainLoopWatcher).Start();
 		while (IsRunning)
 		{

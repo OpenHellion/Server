@@ -22,14 +22,6 @@ public static class JsonSerialiser
 		return JsonConvert.SerializeObject(obj, (Newtonsoft.Json.Formatting)format);
 	}
 
-	public static void SerializeToFile(object obj, string filePath, Formatting format = Formatting.Indented)
-	{
-		File.WriteAllText(filePath, JsonConvert.SerializeObject(obj, (Newtonsoft.Json.Formatting)format, new JsonSerializerSettings
-		{
-			NullValueHandling = NullValueHandling.Ignore
-		}));
-	}
-
 	public static void SerializeToFile(object obj, string filePath, Formatting format = Formatting.Indented, JsonSerializerSettings settings = null)
 	{
 		File.WriteAllText(filePath, JsonConvert.SerializeObject(obj, (Newtonsoft.Json.Formatting)format, settings));

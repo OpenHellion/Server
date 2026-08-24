@@ -35,11 +35,11 @@ public static class SpawnManager
 
 	public static List<SpawnRule> spawnRules;
 
-	private static List<SpawnRule> startingSceneSpawnRules = new List<SpawnRule>();
+	private static readonly List<SpawnRule> startingSceneSpawnRules = [];
 
-	private static List<SpawnRule> questSpawnRules = new List<SpawnRule>();
+	private static readonly List<SpawnRule> questSpawnRules = [];
 
-	public static List<SpawnRule> timedSpawnRules = new List<SpawnRule>();
+	public static List<SpawnRule> timedSpawnRules = [];
 
 	public static ConcurrentDictionary<long, Tuple<SpawnRule, SpawnRuleScene, int>> SpawnedVessels = new();
 
@@ -421,9 +421,9 @@ public static class SpawnManager
 		return ret;
 	}
 
-	public static async Task<Ship> SpawnStartingSetup(string name)
+	public static async Task<Ship> SpawnStartingSetup(SpawnSetupType spawnSetup)
 	{
-		SpawnRule sr = startingSceneSpawnRules.OrderBy((SpawnRule m) => MathHelper.RandomNextDouble()).FirstOrDefault((SpawnRule m) => m.Name == name);
+		SpawnRule sr = startingSceneSpawnRules.OrderBy((SpawnRule m) => MathHelper.RandomNextDouble()).FirstOrDefault((SpawnRule m) => m.Name == spawnSetup.ToString());
 		return await sr.ExecuteRule() as Ship;
 	}
 

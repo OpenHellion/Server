@@ -5,7 +5,10 @@
 [x] Check ObjectMoveRequest if valid
 [x] Only send MovementMessage when positions were changed
 [x] Fix main loop watcher
+[x] Make admin mode on for all debug builds
+[x] Add assert to Debug.cs
 [ ] Rewrite EventSystem to fix weaknesses
+[ ] Respawn command does not work
 [ ] Collect all network messages and flush on tick
 [ ] Merge similar network messages in same tick
 [ ] Dispose all known syncrequests on delete

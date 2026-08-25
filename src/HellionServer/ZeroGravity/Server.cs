@@ -731,10 +731,11 @@ public sealed class Server
 			Add(player);
 		}
 
-		if (_serverAdmins.Contains(player.PlayerId) || _serverAdmins.Contains("*"))
-		{
-			player.IsAdmin = true;
-		}
+#if DEBUG
+		player.IsAdmin = true;
+#else
+		player.IsAdmin = _serverAdmins.Contains(player.PlayerId) || _serverAdmins.Contains("*");
+#endif
 
 		return player;
 	}
@@ -873,7 +874,7 @@ public sealed class Server
 		EventSystem.AddListener<RepairItemMessage>(RepairMessageListener);
 		EventSystem.AddListener<RepairVesselMessage>(RepairMessageListener);
 		EventSystem.AddListener<HurtPlayerMessage>(HurtPlayerMessageListener);
-		EventSystem.AddListener<ConsoleMessage>(ConsoleMessageListener);
+		EventSystem.AddSyncRequestListener<ConsoleMessage>(ConsoleMessageListener);
 		EventSystem.AddListener<ExplosionMessage>(ExplosionMessageListener);
 		EventSystem.AddListener<LatencyTestMessage>(LatencyTestListener);
 		EventSystem.AddListener<ServerShutDownMessage>(ServerShutDownMessageListener);
@@ -1113,14 +1114,26 @@ public sealed class Server
 		await pl.TakeDamage(message.Duration, "hurt-trigger", message.Damage);
 	}
 
-	private async void ConsoleMessageListener(NetworkData data)
+	private async Task<NetworkData> ConsoleMessageListener(NetworkData data)
 	{
 		var message = data as ConsoleMessage;
 		Player player = GetPlayer(message.Sender);
-		if (player.IsAdmin)
+
+		if (player is null)
 		{
-			await ProcessConsoleCommand(message.Text, player);
+			return new ConsoleMessage { Text = "Unknown sender.", Status = NetworkData.MessageStatus.Failure };
 		}
+
+		if (!player.IsAdmin)
+		{
+			return new ConsoleMessage
+			{
+				Text = "You are not an admin on this server.",
+				Status = NetworkData.MessageStatus.Failure
+			};
+		}
+
+		return await ProcessConsoleCommand(message.Text, player);
 	}
 
 	private async void TextChatMessageListener(NetworkData data)
@@ -1150,22 +1163,66 @@ public sealed class Server
 		await NetworkController.SendToAllAsync(message, message.Sender);
 	}
 
-	private async Task ProcessConsoleCommand(string cmd, Player player)
+	private async Task<ConsoleMessage> ProcessConsoleCommand(string cmd, Player player)
 	{
+		static ConsoleMessage Ok(string text) =>
+			new() { Text = text, Status = NetworkData.MessageStatus.Success };
+		static ConsoleMessage Error(string text) =>
+			new() { Text = text, Status = NetworkData.MessageStatus.Failure };
+
+		string[] parts = cmd?.Split(' ',
+			StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+
+		if (parts.Length == 0)
+		{
+			return Error("Empty command. Type 'help' for a list.");
+		}
+
 		try
 		{
-			if (!player.IsAdmin)
-			{
-				return;
-			}
-			string[] parts = cmd.Split(' ');
 			for (int i = 0; i < parts.Length && i != 2; i++)
 			{
 				parts[i] = parts[i].ToLower();
 			}
 			SpaceObject parent = player.Parent;
-			if (parts[0] == "refill" && parts.Length == 1)
+
+			switch (parts[0])
 			{
+			case "help":
+			{
+				return Ok(string.Join("\r\n",
+					"help                                 list these commands",
+					"refill                               refill held item, suit and station storages",
+					"restock                              refill every empty attach point on this vessel",
+					"spawn <item|scene> [tier|tag]        spawn an item, corpse, ship or asteroid",
+					"station <name>                       assemble a station from Data/Stations/<name>.json",
+					"torpedo [seconds]                    launch a dockable container where you look",
+					"hitme                                send a corridor module at you",
+					"selfdestruct <seconds>               arm self destruct on this vessel",
+					"collision <0|1>                      toggle collision on this vessel",
+					"blink <km>                           jump this vessel forward",
+					"teleport <player|vessel>             move to a player or vessel",
+					"whereami                             print your player location",
+					"countships [range|celestial body]    count spawned ships",
+					"countitems [range|celestial body]    count spawned items",
+					"vent                                 depressurize the current room",
+					"pressurize                           pressurize the current room",
+					"airquality <0-1>                     set air quality in the current room",
+					"sethealth <health>                   set health of held item, or of this vessel",
+					"god [0|1]                            query or set god mode",
+					"setmain                              make this vessel the current station's main vessel",
+					"respawn <spawn rule>                 respawn a blueprint spawn rule",
+					"spawnrulescleanup                    destroy vessels no spawn rule owns",
+					"unmatchall                           disable stabilisation everywhere",
+					"resetblueprints                      reset every player's blueprints"));
+			}
+			case "refill":
+			{
+				if (parts.Length != 1)
+				{
+					return Error("refill: expected no arguments.");
+				}
+
 				Item handsItem = player.PlayerInventory.HandsSlot.Item;
 				if (handsItem is ICargo cargo)
 				{
@@ -1200,7 +1257,7 @@ public sealed class Server
 				}
 				if (parent is not SpaceObjectVessel vessel)
 				{
-					return;
+					return Ok("refill: inventory refilled.");
 				}
 				foreach (ResourceContainer rc in vessel.MainDistributionManager.GetResourceContainers())
 				{
@@ -1212,18 +1269,21 @@ public sealed class Server
 						}
 					}
 				}
+				foreach (GeneratorCapacitor cap in (from m in vessel.MainDistributionManager.GetGenerators()
+					where m is GeneratorCapacitor
+					select m).Cast<GeneratorCapacitor>())
 				{
-					foreach (GeneratorCapacitor cap in (from m in vessel.MainDistributionManager.GetGenerators()
-						where m is GeneratorCapacitor
-						select m).Cast<GeneratorCapacitor>())
-					{
-						cap.Capacity = cap.MaxCapacity;
-					}
-					return;
+					cap.Capacity = cap.MaxCapacity;
 				}
+				return Ok("refill: inventory and vessel storages refilled.");
 			}
-			if (parts[0] == "spawn" && parts.Length is 2 or 3)
+			case "spawn":
 			{
+				if (parts.Length is not (2 or 3))
+				{
+					return Error("spawn: expected <item|scene> [tier|tag].");
+				}
+
 				Vector3D spawnItemPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward;
 				if (parts[1].ToLower() == "corpse")
 				{
@@ -1232,7 +1292,7 @@ public sealed class Server
 					{
 						LocalPosition = player.LocalPosition + player.LocalRotation * Vector3D.Forward
 					};
-					return;
+					return Ok("spawn: corpse spawned.");
 				}
 				int tier = 1;
 				if (parts.Length == 3 && !int.TryParse(parts[2], out tier))
@@ -1270,7 +1330,7 @@ public sealed class Server
 						InventorySlot slot3 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(dod.ItemType));
 						await DynamicObject.SpawnDynamicObject(dod.ItemType, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot3, refill: true);
 					}
-					return;
+					return Ok("spawn: spawned " + dod.ItemType + ".");
 				}
 				foreach (ItemType v in Enum.GetValues(typeof(ItemType)))
 				{
@@ -1278,7 +1338,7 @@ public sealed class Server
 					{
 						InventorySlot slot4 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(v));
 						await DynamicObject.SpawnDynamicObject(v, GenericItemSubType.None, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot4, refill: true);
-						return;
+						return Ok("spawn: spawned " + v + ".");
 					}
 				}
 				foreach (GenericItemSubType v4 in Enum.GetValues(typeof(GenericItemSubType)))
@@ -1287,7 +1347,7 @@ public sealed class Server
 					{
 						InventorySlot slot5 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.GenericItem));
 						await DynamicObject.SpawnDynamicObject(ItemType.GenericItem, v4, MachineryPartType.None, parent, -1, spawnItemPosition, null, null, tier, slot5, refill: true);
-						return;
+						return Ok("spawn: spawned " + v4 + ".");
 					}
 				}
 				foreach (MachineryPartType v5 in Enum.GetValues(typeof(MachineryPartType)))
@@ -1296,7 +1356,7 @@ public sealed class Server
 					{
 						InventorySlot slot6 = inventorySlots.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(ItemType.MachineryPart));
 						await DynamicObject.SpawnDynamicObject(ItemType.MachineryPart, GenericItemSubType.None, v5, parent, -1, spawnItemPosition, null, null, tier, slot6, refill: true);
-						return;
+						return Ok("spawn: spawned " + v5 + ".");
 					}
 				}
 				{
@@ -1328,22 +1388,33 @@ public sealed class Server
 								Ship ship2 = await Ship.CreateNewShip(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid }, null, offset, null, null, tag, checkPosition: false);
 								ship2.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
 							}
-							break;
+							return Ok("spawn: spawned " + v6 + ".");
 						}
 					}
-					return;
+					return Error("spawn: nothing matches '" + parts[1] + "'.");
 				}
 			}
-			if (parts[0] == "selfdestruct" && parts.Length == 2)
+			case "selfdestruct":
 			{
-				if (parent is SpaceObjectVessel vessel && int.TryParse(parts[1], out var time2))
+				if (parts.Length != 2 || !int.TryParse(parts[1], out var time2))
 				{
-					vessel.SelfDestructTimer = new SelfDestructTimer(vessel, time2);
+					return Error("selfdestruct: expected <seconds>.");
 				}
-				return;
+				if (parent is not SpaceObjectVessel vessel)
+				{
+					return Error("selfdestruct: you are not inside a vessel.");
+				}
+
+				vessel.SelfDestructTimer = new SelfDestructTimer(vessel, time2);
+				return Ok("selfdestruct: armed for " + time2 + "s on " + vessel.VesselName + ".");
 			}
-			if (parts[0] == "hitme" && parts.Length == 1)
+			case "hitme":
 			{
+				if (parts.Length != 1)
+				{
+					return Error("hitme: expected no arguments.");
+				}
+
 				double distance = 500.0;
 				double velocity = 50.0;
 				double radius2 = 10.0;
@@ -1353,40 +1424,72 @@ public sealed class Server
 				Vector3D offset4 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * radius2 * 2.0;
 				ship3.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
 				ship3.Orbit.InitFromStateVectors(ship3.Orbit.Parent, ship3.Orbit.Position + offset4, ship3.Orbit.Velocity + thrust2, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
-				return;
+				return Ok("hitme: corridor module inbound.");
 			}
-			if (parts[0] == "setmain" && parts.Length == 1 && parent is SpaceObjectVessel objectVessel)
+			case "setmain":
 			{
+				if (parts.Length != 1)
+				{
+					return Error("setmain: expected no arguments.");
+				}
+				if (parent is not SpaceObjectVessel objectVessel)
+				{
+					return Error("setmain: you are not inside a vessel.");
+				}
+
 				objectVessel.SetMainVessel();
-				return;
+				return Ok("setmain: " + objectVessel.VesselName + " is now the main vessel.");
 			}
-			if (parts[0] == "pressurize" && parts.Length == 1 && parent is SpaceObjectVessel)
+			case "pressurize":
 			{
-				if (player.CurrentRoom != null)
+				if (parts.Length != 1)
 				{
-					player.CurrentRoom.CompoundRoom.AirPressure = 1f;
-					player.CurrentRoom.CompoundRoom.AirQuality = 1f;
+					return Error("pressurize: expected no arguments.");
 				}
-				return;
-			}
-			if (parts[0] == "airquality" && parts.Length == 2 && parent is SpaceObjectVessel)
-			{
-				if (player.CurrentRoom != null && float.TryParse(parts[1], out var aq))
+				if (parent is not SpaceObjectVessel || player.CurrentRoom is null)
 				{
-					player.CurrentRoom.CompoundRoom.AirQuality = aq;
+					return Error("pressurize: you are not inside a room.");
 				}
-				return;
+
+				player.CurrentRoom.CompoundRoom.AirPressure = 1f;
+				player.CurrentRoom.CompoundRoom.AirQuality = 1f;
+				return Ok("pressurize: room pressurized.");
 			}
-			if (parts[0] == "vent" && parts.Length == 1 && parent is SpaceObjectVessel)
+			case "airquality":
 			{
-				if (player.CurrentRoom != null)
+				if (parts.Length != 2 || !float.TryParse(parts[1], out var aq))
 				{
-					player.CurrentRoom.CompoundRoom.AirPressure = 0f;
+					return Error("airquality: expected <0-1>.");
 				}
-				return;
+				if (parent is not SpaceObjectVessel || player.CurrentRoom is null)
+				{
+					return Error("airquality: you are not inside a room.");
+				}
+
+				player.CurrentRoom.CompoundRoom.AirQuality = aq;
+				return Ok("airquality: set to " + aq + ".");
 			}
-			if (parts[0] == "torpedo")
+			case "vent":
 			{
+				if (parts.Length != 1)
+				{
+					return Error("vent: expected no arguments.");
+				}
+				if (parent is not SpaceObjectVessel || player.CurrentRoom is null)
+				{
+					return Error("vent: you are not inside a room.");
+				}
+
+				player.CurrentRoom.CompoundRoom.AirPressure = 0f;
+				return Ok("vent: room depressurized.");
+			}
+			case "torpedo":
+			{
+				if (parts.Length > 2)
+				{
+					return Error("torpedo: expected [seconds].");
+				}
+
 				Vector3D offset2 = player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0;
 				Vector3D direction = (player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward).Normalized;
 				long guid = player.Parent.Guid;
@@ -1406,19 +1509,26 @@ public sealed class Server
 				ship.MaxHealth = 50000f;
 				if (parts.Length == 2)
 				{
-					if (float.TryParse(parts[1], out var time))
+					if (!float.TryParse(parts[1], out var time))
 					{
-						ship.SelfDestructTimer = new SelfDestructTimer(ship, time);
+						return Error("torpedo: expected [seconds].");
 					}
+					ship.SelfDestructTimer = new SelfDestructTimer(ship, time);
 				}
 				else
 				{
 					ship.SelfDestructTimer = new SelfDestructTimer(ship, 60f);
 				}
-				return;
+				return Ok("torpedo: launched.");
 			}
-			if ((parts[0] == "countships" || parts[0] == "countitems") && parts.Length is 1 or 2)
+			case "countships":
+			case "countitems":
 			{
+				if (parts.Length is not (1 or 2))
+				{
+					return Error(parts[0] + ": expected [range in meters|celestial body].");
+				}
+
 				double radius = 2000;
 				string msg = "";
 				List<SpaceObjectVessel> vessels;
@@ -1434,7 +1544,7 @@ public sealed class Server
 						cbd = StaticData.SolarSystem.CelestialBodies.FirstOrDefault((CelestialBodyData m) => m.Name.Contains(parts[1], StringComparison.CurrentCultureIgnoreCase));
 						if (cbd == null)
 						{
-							return;
+							return Error(parts[0] + ": '" + parts[1] + "' is neither a range nor a celestial body.");
 						}
 					}
 					CelestialBody cb = SolarSystem.GetCelestialBodies().FirstOrDefault((CelestialBody m) => m.GUID == cbd.GUID);
@@ -1473,47 +1583,59 @@ public sealed class Server
 				{
 					msg = msg + (msg == "" ? "" : "\r\n") + kv.Key + ": " + kv.Value;
 				}
-				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
-				{
-					Text = msg
-				});
-				return;
+				return Ok(msg == "" ? parts[0] + ": nothing found." : msg);
 			}
-			if (parts[0] == "station" && parts.Length == 2)
+			case "station":
 			{
-				await StationBlueprint.AssembleStation(parts[1], "JsonStation", "JsonStation", null, parent.Guid);
-				return;
-			}
-			if (parts[0] == "collision" && parts.Length == 2)
-			{
-				if (player.Parent is not SpaceObjectVessel vessel5)
+				if (parts.Length != 2)
 				{
-					return;
+					return Error("station: expected <name of a json in Data/Stations>.");
 				}
 
-				vessel5.MainVessel.RigidBody.CollisionFlags = parts[1] == "0" ? CollisionFlags.NoContactResponse : CollisionFlags.None;
-				{
-					foreach (SpaceObjectVessel v3 in vessel5.MainVessel.AllDockedVessels)
-					{
-						v3.RigidBody.CollisionFlags = parts[1] == "0" ? CollisionFlags.NoContactResponse : CollisionFlags.None;
-					}
-					return;
-				}
+				var vessels = await StationBlueprint.AssembleStation(parts[1], "JsonStation", "JsonStation", null, parent.Guid);
+				vessels[0].MainVessel.AddPlayerToCrew(player);
+				return Ok("station: assembled '" + parts[1] + "'.");
 			}
-			if (parts[0] == "god")
+			case "collision":
 			{
+				if (parts.Length != 2)
+				{
+					return Error("collision: expected <0|1>.");
+				}
+				if (parent is not SpaceObjectVessel vessel5)
+				{
+					return Error("collision: you are not inside a vessel.");
+				}
+
+				CollisionFlags flags = parts[1] == "0" ? CollisionFlags.NoContactResponse : CollisionFlags.None;
+				vessel5.MainVessel.RigidBody.CollisionFlags = flags;
+				foreach (SpaceObjectVessel v3 in vessel5.MainVessel.AllDockedVessels)
+				{
+					v3.RigidBody.CollisionFlags = flags;
+				}
+				return Ok("collision: " + (parts[1] == "0" ? "disabled" : "enabled") + ".");
+			}
+			case "god":
+			{
+				if (parts.Length > 2)
+				{
+					return Error("god: expected [0|1].");
+				}
 				if (parts.Length == 2)
 				{
 					player.GodMode = parts[1] != "0";
 				}
-				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
-				{
-					Text = "God mode: " + (player.GodMode ? "ON" : "OFF")
-				});
-				return;
+
+				// The client keys its god mode toggle on this exact text, so don't change.
+				return Ok("God mode: " + (player.GodMode ? "ON" : "OFF"));
 			}
-			if (parts[0] == "teleport" && parts.Length == 2)
+			case "teleport":
 			{
+				if (parts.Length != 2)
+				{
+					return Error("teleport: expected <player name|vessel name>.");
+				}
+
 				ArtificialBody target = null;
 				Player p = _players.Values.FirstOrDefault((Player m) => m.PlayerId == parts[1] || m.Name.ToLower() == parts[1].ToLower());
 				if (p is { Parent: ArtificialBody body })
@@ -1530,59 +1652,75 @@ public sealed class Server
 						target = v2.MainVessel;
 					}
 				}
-				ArtificialBody myAb = parent is SpaceObjectVessel spaceObjectVessel ? spaceObjectVessel.MainVessel : parent as ArtificialBody;
-				if (target != null && target != myAb)
+
+				if (target is null)
 				{
-					await myAb.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
-					myAb.Orbit.CopyDataFrom(target.Orbit, SolarSystem.CurrentTime, exactCopy: true);
-					if (myAb is Pivot)
-					{
-						myAb.Orbit.RelativePosition -= player.LocalPosition + player.LocalRotation * Vector3D.Forward * (target.Radius + 100.0);
-						myAb.Orbit.RelativeVelocity -= player.LocalVelocity;
-					}
-					else
-					{
-						myAb.Orbit.RelativePosition -= myAb.Rotation * Vector3D.Forward * (target.Radius + 100.0);
-					}
-					myAb.Orbit.InitFromCurrentStateVectors(SolarSystem.CurrentTime);
-					myAb.Orbit.UpdateOrbit();
+					return Error("teleport: no player or vessel matches '" + parts[1] + "'.");
 				}
-				return;
-			}
-			if (parts[0] == "respawn" && parts.Length == 2)
-			{
-				await SpawnManager.RespawnBlueprintRule(parts[1]);
-				return;
-			}
-			if (parts[0] == "sethealth" && parts.Length == 2)
-			{
-				if (!float.TryParse(parts[1], out var health))
+
+				ArtificialBody myAb = parent is SpaceObjectVessel spaceObjectVessel ? spaceObjectVessel.MainVessel : parent as ArtificialBody;
+				if (target == myAb)
 				{
-					return;
+					return Error("teleport: you are already there.");
+				}
+
+				await myAb.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
+				myAb.Orbit.CopyDataFrom(target.Orbit, SolarSystem.CurrentTime, exactCopy: true);
+				if (myAb is Pivot)
+				{
+					myAb.Orbit.RelativePosition -= player.LocalPosition + player.LocalRotation * Vector3D.Forward * (target.Radius + 100.0);
+					myAb.Orbit.RelativeVelocity -= player.LocalVelocity;
+				}
+				else
+				{
+					myAb.Orbit.RelativePosition -= myAb.Rotation * Vector3D.Forward * (target.Radius + 100.0);
+				}
+				myAb.Orbit.InitFromCurrentStateVectors(SolarSystem.CurrentTime);
+				myAb.Orbit.UpdateOrbit();
+				return Ok("teleport: moved to " + (target is SpaceObjectVessel targetVessel ? targetVessel.FullName : parts[1]) + ".");
+			}
+			case "respawn":
+			{
+				if (parts.Length != 2)
+				{
+					return Error("respawn: expected <spawn rule name>.");
+				}
+
+				if (await SpawnManager.RespawnBlueprintRule(parts[1]))
+				{
+					return Ok("respawn: respawned '" + parts[1] + "'.");
+				}
+
+				return Error("respawn: invalid spawn rule.");
+			}
+			case "sethealth":
+			{
+				if (parts.Length != 2 || !float.TryParse(parts[1], out var health))
+				{
+					return Error("sethealth: expected <health>.");
 				}
 				if (player.PlayerInventory.HandsSlot.Item != null)
 				{
 					player.PlayerInventory.HandsSlot.Item.Health = health;
 					await player.PlayerInventory.HandsSlot.Item.DynamicObj.SendStatsToClient();
+					return Ok("sethealth: held item set to " + health + ".");
 				}
-				else
+				if (parent is not SpaceObjectVessel parentVessel)
 				{
-					if (parent is not SpaceObjectVessel vessel4)
-					{
-						return;
-					}
-
-					foreach (VesselRepairPoint vrp in vessel4.RepairPoints)
-					{
-						await vrp.SetHealthAsync(vrp.MaxHealth);
-					}
-					await vessel4.SetHealthAsync(health);
-					vessel4.MainVessel.UpdateVesselData();
+					return Error("sethealth: nothing in hands and you are not inside a vessel.");
 				}
-				return;
+
+				foreach (VesselRepairPoint repairPoint in parentVessel.RepairPoints)
+				{
+					await repairPoint.SetHealthAsync(repairPoint.MaxHealth);
+				}
+				await parentVessel.SetHealthAsync(health);
+				parentVessel.MainVessel.UpdateVesselData();
+				return Ok("sethealth: " + parentVessel.VesselName + " set to " + health + ".");
 			}
-			if (parts[0] == "spawnrulescleanup")
+			case "spawnrulescleanup":
 			{
+				int destroyed = 0;
 				ArtificialBody[] artificialBodies2 = SolarSystem.GetArtificialBodies();
 				foreach (ArtificialBody ab in artificialBodies2)
 				{
@@ -1603,20 +1741,21 @@ public sealed class Server
 					{
 						vessel.MarkForDestruction = true;
 						SpawnManager.SpawnedVessels.TryRemove(vessel.Guid, out _);
+						destroyed++;
 					}
 				}
-				return;
+				return Ok("spawnrulescleanup: marked " + destroyed + " vessels for destruction.");
 			}
-			if (parts[0] == "unmatchall")
+			case "unmatchall":
 			{
 				ArtificialBody[] artificialBodies3 = SolarSystem.GetArtificialBodies();
 				foreach (ArtificialBody ab2 in artificialBodies3)
 				{
 					await ab2.DisableStabilization(disableForChildren: true, updateBeforeDisable: true);
 				}
-				return;
+				return Ok("unmatchall: stabilisation disabled on " + artificialBodies3.Length + " bodies.");
 			}
-			if (parts[0] == "resetblueprints")
+			case "resetblueprints":
 			{
 				foreach (Player pl in _players.Values)
 				{
@@ -1626,52 +1765,66 @@ public sealed class Server
 						Blueprints = pl.Blueprints
 					});
 				}
-				return;
+				return Ok("resetblueprints: reset for " + _players.Count + " players.");
 			}
-			if (parts[0] == "blink" && parts.Length == 2)
+			case "blink":
 			{
-				double.TryParse(parts[1], out var dist);
-				if (parent is SpaceObjectVessel vessel3)
+				if (parts.Length != 2 || !double.TryParse(parts[1], out var dist))
 				{
-					await vessel3.MainVessel.DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
-					vessel3.MainVessel.Orbit.RelativePosition += vessel3.Rotation * Vector3D.Forward * dist * 1000.0;
-					vessel3.MainVessel.Orbit.InitFromCurrentStateVectors(SolarSystemTime);
-					vessel3.MainVessel.Orbit.UpdateOrbit();
+					return Error("blink: expected <distance in km>.");
 				}
+				if (parent is not SpaceObjectVessel vessel3)
+				{
+					return Error("blink: you are not inside a vessel.");
+				}
+
+				await vessel3.MainVessel.DisableStabilization(disableForChildren: false, updateBeforeDisable: true);
+				vessel3.MainVessel.Orbit.RelativePosition += vessel3.Rotation * Vector3D.Forward * dist * 1000.0;
+				vessel3.MainVessel.Orbit.InitFromCurrentStateVectors(SolarSystemTime);
+				vessel3.MainVessel.Orbit.UpdateOrbit();
+				return Ok("blink: moved " + dist + "km forward.");
 			}
-			else if (parts[0] == "whereami" && parts.Length == 1)
+			case "whereami":
 			{
-				string msg2;
+				if (parts.Length != 1)
+				{
+					return Error("whereami: expected no arguments.");
+				}
+				string response = "At coordinates '" + player.Position + "', ";
 				if (parent is SpaceObjectVessel vessel)
 				{
-					msg2 = "Inside vessel '" + vessel.VesselName + "' near " + (CelestialBodyGUID)vessel.Orbit.Parent.CelestialBody.GUID;
+					response += "inside vessel '" + vessel.VesselName + "' near " + (CelestialBodyGUID)vessel.Orbit.Parent.CelestialBody.GUID;
 					foreach (SpawnRule sr in SpawnManager.spawnRules)
 					{
 						if (sr.SpawnedVessels.FirstOrDefault((SpaceObjectVessel m) => m == vessel) != null)
 						{
-							msg2 = msg2 + ", spawn rule '" + sr.Name + "'";
+							response += ", spawn rule '" + sr.Name + "'";
 						}
 					}
+					return Ok(response);
 				}
-				else
+				else if (parent is Pivot pivot)
 				{
-					if (parent is not Pivot pivot)
-					{
-						return;
-					}
-					msg2 = "Near " + pivot.Orbit.Parent.CelestialBody;
+					response += "near " + (CelestialBodyGUID)pivot.Orbit.Parent.CelestialBody.GUID;
+					return Ok(response);
 				}
-				await NetworkController.SendAsync(player.Guid, new ConsoleMessage
-				{
-					Text = msg2
-				});
+
+				Debug.Assert(parent != null);
+				Debug.Assert(parent is not SpaceObjectTransferable);
+				return Error("whereami: you are neither inside a vessel nor at a pivot.");
+
 			}
-			else
+			case "restock":
 			{
-				if (parts[0] != "restock" || parts.Length != 1 || parent is not SpaceObjectVessel vessel)
+				if (parts.Length != 1)
 				{
-					return;
+					return Error("restock: expected no arguments.");
 				}
+				if (parent is not SpaceObjectVessel vessel)
+				{
+					return Error("restock: you are not inside a vessel.");
+				}
+
 				List<SpaceObjectVessel> list = [vessel.MainVessel];
 				{
 					foreach (SpaceObjectVessel vessel2 in list.Concat(vessel.MainVessel.AllDockedVessels))
@@ -1706,11 +1859,18 @@ public sealed class Server
 						}
 					}
 				}
+				return Ok("restock: attach points refilled.");
+			}
+			default:
+			{
+				return Error("Unknown command '" + parts[0] + "'. Type 'help' for a list.");
+			}
 			}
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
-			// ignored
+			Debug.LogException(ex);
+			return Error(ex.Message);
 		}
 	}
 

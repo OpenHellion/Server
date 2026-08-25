@@ -4,25 +4,19 @@ using System.IO;
 
 public static class Debug
 {
-	public static string OutputDir = "";
-
-	public const bool AddTimestamp = true;
+	internal static string OutputDir = "";
 
 	public const string TimestampFormat = "HH:mm:ss.ffff";
 
 	public static void Initialize()
 	{
-		string fileName = OutputDir + "output_log.txt";
+		string fileName = OutputDir + "log.txt";
 		try
 		{
 			if (File.Exists(fileName))
 			{
-				string backupFileName = OutputDir + "output_log_backup.txt";
-				if (File.Exists(backupFileName))
-				{
-					File.Delete(backupFileName);
-				}
-				File.Move(fileName, backupFileName);
+				string backupFileName = OutputDir + "log_backup.txt";
+				File.Move(fileName, backupFileName, true);
 			}
 		}
 		catch
@@ -32,16 +26,15 @@ public static class Debug
 
 		Trace.Listeners.Clear();
 
-		// Logging to console creates issues for the client if it is singleplayer. Plus it is pointless.
 		ConsoleTraceListener consoleListener = new ConsoleTraceListener(useErrorStream: false)
 		{
-			TraceOutputOptions = TraceOptions.None
+			TraceOutputOptions = TraceOptions.Callstack
 		};
 		Trace.Listeners.Add(consoleListener);
 
 		TextWriterTraceListener writerListener = new TextWriterTraceListener(new StreamWriter(fileName, append: false))
 		{
-			TraceOutputOptions = TraceOptions.None
+			TraceOutputOptions = TraceOptions.Callstack
 		};
 		Trace.Listeners.Add(writerListener);
 
@@ -53,11 +46,11 @@ public static class Debug
 		Trace.Listeners.Clear();
 	}
 
-	private static void WriteToLog(string message)
+	private static void Write(string message, string category)
 	{
 		try
 		{
-			Trace.WriteLine($"{(AddTimestamp ? DateTime.UtcNow.ToString(TimestampFormat + " -" ) : "")} {message}");
+			Trace.WriteLine(DateTime.UtcNow.ToString(TimestampFormat + " - " ) + message, category);
 		}
 		catch
 		{
@@ -74,14 +67,14 @@ public static class Debug
 	[Conditional("SHOW_ALL_LOGS")]
 	public static void Log(string message)
 	{
-		WriteToLog($"[Debug] {message}");
+		Write(message, "Debug");
 	}
 
 	[Conditional("DEBUG")]
 	[Conditional("SHOW_ALL_LOGS")]
 	public static void LogFormat(string message, params object[] args)
 	{
-		WriteToLog(string.Format($"[Debug] {message}", args));
+		Log(string.Format(message, args));
 	}
 
 	[Conditional("DEBUG")]
@@ -90,11 +83,11 @@ public static class Debug
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog($"[Debug] {GetString(values[0])}");
+			Log(GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog($"[Debug] {string.Join(" ", values)}");
+			Log(string.Join(" ", values));
 		}
 	}
 
@@ -105,56 +98,56 @@ public static class Debug
 
 	public static void LogInfo(string message)
 	{
-		WriteToLog($"[Info] {message}");
+		Write(message, "Info");
 	}
 
 	public static void LogInfoFormat(string message, params object[] values)
 	{
-		WriteToLog(string.Format($"[Info] {message}", values));
+		LogInfo(string.Format(message, values));
 	}
 
 	public static void LogInfo(params object[] values)
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog($"[Info] {GetString(values[0])}");
+			LogInfo(GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog($"[Info] {string.Join(" ", values)}");
+			LogInfo(string.Join(" ", values));
 		}
 	}
 
 	public static void LogWarning(string message)
 	{
-		WriteToLog("[Warn] " + message);
+		Write(message, "Warning");
 	}
 
 	public static void LogWarningFormat(string message, params object[] values)
 	{
-		WriteToLog(string.Format($"[Warn] {message}", values));
+		LogWarning(string.Format(message, values));
 	}
 
 	public static void LogWarning(params object[] values)
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog("[Warn] " + GetString(values[0]));
+			LogWarning(GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog("[Warn] " + string.Join(" ", values));
+			LogWarning(string.Join(" ", values));
 		}
 	}
 
 	public static void LogError(string message)
 	{
-		WriteToLog($"[Error] {message}");
+		Write(message, "Error");
 	}
 
 	public static void LogErrorFormat(string message, params object[] values)
 	{
-		WriteToLog(string.Format($"[Error] {message}", values));
+		LogError(string.Format(message, values));
 	}
 
 
@@ -162,16 +155,37 @@ public static class Debug
 	{
 		if (values.Length == 1)
 		{
-			WriteToLog("[Error] " + GetString(values[0]));
+			LogError(GetString(values[0]));
 		}
 		else
 		{
-			WriteToLog("[Error] " + string.Join(" ", values));
+			LogError(string.Join(" ", values));
 		}
 	}
 
 	public static void LogException(Exception ex)
 	{
-		WriteToLog($"[Exception] {ex}");
+		Write(ex.ToString(), "Exception");
+	}
+
+	/// <summary>
+	/// 	When condition is false, break the program and log an error message.
+	/// </summary>
+	/// <param name="condition">Condition to assert</param>
+	[Conditional("DEBUG")]
+	public static void Assert(bool condition)
+	{
+		Trace.Assert(condition);
+	}
+
+	/// <summary>
+	/// 	When condition is false, break the program and log the provided message.
+	/// </summary>
+	/// <param name="condition">Condition to check.</param>
+	/// <param name="message">Message to log on fail.</param>
+	[Conditional("DEBUG")]
+	public static void Assert(bool condition, string message)
+	{
+		Trace.Assert(condition, message);
 	}
 }

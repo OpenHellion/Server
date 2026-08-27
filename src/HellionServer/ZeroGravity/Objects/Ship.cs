@@ -1676,10 +1676,10 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (data.RepairPoints is { Count: > 0 })
 		{
-			await Parallel.ForEachAsync(data.RepairPoints, async (rp, ct) =>
+			foreach (var rp in data.RepairPoints)
 			{
 				await RepairPoints.Find((VesselRepairPoint x) => x.ID.InSceneID == rp.InSceneID)?.LoadPersistenceData(rp);
-			});
+			}
 		}
 		await MainDistributionManager.UpdateSystems();
 		if (data.OrbitData != null)

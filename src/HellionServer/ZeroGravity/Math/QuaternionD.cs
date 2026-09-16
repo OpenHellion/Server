@@ -237,7 +237,7 @@ public struct QuaternionD
 		return vector3;
 	}
 
-	// Expanded form of qZ * qX * qY.
+	// Expanded form of qY * qX * qZ.
 	private static QuaternionD FromEulerRad(Vector3D euler)
 	{
 		double halfXAngle = euler.X * 0.5;
@@ -250,10 +250,10 @@ public struct QuaternionD
 		double cz = System.Math.Cos(halfZAngle);
 		double sz = System.Math.Sin(halfZAngle);
 		return new QuaternionD(
-			w: cx * cy * cz - sx * sy * sz,
-			x: sx * cy * cz - cx * sy * sz,
-			y: cx * sy * cz + sx * cy * sz,
-			z: cx * cy * sz + sx * sy * cz
+			w: cx * cy * cz + sx * sy * sz,
+			x: sx * cy * cz + cx * sy * sz,
+			y: cx * sy * cz - sx * cy * sz,
+			z: cx * cy * sz - sx * sy * cz
 			);
 	}
 
@@ -299,7 +299,7 @@ public struct QuaternionD
 		if (sqrLength > 1E-06)
 		{
 			angle = 2.0 * System.Math.Acos(q.W);
-			axis = new Vector3D(q.X, q.Y, q.Z) / sqrLength;
+			axis = new Vector3D(q.X, q.Y, q.Z) / System.Math.Sqrt(sqrLength);
 		}
 		else
 		{

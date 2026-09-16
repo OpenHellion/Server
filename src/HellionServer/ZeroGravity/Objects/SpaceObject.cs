@@ -126,19 +126,11 @@ public abstract class SpaceObject
 		{
 			sun = sun.Parent;
 		}
-		Vector3D position;
-		if (this is SpaceObjectVessel)
+		if (this is not SpaceObjectVessel && (this is not SpaceObjectTransferable || Parent is not Pivot))
 		{
-			position = Position;
+			return false;
 		}
-		else
-		{
-			if (this is not SpaceObjectTransferable || Parent is not Pivot)
-			{
-				return false;
-			}
-			position = Parent.Position + (this as SpaceObjectTransferable).LocalPosition;
-		}
+		Vector3D position = Position;
 		Vector3D vSunPos = sun.Position - position;
 		sqrDistFromSun = vSunPos.SqrMagnitude;
 		foreach (CelestialBody cb in Server.Instance.SolarSystem.GetCelestialBodies())

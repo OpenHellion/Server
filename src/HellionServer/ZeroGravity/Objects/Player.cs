@@ -83,23 +83,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public override Vector3D Velocity => (Parent?.Velocity ?? Vector3D.Zero)
 		+ (Parent?.Rotation ?? QuaternionD.Identity) * LocalVelocity;
 
-	private long _anchorGuid;
-
-	public long AnchorGuid
-	{
-		get => _anchorGuid;
-		set
-		{
-			if (_anchorGuid == value)
-			{
-				return;
-			}
-
-			_anchorGuid = value;
-			LastReportedPosition = null;
-			LastReportedVelocity = null;
-		}
-	}
+	public long AnchorGuid { get; set; }
 
 	public const double AnchorRebaseDistance = 200.0;
 
@@ -110,7 +94,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	private double _lastAnimationMessageTime = -1.0;
 
 	// Movement requests and parent changes share one queue because only their relative order tells us
-	// which anchor each request was measured from.
+	// which parent each request was measured from.
 	private readonly ConcurrentQueue<NetworkData> _pendingMoveRequests = new();
 
 	public Vector3D? LastReportedPosition;
@@ -698,12 +682,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	public void ModifyLocalPositionAndRotation(Vector3D locPos, QuaternionD locRot)
-	{
-		LocalPosition += locPos;
-		LocalRotation *= locRot;
-	}
-
 	private void MoveObjectRequestListener(NetworkData data)
 	{
 		var message = data as MoveObjectRequest;
@@ -738,21 +716,17 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			return;
 		}
 
-		Vector3D worldPosition = Position;
-		QuaternionD worldRotation = Rotation;
-		Vector3D worldVelocity = Velocity;
-
 		SpaceObject newParent;
 		if (message.ParentGuid == FakeGuid)
 		{
-			if (Parent is not SpaceObjectVessel)
+			if (Parent is not SpaceObjectVessel vesselLeft)
 			{
 				Debug.LogWarning("Cannot create a pivot without a vessel to leave", Guid, Name,
 					"parent", Parent.Guid, "type", Parent.GetType().Name);
 				return;
 			}
 
-			Pivot pivot = new Pivot(this, worldPosition, worldVelocity);
+			Pivot pivot = new Pivot(this, vesselLeft.MainVessel);
 			pivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
 			newParent = pivot;
 		}
@@ -777,15 +751,28 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			}
 		}
 
-		Parent = newParent;
+		ReparentKeepingWorldPose(newParent);
 		if (oldParent is Pivot oldPivot)
 		{
 			await oldPivot.Destroy();
 		}
+	}
 
-		// Same place, measured from the new parent.
+	/// <summary>
+	/// 	Moves the player to another parent without moving it in the world, re-expressing its pose in the
+	/// 	new parent's structure frame.
+	/// </summary>
+	private void ReparentKeepingWorldPose(SpaceObject newParent)
+	{
+		Vector3D worldPosition = Position;
+		QuaternionD worldRotation = Rotation;
+		Vector3D worldVelocity = Velocity;
+
+		Parent = newParent;
+
 		QuaternionD parentRotationInverse = QuaternionD.Inverse(Parent.Rotation);
-		LocalPosition = parentRotationInverse * (worldPosition - Parent.Position);
+		Vector3D localPosition = parentRotationInverse * (worldPosition - Parent.Position);
+		LocalPosition = Parent is SpaceObjectVessel vessel ? vessel.LocalToStructurePosition(localPosition) : localPosition;
 		LocalRotation = parentRotationInverse * worldRotation;
 		LocalVelocity = parentRotationInverse * (worldVelocity - Parent.Velocity);
 	}
@@ -857,9 +844,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 			var message = (MoveObjectRequest)queued;
 
-			// A mismatch means this was measured before a reanchor, and the
-			// position in it is outdated.
-			if (message.AnchorGuid != AnchorGuid)
+			if (message.ParentGuid != Parent.Guid)
 			{
 				continue;
 			}
@@ -876,23 +861,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				stabilisePivot.Orbit.SetLastChangeTime(Server.SolarSystemTime);
 			}
 
-			if (!Server.Instance.TryGetSpaceObject(AnchorGuid, out SpaceObject anchorObject)
-				|| anchorObject is not ArtificialBody anchor)
-			{
-				continue;
-			}
-
-			Vector3D reportedPosition = SpatialMath.ToLocalPosition(message.Position.ToVector3D(),
-				anchor.Position, Parent.Position, Parent.Rotation);
-			QuaternionD reportedRotation = SpatialMath.ToLocalRotation(message.Rotation.ToQuaternionD(),
-				Parent.Rotation);
-			Vector3D newVelocity = SpatialMath.ToLocalVelocity(message.Velocity.ToVector3D(),
-				anchor.Velocity, Parent.Velocity, Parent.Rotation);
+			Vector3D reportedPosition = message.Position.ToVector3D();
+			QuaternionD reportedRotation = message.Rotation.ToQuaternionD();
+			Vector3D newVelocity = message.Velocity.ToVector3D();
 
 			// What the client believes, whether or not we go on to accept it. The movement message
 			// compares this against where the player really is to decide whether we owe it a correction.
-			LastReportedPosition = message.Position.ToVector3D();
-			LastReportedVelocity = message.Velocity.ToVector3D();
+			LastReportedPosition = reportedPosition;
+			LastReportedVelocity = newVelocity;
 
 			fastest = System.Math.Max(fastest, newVelocity.Magnitude);
 			if (gateArmed)
@@ -944,19 +920,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	/// <summary>
 	/// 	If the player has moved in a way that warrants a transform correction.
 	/// </summary>
-	public bool NeedsTransformCorrection(ArtificialBody anchor, Vector3D playerPosition, Vector3D playerVelocity)
+	public bool NeedsTransformCorrection()
 	{
-		if (LastReportedPosition is not { } reportedPosition || LastReportedVelocity is not { } reportedVelocity)
-		{
-			return true;
-		}
-
-		// Capped, or a client that stops reporting would widen its own tolerance without limit.
-		double gap = System.Math.Min(Server.SolarSystemTime - _lastMoveRequestTime, MaxResimDeltaTime);
-		double separation = gap > 0.0 ? (Parent.Velocity - anchor.Velocity).Magnitude * gap : 0.0;
-
-		return (playerPosition - reportedPosition).Magnitude > TransformCorrectionEpsilon + separation
-			|| (playerVelocity - reportedVelocity).Magnitude > TransformCorrectionEpsilon;
+		return LastReportedPosition is not { } reportedPosition || LastReportedVelocity is not { } reportedVelocity
+			|| (LocalPosition - reportedPosition).Magnitude > TransformCorrectionEpsilon
+			|| (LocalVelocity - reportedVelocity).Magnitude > TransformCorrectionEpsilon;
 	}
 
 	private async void CharacterAnimationMessageListener(NetworkData data)
@@ -1422,12 +1390,11 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		MessagesReceivedWhileLoading = new ConcurrentQueue<ShipStatsMessage>();
 		try
 		{
-			if (Parent is Ship && isOutsideRoom)
+			if (Parent is Ship ship && isOutsideRoom)
 			{
-				Pivot pivot = new Pivot(this, Position, Velocity);
-				pivot.StabilizeToTarget(Parent as Ship, forceStabilize: true);
-				LocalPosition = Vector3D.Zero;
-				Parent = pivot;
+				Pivot pivot = new Pivot(this, ship.MainVessel);
+				pivot.StabilizeToTarget(ship, forceStabilize: true);
+				ReparentKeepingWorldPose(pivot);
 			}
 		}
 		catch (Exception)
@@ -1586,7 +1553,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		CurrentSpawnPoint = spawnPoint;
 		if (spawnPoint != null && !IsAlive)
 		{
-			LocalPosition = spawnPoint.Ship.StructureToLocalPosition(spawnPoint.RelativePosition);
+			LocalPosition = spawnPoint.RelativePosition;
 			LocalRotation = spawnPoint.RelativeRotation;
 		}
 	}

@@ -25,7 +25,8 @@ namespace OpenHellion.Net.Message;
 
 /// <summary>
 /// 	Message to the client that tells the game to move objects in the world.
-/// 	Celestial bod
+/// 	Celestial bodies (planets and sun) are not included. Map is updated separately.
+/// </summary>
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
 public class MovementMessage : NetworkData
 {
@@ -33,6 +34,9 @@ public class MovementMessage : NetworkData
 	public struct TransformInfo
 	{
 		public long Guid;
+
+		// When > 0, the this transform will be relative to this object. Anchor when 0.
+		public long ParentGuid;
 
 		public float[] Position;
 
@@ -53,6 +57,8 @@ public class MovementMessage : NetworkData
 	public struct OtherPlayerInfo
 	{
 		public long Guid;
+
+		public long ParentGuid;
 
 		public float[] Position;
 

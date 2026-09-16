@@ -25,83 +25,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		public float Chance;
 	}
 
-	private class DockUndockPlayerData
-	{
-		private class PlayerItem
-		{
-			public Player Player;
-
-			public SpaceObjectVessel Parent;
-
-			public Vector3D PosFromParent;
-
-			public QuaternionD RotFromParent;
-		}
-
-		private readonly List<PlayerItem> players = new List<PlayerItem>();
-
-		public static DockUndockPlayerData GetPlayerData(params SpaceObjectVessel[] vessels)
-		{
-			DockUndockPlayerData retVal = new DockUndockPlayerData();
-			foreach (SpaceObjectVessel vs in vessels)
-			{
-				SpaceObjectVessel ves = vs;
-				if (ves.DockedToMainVessel != null)
-				{
-					ves = ves.DockedToMainVessel;
-				}
-				foreach (Player pl2 in ves.VesselCrew)
-				{
-					retVal.players.Add(new PlayerItem
-					{
-						Player = pl2,
-						Parent = ves,
-						PosFromParent = ves.LocalToStructurePosition(pl2.LocalPosition),
-						RotFromParent = pl2.LocalRotation
-					});
-				}
-				foreach (SpaceObjectVessel childVes in ves.AllDockedVessels)
-				{
-					foreach (Player pl in childVes.VesselCrew)
-					{
-						retVal.players.Add(new PlayerItem
-						{
-							Player = pl,
-							Parent = childVes,
-							PosFromParent = childVes.RelativeRotationFromMainParent * (ves.LocalToStructurePosition(pl.LocalPosition) - childVes.RelativePositionFromMainParent),
-							RotFromParent = pl.LocalRotation * childVes.RelativeRotationFromMainParent.Inverse()
-						});
-					}
-				}
-			}
-			return retVal;
-		}
-
-		public void ModifyPlayersPositionAndRotation()
-		{
-			if (players == null || players.Count == 0)
-			{
-				return;
-			}
-			foreach (PlayerItem it in players)
-			{
-				Vector3D posDiff;
-				QuaternionD rotDiff;
-				if (it.Parent.DockedToMainVessel != null)
-				{
-					posDiff = it.Parent.DockedToMainVessel.StructureToLocalPosition(it.Parent.RelativePositionFromMainParent + it.Parent.RelativeRotationFromMainParent * it.PosFromParent) - it.Player.LocalPosition;
-					rotDiff = it.Player.LocalRotation.Inverse() * (it.Parent.RelativeRotationFromMainParent * it.RotFromParent);
-				}
-				else
-				{
-					posDiff = it.Parent.StructureToLocalPosition(it.PosFromParent) - it.Player.LocalPosition;
-					rotDiff = it.Player.LocalRotation.Inverse() * it.RotFromParent;
-				}
-				it.Player.ModifyLocalPositionAndRotation(posDiff, rotDiff);
-			}
-		}
-	}
-
 	public List<VesselPrimitiveColliderData> PrimitiveCollidersData = new List<VesselPrimitiveColliderData>();
 
 	public List<VesselMeshColliderData> MeshCollidersData = new List<VesselMeshColliderData>();
@@ -302,7 +225,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			{
 				return base.Position;
 			}
-			return MainVessel.Position + MainVessel.Rotation * RelativePositionFromMainParent;
+			return MainVessel.Position + MainVessel.Rotation * (RelativePositionFromMainParent - MainVessel.CollidersCenterOffset.ToVector3D());
 		}
 	}
 
@@ -314,7 +237,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			{
 				return base.Rotation;
 			}
-			return RelativeRotationFromMainParent * MainVessel.Rotation;
+			return MainVessel.Rotation * RelativeRotationFromMainParent;
 		}
 	}
 
@@ -892,7 +815,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			}
 			else if (artificialBody is Pivot pivot)
 			{
-				Vector3D pos = pivot.Position + pivot.Child.LocalRotation * pivot.Child.LocalPosition;
+				Vector3D pos = pivot.Child.Position;
 				float dist = (float)(Position - pos).Magnitude;
 				float ratio = MathHelper.Clamp((radius - dist) / radius, 0f, 1f);
 				if (pivot.Child is Player player)
@@ -1158,7 +1081,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		dockToPort.DockedToID = port.ID;
 		dockToPort.DockedVessel = this;
 		dockToPort.DockingStatus = true;
-		DockUndockPlayerData dupd = DockUndockPlayerData.GetPlayerData(this, dockToVessel);
 		SpaceObjectVessel rBodyRemoveOld = dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel;
 		SpaceObjectVessel rBodyRemoveNew = IsDocked ? DockedToMainVessel : this;
 		SpaceObjectVessel newDockedToMainVessel = dockToVessel.IsDocked ? dockToVessel.DockedToMainVessel : dockToVessel;
@@ -1209,7 +1131,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			}
 		}
 		vesselWithSecuritySystem?.CopyAuthorizedPersonelListToChildren();
-		dupd.ModifyPlayersPositionAndRotation();
 		await CheckMainPropulsionVessel();
 		if (RCS != null)
 		{
@@ -1285,7 +1206,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		DockedToVessel = null;
 		dockedToVessel.DockedToVessel = null;
 		oldMainVessel.ResetDockedToVessel();
-		DockUndockPlayerData dupd = DockUndockPlayerData.GetPlayerData(oldMainVessel);
 		resultVesselMine = oldMainVessel;
 		resultVesselOther = oldMainVessel.AllDockedVessels.FirstOrDefault((SpaceObjectVessel m) => m.DockedToVessel == null);
 		if (resultVesselMine == null && DockedToMainVessel != null)
@@ -1379,7 +1299,6 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		resultVesselMine.Orbit.FillOrbitData(ref details.VesselOrbit, resultVesselMine);
 		details.VesselOrbitOther = new OrbitData();
 		resultVesselOther.Orbit.FillOrbitData(ref details.VesselOrbitOther, resultVesselOther);
-		dupd.ModifyPlayersPositionAndRotation();
 		if (resultVesselMine.IsPartOfSpawnSystem)
 		{
 			if (resultVesselMine.AllDockedVessels.Count == 0)
@@ -1500,7 +1419,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 	{
 		if (pl.Parent is Pivot)
 		{
-			return (pl.Parent.Position + pl.LocalPosition - Position).Magnitude;
+			return (pl.Position - Position).Magnitude;
 		}
 		return (pl.Parent.Position - Position).Magnitude;
 	}

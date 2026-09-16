@@ -18,13 +18,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public ItemType ItemType;
 
-	private Player MasterPlayer;
-
-	private long _MasterClientID;
-
 	private DateTime lastSenderTime;
-
-	private DateTime takeoverTime;
 
 	public double LastStatsSendTime;
 
@@ -50,18 +44,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.DynamicObject;
 
-	public long MasterClientID
-	{
-		get
-		{
-			return _MasterClientID;
-		}
-		private set
-		{
-			_MasterClientID = value;
-			MasterPlayer = Server.Instance.GetPlayer(value);
-		}
-	}
+	public long MasterClientID { get; private set; }
 
 	public bool IsAttached => Item != null && (Item.Slot != null || Item.AttachPointType != 0 || Parent is DynamicObject);
 
@@ -218,58 +201,12 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 
 	public void ConnectToNetworkController()
 	{
-		EventSystem.AddListener<MoveObjectRequest>(MoveObjectRequestListener);
 		EventSystem.AddListener<DynamicObjectStatsMessage>(DynamicObjectStatsMessageListener);
 	}
 
 	public void DisconnectFromNetworkController()
 	{
-		EventSystem.RemoveListener<MoveObjectRequest>(MoveObjectRequestListener);
 		EventSystem.RemoveListener<DynamicObjectStatsMessage>(DynamicObjectStatsMessageListener);
-	}
-
-	/// <summary>
-	/// 	Applies a movement request that targets this dynamic object. The same message moves any
-	/// 	object (see <see cref="MoveObjectRequest" />); players ignore guids that aren't their own,
-	/// 	and we ignore guids that aren't ours.
-	/// </summary>
-	private void MoveObjectRequestListener(NetworkData data)
-	{
-		var message = data as MoveObjectRequest;
-		if (message.Guid != Guid)
-		{
-			return;
-		}
-		if (MasterClientID != message.Sender)
-		{
-			if ((DateTime.UtcNow - takeoverTime).TotalSeconds < 0.8)
-			{
-				return;
-			}
-			takeoverTime = DateTime.UtcNow;
-			MasterClientID = message.Sender;
-		}
-		if (MasterClientID == 0L || message.Sender == MasterClientID || MasterPlayer == null || (MasterPlayer.Parent != Parent && MasterClientID != message.Sender && Parent.ObjectType != SpaceObjectType.DynamicObjectPivot))
-		{
-			MasterClientID = message.Sender;
-			lastSenderTime = DateTime.UtcNow;
-			bool changed = false;
-			if (!LocalPosition.IsEpsilonEqual(message.Position.ToVector3D(), 0.0001))
-			{
-				LocalPosition = message.Position.ToVector3D();
-				changed = true;
-			}
-			if (!LocalRotation.IsEpsilonEqual(message.Rotation.ToQuaternionD(), 1E-05))
-			{
-				LocalRotation = message.Rotation.ToQuaternionD();
-				changed = true;
-			}
-			AngularVelocity = message.AngularVelocity.ToVector3D();
-			if (changed)
-			{
-				LastChangeTime = Server.Instance.SolarSystem.CurrentTime;
-			}
-		}
 	}
 
 	private async void DynamicObjectStatsMessageListener(NetworkData data)

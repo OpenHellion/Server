@@ -1148,11 +1148,10 @@ public sealed class Server
 		}
 		if (message.Local)
 		{
-			Vector3D playerGlobalPos = player.Parent.Position + player.Position;
 			{
 				foreach (Player pl in _players.Values)
 				{
-					if ((pl.Parent.Position + pl.Position - playerGlobalPos).SqrMagnitude < 1000000.0 && pl != player)
+					if ((pl.Position - player.Position).SqrMagnitude < 1000000.0 && pl != player)
 					{
 						await NetworkController.SendAsync(pl.Guid, message);
 					}
@@ -1372,7 +1371,7 @@ public sealed class Server
 							Vector3D offset;
 							if (parent is SpaceObjectVessel vessel6)
 							{
-								offset = vessel6.Rotation * (player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0);
+								offset = player.Position - vessel6.MainVessel.Position + player.Rotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0;
 							}
 							else
 							{
@@ -1490,16 +1489,10 @@ public sealed class Server
 					return Error("torpedo: expected [seconds].");
 				}
 
-				Vector3D offset2 = player.LocalPosition + player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward * 25.0;
-				Vector3D direction = (player.LocalRotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward).Normalized;
-				long guid = player.Parent.Guid;
-				if (parent is SpaceObjectVessel vessel7)
-				{
-					offset2 = vessel7.MainVessel.Rotation * (offset2 - vessel7.CollidersCenterOffset.ToVector3D());
-					direction = vessel7.MainVessel.Rotation * direction;
-					guid = vessel7.MainVessel.Guid;
-				}
-				Ship ship = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_DockableContainer, "PHTORP MK4", -1L, new List<long> { guid }, null, offset2, null, null, checkPosition: false);
+				Vector3D direction = (player.Rotation * QuaternionD.Euler(0f - player.MouseLook, 0.0, 0.0) * Vector3D.Forward).Normalized;
+				SpaceObject launcher = parent is SpaceObjectVessel vessel7 ? vessel7.MainVessel : player.Parent;
+				Vector3D offset2 = player.Position - launcher.Position + direction * 25.0;
+				Ship ship = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_DockableContainer, "PHTORP MK4", -1L, new List<long> { launcher.Guid }, null, offset2, null, null, checkPosition: false);
 				ship.Rotation = QuaternionD.LookRotation(direction);
 				Vector3D thrust = direction * 80.0;
 				ship.Orbit.InitFromStateVectors(ship.Orbit.Parent, ship.Orbit.Position, ship.Orbit.Velocity + thrust, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
@@ -1956,7 +1949,7 @@ public sealed class Server
 
 				ArtificialBody mainVessel = parentBody is SpaceObjectVessel parentVessel ? parentVessel.MainVessel : parentBody;
 				spawnResponse.AllNearbySpaceObjects = [.. SolarSystem.BuildPlayerView(pl, mainVessel,
-					SolarSystem.GetArtificialBodiesInRange(pl.Position, SolarSystem.ViewRadius, pl.FakeGuid))];
+					SpaceObjects.QueryRadius<ArtificialBody>(pl.Position, SolarSystem.ViewRadius))];
 
 				if (pl.CurrentSpawnPoint != null
 					&& ((pl.CurrentSpawnPoint.IsPlayerInSpawnPoint && pl.CurrentSpawnPoint.Ship == pl.Parent)
@@ -1986,8 +1979,8 @@ public sealed class Server
 
 				spawnResponse.AnchorGuid = pl.AnchorGuid;
 				spawnResponse.OriginWorldPosition = anchorPosition.ToArray();
-				spawnResponse.Position = (pl.Position - anchorPosition).ToFloatArray();
-				spawnResponse.Rotation = pl.Rotation.ToFloatArray();
+				spawnResponse.Position = pl.LocalPosition.ToFloatArray();
+				spawnResponse.Rotation = pl.LocalRotation.ToFloatArray();
 				spawnResponse.DynamicObjects = DynamicObject.GetCarriedDetails(pl);
 			}
 			else

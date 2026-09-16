@@ -172,9 +172,7 @@ public class SolarSystem
 			return;
 		}
 
-		// Pivots will always have the same guid as its child, so don't include it if
-		// it is the player.
-		List<ArtificialBody> bodiesInRange = GetArtificialBodiesInRange(player.Position, ViewRadius, player.FakeGuid);
+		List<ArtificialBody> bodiesInRange = Server.Instance.SpaceObjects.QueryRadius<ArtificialBody>(player.Position, ViewRadius);
 
 		MovementMessage movementMessage = new MovementMessage
 		{
@@ -189,16 +187,11 @@ public class SolarSystem
 			DynamicObjectsMovement = [],
 		};
 
-		Vector3D playerPosition = SpatialMath.ToAnchorRelativePosition(player.LocalPosition, anchor.Position,
-			player.Parent.Position, player.Parent.Rotation);
-		Vector3D playerVelocity = SpatialMath.ToAnchorRelativeVelocity(player.LocalVelocity, anchor.Velocity,
-			player.Parent.Velocity, player.Parent.Rotation);
-
-		if (player.NeedsTransformCorrection(anchor, playerPosition, playerVelocity))
+		if (player.NeedsTransformCorrection())
 		{
-			movementMessage.PlayerPosition = playerPosition.ToFloatArray();
-			movementMessage.PlayerRotation = player.Rotation.ToFloatArray();
-			movementMessage.PlayerVelocity = playerVelocity.ToFloatArray();
+			movementMessage.PlayerPosition = player.LocalPosition.ToFloatArray();
+			movementMessage.PlayerRotation = player.LocalRotation.ToFloatArray();
+			movementMessage.PlayerVelocity = player.LocalVelocity.ToFloatArray();
 		}
 
 		foreach (ArtificialBody artificialBody in bodiesInRange)
@@ -239,8 +232,9 @@ public class SolarSystem
 						MovementMessage.OtherPlayerInfo playerInfo = new()
 						{
 							Guid = crewPlayer.FakeGuid,
-							Position = (crewPlayer.Position - anchor.Position).ToFloatArray(),
-							Rotation = crewPlayer.Rotation.ToFloatArray(),
+							ParentGuid = crewPlayer.Parent.Guid,
+							Position = crewPlayer.LocalPosition.ToFloatArray(),
+							Rotation = crewPlayer.LocalRotation.ToFloatArray(),
 							FreeLookX = crewPlayer.FreeLookX,
 							FreeLookY = crewPlayer.FreeLookY,
 							MouseLook = crewPlayer.MouseLook,
@@ -260,9 +254,10 @@ public class SolarSystem
 							MovementMessage.TransformInfo corpseInfo = new()
 							{
 								Guid = corpseGuid,
-								Position = (corpse.Position - anchor.Position).ToFloatArray(),
-								Rotation = corpse.Rotation.ToFloatArray(),
-								Velocity = (corpse.Velocity - anchor.Velocity).ToFloatArray(),
+								ParentGuid = corpse.Parent.Guid,
+								Position = corpse.LocalPosition.ToFloatArray(),
+								Rotation = corpse.LocalRotation.ToFloatArray(),
+								Velocity = Vector3D.Zero.ToFloatArray(),
 								AngularVelocity = corpse.AngularVelocity.ToFloatArray(),
 							};
 
@@ -278,9 +273,10 @@ public class SolarSystem
 							MovementMessage.TransformInfo dynamicObjectInfo = new()
 							{
 								Guid = dynamicObjectGuid,
-								Position = (dynamicObject.Position - anchor.Position).ToFloatArray(),
-								Rotation = dynamicObject.Rotation.ToFloatArray(),
-								Velocity = (dynamicObject.Velocity - anchor.Velocity).ToFloatArray(),
+								ParentGuid = dynamicObject.Parent.Guid,
+								Position = dynamicObject.LocalPosition.ToFloatArray(),
+								Rotation = dynamicObject.LocalRotation.ToFloatArray(),
+								Velocity = Vector3D.Zero.ToFloatArray(),
 								AngularVelocity = dynamicObject.AngularVelocity.ToFloatArray(),
 							};
 
@@ -297,8 +293,9 @@ public class SolarSystem
 					MovementMessage.OtherPlayerInfo playerInfo = new()
 					{
 						Guid = otherPlayer.FakeGuid,
-						Position = (otherPlayer.Position - anchor.Position).ToFloatArray(),
-						Rotation = otherPlayer.Rotation.ToFloatArray(),
+						ParentGuid = pivot.Guid,
+						Position = otherPlayer.LocalPosition.ToFloatArray(),
+						Rotation = otherPlayer.LocalRotation.ToFloatArray(),
 						FreeLookX = otherPlayer.FreeLookX,
 						FreeLookY = otherPlayer.FreeLookY,
 						MouseLook = otherPlayer.MouseLook,

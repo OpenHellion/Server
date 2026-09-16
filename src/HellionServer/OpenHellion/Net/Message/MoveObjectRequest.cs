@@ -30,7 +30,7 @@ public class MoveObjectRequest : NetworkData
 {
 	public long Guid;
 
-	public long AnchorGuid;
+	public long ParentGuid;
 
 	public float[] Position;
 

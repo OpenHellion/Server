@@ -8,10 +8,6 @@ public class DockedVesselData
 {
 	public long Guid;
 
-	public float[] Position;
-
-	public float[] Rotation;
-
 	public string VesselRegistration;
 
 	public string VesselName;

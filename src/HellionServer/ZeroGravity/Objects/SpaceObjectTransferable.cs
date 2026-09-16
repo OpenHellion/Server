@@ -29,7 +29,8 @@ public abstract class SpaceObjectTransferable : SpaceObject
 				Debug.LogError("SpaceObjectTransferable must have a parent!", Guid);
 				return LocalPosition;
 			}
-			return Parent.Position + Parent.Rotation * LocalPosition;
+			Vector3D localPosition = Parent is SpaceObjectVessel vessel ? vessel.StructureToLocalPosition(LocalPosition) : LocalPosition;
+			return Parent.Position + Parent.Rotation * localPosition;
 		}
 	}
 

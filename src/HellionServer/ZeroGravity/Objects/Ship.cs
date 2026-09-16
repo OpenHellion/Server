@@ -840,8 +840,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 				retVal.Add(new DockedVesselData
 				{
 					Guid = sh.Guid,
-					Position = sh.RelativePositionFromMainParent.ToFloatArray(),
-					Rotation = sh.RelativeRotationFromMainParent.ToFloatArray(),
 					VesselRegistration = sh.VesselRegistration,
 					VesselName = sh.VesselName,
 					Tag = sh.VesselTag,

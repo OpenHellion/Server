@@ -21,17 +21,16 @@ public class ArtificialBody : SpaceObject
 
 	public double Radius;
 
+	/// <summary>
+	/// 	True angular velocity in the body's own frame, in degrees per second.
+	/// </summary>
 	public Vector3D AngularVelocity;
-
-	public Vector3D AngularVelocityPerAxis;
 
 	protected Vector3D PhysicsVelocityDifference;
 
 	protected Vector3D PhysicsRotationDifference;
 
 	private bool _markForDestruction;
-
-	private bool _updateAngularVelocity = true;
 
 	private const double StabilizeToTargetMaxVelocityDiff = 2.0;
 
@@ -176,12 +175,21 @@ public class ArtificialBody : SpaceObject
 
 	private void ApplyRotation(double deltaTime)
 	{
-		if (ObjectType is SpaceObjectType.Player or SpaceObjectType.Ship or SpaceObjectType.Asteroid)
+		if (ObjectType is not (SpaceObjectType.Player or SpaceObjectType.Ship or SpaceObjectType.Asteroid))
 		{
-			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z, 0.0 - Server.MaxAngularVelocityPerAxis, Server.MaxAngularVelocityPerAxis);
-			Rotation = Rotation * QuaternionD.Euler(AngularVelocityPerAxis * deltaTime);
+			return;
+		}
+
+		double speed = AngularVelocity.Magnitude;
+		if (speed > Server.MaxAngularVelocity)
+		{
+			AngularVelocity = AngularVelocity / speed * Server.MaxAngularVelocity;
+			speed = Server.MaxAngularVelocity;
+		}
+
+		if (speed > 1E-09)
+		{
+			Rotation = Rotation * QuaternionD.AngleAxis(speed * deltaTime, AngularVelocity / speed);
 		}
 	}
 
@@ -196,7 +204,6 @@ public class ArtificialBody : SpaceObject
 		if (this is Ship && !(this as Ship).IsMainVessel)
 		{
 			((this as Ship).MainVessel as Ship).AddDockedVesselsThrust(this as Ship, deltaTime);
-			await (this as Ship).CheckThrustStatsMessage();
 			return;
 		}
 		if (_stabilizationDisabledTime.HasValue)
@@ -354,7 +361,6 @@ public class ArtificialBody : SpaceObject
 
 	private async Task<bool> CheckThrustAndRotation(double timeDelta)
 	{
-		Vector3D prevAngularVelocity = AngularVelocityPerAxis;
 		bool recalculateOrbit = false;
 		if (this is Ship)
 		{
@@ -376,39 +382,22 @@ public class ArtificialBody : SpaceObject
 			}
 			if (sh.CalculateRotationThrust(timeDelta))
 			{
-				_updateAngularVelocity = true;
-				AngularVelocityPerAxis += sh.RotationThrustVelocityDifference;
+				AngularVelocity += sh.RotationThrustVelocityDifference;
 				sh.RotationThrustVelocityDifference = Vector3D.Zero;
 			}
-			if (sh.CalculateRotationDampen(timeDelta))
+			if (!sh.CalculateRotationDampen(timeDelta))
 			{
-				_updateAngularVelocity = true;
-			}
-			else if (await sh.CalculateAutoStabilizeRotation(timeDelta))
-			{
-				_updateAngularVelocity = true;
+				await sh.CalculateAutoStabilizeRotation(timeDelta);
 			}
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
-				_updateAngularVelocity = true;
-				AngularVelocityPerAxis += PhysicsRotationDifference;
+				AngularVelocity += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
-			if (_updateAngularVelocity)
-			{
-				QuaternionD oldRotation2 = Rotation;
-				if (AngularVelocityPerAxis.IsNotEpsilonZero())
-				{
-					ApplyRotation(timeDelta);
-				}
-				AngularVelocity = (Rotation * oldRotation2.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
-				_updateAngularVelocity = false;
-			}
-			else if (AngularVelocityPerAxis.IsNotEpsilonZero())
+			if (AngularVelocity.IsNotEpsilonZero())
 			{
 				ApplyRotation(timeDelta);
 			}
-			await sh.CheckThrustStatsMessage();
 		}
 		else if (this is Asteroid)
 		{
@@ -419,21 +408,10 @@ public class ArtificialBody : SpaceObject
 			}
 			if (PhysicsRotationDifference.IsNotEpsilonZero(0.001))
 			{
-				_updateAngularVelocity = true;
-				AngularVelocityPerAxis += PhysicsRotationDifference;
+				AngularVelocity += PhysicsRotationDifference;
 				PhysicsRotationDifference = Vector3D.Zero;
 			}
-			if (_updateAngularVelocity)
-			{
-				QuaternionD oldRotation = Rotation;
-				if (AngularVelocityPerAxis.IsNotEpsilonZero())
-				{
-					ApplyRotation(timeDelta);
-				}
-				AngularVelocity = (Rotation * oldRotation.Inverse()).EulerAngles / timeDelta * (System.Math.PI / 180.0);
-				_updateAngularVelocity = false;
-			}
-			else if (AngularVelocityPerAxis.IsNotEpsilonZero())
+			if (AngularVelocity.IsNotEpsilonZero())
 			{
 				ApplyRotation(timeDelta);
 			}

@@ -162,6 +162,29 @@ public class SolarSystem
 		return view;
 	}
 
+	/// <summary>
+	/// 	Sends the pilot the authoritative state of the vessel they are flying. This goes out far more
+	/// 	often than <see cref="MovementMessage"/> because the piloted vessel is the client's anchor:
+	/// 	its world position is what places every other body on screen.
+	/// </summary>
+	public async Task SendPilotStateMessageToPlayer(Player player)
+	{
+		if (player.Parent is not Ship ship || !player.IsPilotingVessel)
+		{
+			return;
+		}
+
+		await NetworkController.SendAsync(player.Guid, new ShipThrustStateMessage
+		{
+			VesselGuid = ship.Guid,
+			LastProcessedInputSequence = ship.LastProcessedInputSequence,
+			WorldPosition = ship.Position.ToArray(),
+			Velocity = ship.Velocity.ToFloatArray(),
+			Rotation = ship.Rotation.ToFloatArray(),
+			AngularVelocity = (ship.AngularVelocity * (System.Math.PI / 180.0)).ToFloatArray(),
+		});
+	}
+
 	public async Task SendMovementMessageToPlayer(Player player)
 	{
 		ArtificialBody anchor = Server.Instance.TryGetSpaceObject(player.AnchorGuid, out SpaceObject anchorObject)
@@ -202,7 +225,7 @@ public class SolarSystem
 				Position = (artificialBody.Position - anchor.Position).ToFloatArray(),
 				Rotation = artificialBody.Rotation.ToFloatArray(),
 				Velocity = (artificialBody.Velocity - anchor.Velocity).ToFloatArray(),
-				AngularVelocity = artificialBody.AngularVelocity.ToFloatArray(),
+				AngularVelocity = (artificialBody.AngularVelocity * (System.Math.PI / 180.0)).ToFloatArray(),
 			};
 
 			if (artificialBody.StabilizeToTargetObj is not null)

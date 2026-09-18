@@ -362,7 +362,7 @@ public sealed class Server
 
 	public static bool CanWarpThroughCelestialBodies;
 
-	public static double MaxAngularVelocityPerAxis = 300.0;
+	public static double MaxAngularVelocity = 300.0;
 
 	private static List<string> _serverAdmins = new List<string>();
 
@@ -376,7 +376,11 @@ public sealed class Server
 
 	public readonly DoomedShipController DoomedShipController = new DoomedShipController();
 
-	private const double MovementMessageSendInterval = 1;
+	private const double MovementMessageSendInterval = 0.1;
+
+	private const double PilotStateSendInterval = 1.0 / 30.0;
+
+	private static double _pilotStateTimer;
 
 	private static double _movementMessageTimer;
 
@@ -706,7 +710,7 @@ public sealed class Server
 		Properties.TryGetPropertySafe("junk_items_time_to_live", ref JunkItemsTimeToLive);
 		Properties.TryGetPropertySafe("junk_items_cleanup_interval", ref JunkItemsCleanupInterval);
 		Properties.TryGetPropertySafe("can_warp_through_celestial_bodies", ref CanWarpThroughCelestialBodies);
-		Properties.TryGetPropertySafe("max_angular_velocity_per_axis", ref MaxAngularVelocityPerAxis);
+		Properties.TryGetPropertySafe("max_angular_velocity", ref MaxAngularVelocity);
 		Properties.TryGetPropertySafe("arena_ship_respawn_timer", ref SpaceObjectVessel.ArenaRescueTime);
 		Properties.TryGetPropertySafe("print_debug_objects", ref _printDebugObjects);
 		Properties.TryGetPropertySafe("spawn_manager_print_categories", ref SpawnManager.Settings.PrintCategories);
@@ -1380,12 +1384,12 @@ public sealed class Server
 							if (GameScenes.Ranges.IsAsteroid(v6))
 							{
 								Asteroid asteroid = Asteroid.CreateNewAsteroid(v6, "", -1L, [parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid], null, offset * 10.0, null, null, tag, checkPosition: false);
-								asteroid.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
+								asteroid.AngularVelocity = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 6.0;
 							}
 							else
 							{
 								Ship ship2 = await Ship.CreateNewShip(v6, "", -1L, new List<long> { parent is SpaceObjectVessel vessel ? vessel.MainVessel.Guid : parent.Guid }, null, offset, null, null, tag, checkPosition: false);
-								ship2.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
+								ship2.AngularVelocity = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()).Normalized * 1.0;
 							}
 							return Ok("spawn: spawned " + v6 + ".");
 						}
@@ -1421,7 +1425,7 @@ public sealed class Server
 				Ship ship3 = await Ship.CreateNewShip(GameScenes.SceneId.AltCorp_CorridorModule, "", -1L, [parent.Guid], null, offset3, null, null, checkPosition: false);
 				Vector3D thrust2 = -offset3.Normalized * velocity;
 				Vector3D offset4 = new Vector3D(MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5, MathHelper.RandomNextDouble() - 0.5) * radius2 * 2.0;
-				ship3.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
+				ship3.AngularVelocity = new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 50.0;
 				ship3.Orbit.InitFromStateVectors(ship3.Orbit.Parent, ship3.Orbit.Position + offset4, ship3.Orbit.Velocity + thrust2, Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 				return Ok("hitme: corridor module inbound.");
 			}
@@ -2186,10 +2190,25 @@ public sealed class Server
 
 		UpdatePlayerInvitationTimers(deltaTime);
 
+		_pilotStateTimer += deltaTime;
+		if (_pilotStateTimer >= PilotStateSendInterval)
+		{
+			_pilotStateTimer = _pilotStateTimer > PilotStateSendInterval * 2.0
+				? 0.0
+				: _pilotStateTimer - PilotStateSendInterval;
+			Player[] pilots = [.. AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive && m.IsPilotingVessel)];
+			if (pilots.Length > 0)
+			{
+				await Parallel.ForEachAsync(pilots, async (pl, ct) => await SolarSystem.SendPilotStateMessageToPlayer(pl)).WaitAsync(new TimeSpan(0, 0, 10));
+			}
+		}
+
 		_movementMessageTimer += deltaTime;
 		if (_movementMessageTimer >= MovementMessageSendInterval)
 		{
-			_movementMessageTimer = 0.0;
+			_movementMessageTimer = _movementMessageTimer > MovementMessageSendInterval * 2.0
+				? 0.0
+				: _movementMessageTimer - MovementMessageSendInterval;
 			Player[] players = [.. AllPlayers.Where((Player m) => m.EnvironmentReady && m.IsAlive)];
 			if (players.Length > 0)
 			{
@@ -2215,17 +2234,17 @@ public sealed class Server
 		}
 		if (ab is SpaceObjectVessel ves)
 		{
-			if (destroyChildren && ves.AllDockedVessels.Count > 0)
+			if (destroyChildren)
 			{
-				await Parallel.ForEachAsync(ves.AllDockedVessels, async (child, ct) =>
+				foreach (SpaceObjectVessel child in ves.AllDockedVessels.ToArray())
 				{
 					await DestroyArtificialBody(child, destroyChildren: false, vesselExploded);
-				});
+				}
 			}
-			await Parallel.ForEachAsync(ves.VesselCrew, async (pl, ct) =>
+			foreach (Player pl in ves.VesselCrew.ToArray())
 			{
 				await pl.KillPlayer(HurtType.Shipwreck, createCorpse: false);
-			});
+			}
 			if (vesselExploded)
 			{
 				await ves.DamageVesselsInExplosionRadius();
@@ -2267,19 +2286,19 @@ public sealed class Server
 		}
 		if (destroyVessels != null)
 		{
-			await Parallel.ForEachAsync(destroyVessels, async (dv, ct) =>
+			foreach (SpaceObjectVessel dv in destroyVessels)
 			{
 				await DestroyArtificialBody(dv, destroyChildren: true, vesselExploded: true);
-			});
+			}
 		}
 		foreach (DynamicObject dobj in _updateableDynamicObjects.Values)
 		{
 			await (dobj.Item as IUpdateable).Update(deltaTime);
 		}
-		await Parallel.ForEachAsync(AllPlayers, async (pl, ct) =>
+		foreach (Player pl in AllPlayers)
 		{
 			await pl.UpdateTimers(deltaTime);
-		});
+		}
 		foreach (DebrisField df in DebrisFields)
 		{
 			df.SpawnFragments();

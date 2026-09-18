@@ -60,11 +60,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public int ColliderIndex = 1;
 
-	private bool _rcsThrustChanged;
-
-	private Vector3D? _currRcsMoveThrust;
-
-	private Vector3D? _currRcsRotationThrust;
+	public uint LastProcessedInputSequence;
 
 	private ManeuverCourse AutoActivateCourse;
 
@@ -81,38 +77,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	private TimeSpan _lastShipCollisionMessageTime = Server.Instance.RunTime;
 
 	public override SpaceObjectType ObjectType => SpaceObjectType.Ship;
-
-	private Vector3D? CurrRcsMoveThrust
-	{
-		get
-		{
-			return _currRcsMoveThrust;
-		}
-		set
-		{
-			if (_currRcsMoveThrust != value)
-			{
-				_currRcsMoveThrust = value;
-				_rcsThrustChanged = true;
-			}
-		}
-	}
-
-	private Vector3D? CurrRcsRotationThrust
-	{
-		get
-		{
-			return _currRcsRotationThrust;
-		}
-		set
-		{
-			if (_currRcsRotationThrust != value)
-			{
-				_currRcsRotationThrust = value;
-				_rcsThrustChanged = true;
-			}
-		}
-	}
 
 	public override float RadarSignature
 	{
@@ -135,6 +99,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		Radius = 100.0;
 		EventSystem.AddListener<ShipStatsMessage>(ShipStatsMessageListener);
+		EventSystem.AddListener<ShipThrustMessage>(PilotInputMessageListener);
 		EventSystem.AddListener<ManeuverCourseRequest>(ManeuverCourseRequestListener);
 		EventSystem.AddListener<DistressCallRequest>(DistressCallRequestListener);
 		EventSystem.AddListener<VesselRequest>(VesselRequestListener);
@@ -158,7 +123,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		_rotationThrustResetTimer = 0.0;
 		_stabilize = Vector3D.Zero;
 		_stabilizeResetTimer = 0.0;
-		AngularVelocityPerAxis = Vector3D.Zero;
 		AngularVelocity = Vector3D.Zero;
 	}
 
@@ -236,16 +200,11 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		if (!_isRcsOnline && ExtraRcsThrustVelocityDifference.IsEpsilonZero())
 		{
-			if (CurrRcsMoveThrust.HasValue)
-			{
-				CurrRcsMoveThrust = null;
-			}
 			return false;
 		}
 		RcsThrustVelocityDifference = ExtraRcsThrustVelocityDifference + RcsThrustDirection * RCSAcceleration * timeDelta;
 		ExtraRcsThrustVelocityDifference = Vector3D.Zero;
 		_rcsThrustResetTimer += timeDelta;
-		CurrRcsMoveThrust = RcsThrustVelocityDifference;
 		ResetAutoStabilizeTimer();
 		if (_rcsThrustResetTimer >= RcsThrustResetTreshold)
 		{
@@ -258,16 +217,11 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	{
 		if (!_isRotationOnline && ExtraRotationThrustVelocityDifference.IsEpsilonZero())
 		{
-			if (CurrRcsRotationThrust.HasValue)
-			{
-				CurrRcsRotationThrust = null;
-			}
 			return false;
 		}
 		RotationThrustVelocityDifference = ExtraRotationThrustVelocityDifference + RotationThrustDirection * RCSRotationAcceleration * timeDelta;
 		ExtraRotationThrustVelocityDifference = Vector3D.Zero;
 		_rotationThrustResetTimer += timeDelta;
-		CurrRcsRotationThrust = RotationThrustVelocityDifference;
 		ResetAutoStabilizeTimer();
 		if (_rotationThrustResetTimer >= RotationThrustResetTreshold)
 		{
@@ -322,7 +276,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 
 	public async Task<bool> CalculateAutoStabilizeRotation(double timeDelta)
 	{
-		if (AngularVelocityPerAxis.IsNotEpsilonZero() && !AutoStabilizationDisabled && !AllVessels.Any((SpaceObjectVessel m) => m.VesselCrew.FirstOrDefault((Player n) => n.IsPilotingVessel) != null))
+		if (AngularVelocity.IsNotEpsilonZero() && !AutoStabilizationDisabled && !AllVessels.Any((SpaceObjectVessel m) => m.VesselCrew.FirstOrDefault((Player n) => n.IsPilotingVessel) != null))
 		{
 			SpaceObjectVessel rcsVessel = null;
 			if (!IsPrefabStationVessel)
@@ -370,19 +324,94 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 	}
 
-	public async Task CheckThrustStatsMessage()
+	/// <summary>
+	/// 	Applies the pilot's control axes. The message carries axis state rather than an impulse,
+	/// 	so the newest one simply replaces the last and dropping one costs nothing.
+	/// </summary>
+	public async void PilotInputMessageListener(NetworkData data)
 	{
-		if (_rcsThrustChanged)
+		var message = data as ShipThrustMessage;
+		if (message.VesselGuid != Guid)
 		{
-			ShipStatsMessage ssm = new ShipStatsMessage();
-			ssm.Guid = Guid;
-			ssm.ThrustStats = new RcsThrustStats
+			return;
+		}
+
+		Player pl = Server.Instance.GetPlayer(message.Sender);
+		if (pl == null || !pl.IsPilotingVessel || pl.Parent != this)
+		{
+			return;
+		}
+
+		LastProcessedInputSequence = message.Sequence;
+
+		bool updateDM = false;
+		if (Engine != null && EngineOnLine)
+		{
+			Engine.ThrustActive = true;
+			updateDM = true;
+		}
+		if (RCS != null && RCS.Status != SystemStatus.OnLine)
+		{
+			await RCS.GoOnLine();
+			updateDM = true;
+		}
+		if (updateDM)
+		{
+			await MainDistributionManager.UpdateSystems(connectionsChanged: false, compoundRoomsChanged: false);
+		}
+
+		if (Engine is { Status: SystemStatus.OnLine })
+		{
+			_engineThrustPercentage = message.EngineThrustPercentage;
+			Engine.RequiredThrust = (float)System.Math.Abs(_engineThrustPercentage);
+			Engine.ReverseThrust = _engineThrustPercentage < 0.0;
+		}
+
+		if (RCS is not { Status: SystemStatus.OnLine })
+		{
+			return;
+		}
+
+		Vector3D thrust = message.Thrust != null ? message.Thrust.ToVector3D() : Vector3D.Zero;
+		if (thrust.SqrMagnitude > 1.0)
+		{
+			thrust = thrust.Normalized;
+		}
+		RcsThrustDirection = thrust * RCS.MaxOperationRate;
+		float opRateThr = (float)RcsThrustDirection.Magnitude / RCS.MaxOperationRate;
+		_isRcsOnline = !RcsThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001);
+		if (_isRcsOnline)
+		{
+			_rcsThrustResetTimer = 0.0;
+		}
+
+		float opRateRot = 0f;
+		if (CurrentCourse == null || !CurrentCourse.IsInProgress)
+		{
+			Vector3D rotation = message.Rotation != null ? message.Rotation.ToVector3D() : Vector3D.Zero;
+			if (rotation.SqrMagnitude > 1.0)
 			{
-				MoveTrust = CurrRcsMoveThrust.HasValue ? CurrRcsMoveThrust.Value.ToFloatArray() : null,
-				RotationTrust = CurrRcsRotationThrust.HasValue ? CurrRcsRotationThrust.Value.ToFloatArray() : null
-			};
-			_rcsThrustChanged = false;
-			await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
+				rotation = rotation.Normalized;
+			}
+			RotationThrustDirection = rotation * RCS.MaxOperationRate;
+			opRateRot = (float)RotationThrustDirection.Magnitude / RCS.MaxOperationRate;
+			_isRotationOnline = !RotationThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001);
+			if (_isRotationOnline)
+			{
+				_rotationThrustResetTimer = 0.0;
+			}
+		}
+
+		if (message.AutoStabilise != null)
+		{
+			_stabilize = message.AutoStabilise.ToVector3D();
+			_stabilizeResetTimer = 0.0;
+			RCS.OperationRate = RCS.MaxOperationRate;
+		}
+
+		if (RCS.OperationRate == 0f)
+		{
+			RCS.OperationRate = System.Math.Max(opRateThr, opRateRot);
 		}
 	}
 
@@ -393,6 +422,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			return;
 		}
+
 		bool sendShipStatsMsg = false;
 		ShipStatsMessage retMsg = new ShipStatsMessage
 		{
@@ -403,104 +433,17 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			VesselObjects = new VesselObjects()
 		};
 		Player pl = Server.Instance.GetPlayer(message.Sender);
-		bool requestEngine = EngineOnLine;
-		bool requestRCS = message.Thrust != null || message.Rotation != null || message.AutoStabilize != null || (message.TargetStabilizationGuid.HasValue && message.Thrust == null);
-		bool canUseEngine = false;
-		bool canUseRCS = false;
-		bool updateDM = false;
-		if (requestEngine || requestRCS)
+		if (message.TargetStabilizationGuid.HasValue)
 		{
-			if (Engine != null && requestEngine)
+			if (Server.Instance.GetSpaceObject(message.TargetStabilizationGuid.Value) is SpaceObjectVessel target && StabilizeToTarget(target))
 			{
-				Engine.ThrustActive = true;
-				updateDM = true;
+				retMsg.TargetStabilizationGuid = target.Guid;
 			}
-			if (RCS != null && requestRCS && RCS.Status != SystemStatus.OnLine)
+			else
 			{
-				await RCS.GoOnLine();
-				updateDM = true;
+				retMsg.TargetStabilizationGuid = -1L;
 			}
-			if (updateDM)
-			{
-				await MainDistributionManager.UpdateSystems(connectionsChanged: false, compoundRoomsChanged: false);
-			}
-			canUseEngine = Engine is { Status: SystemStatus.OnLine };
-			canUseRCS = RCS is { Status: SystemStatus.OnLine };
-		}
-		if (Engine != null && message.EngineThrustPercentage.HasValue)
-		{
-			_engineThrustPercentage = message.EngineThrustPercentage.Value;
-			retMsg.EngineThrustPercentage = (float)_engineThrustPercentage;
-			Engine.RequiredThrust = (float)System.Math.Abs(_engineThrustPercentage);
-			Engine.ReverseThrust = _engineThrustPercentage < 0.0;
 			sendShipStatsMsg = true;
-		}
-		if (RCS != null && canUseRCS)
-		{
-			float opRateThr = 0f;
-			float opRateRot = 0f;
-			if (message.Thrust != null)
-			{
-				Vector3D thr = message.Thrust.ToVector3D();
-				if (thr.SqrMagnitude > 1.0)
-				{
-					thr = thr.Normalized;
-				}
-				RcsThrustDirection = thr * RCS.MaxOperationRate;
-				opRateThr = (float)RcsThrustDirection.Magnitude / RCS.MaxOperationRate;
-				if (!RcsThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001))
-				{
-					_rcsThrustResetTimer = 0.0;
-					_isRcsOnline = true;
-					retMsg.TargetStabilizationGuid = -1L;
-					sendShipStatsMsg = true;
-				}
-				else
-				{
-					_isRcsOnline = false;
-				}
-			}
-			if (message.Rotation != null && (CurrentCourse == null || !CurrentCourse.IsInProgress))
-			{
-				Vector3D rot = message.Rotation.ToVector3D();
-				if (rot.SqrMagnitude > 1.0)
-				{
-					rot = rot.Normalized;
-				}
-				RotationThrustDirection = rot * RCS.MaxOperationRate;
-				opRateThr = (float)RotationThrustDirection.Magnitude / RCS.MaxOperationRate;
-				if (!RotationThrustDirection.IsEpsilonEqual(Vector3D.Zero, 0.0001))
-				{
-					_rotationThrustResetTimer = 0.0;
-					_isRotationOnline = true;
-				}
-				else
-				{
-					_isRotationOnline = false;
-				}
-			}
-			if (message.AutoStabilize != null)
-			{
-				_stabilize = message.AutoStabilize.ToVector3D();
-				_stabilizeResetTimer = 0.0;
-				RCS.OperationRate = RCS.MaxOperationRate;
-			}
-			if (RCS.OperationRate == 0f)
-			{
-				RCS.OperationRate = System.Math.Max(opRateThr, opRateRot);
-			}
-			if (message.TargetStabilizationGuid.HasValue && message.Thrust == null)
-			{
-				if (Server.Instance.GetSpaceObject(message.TargetStabilizationGuid.Value) is SpaceObjectVessel target && StabilizeToTarget(target))
-				{
-					retMsg.TargetStabilizationGuid = target.Guid;
-				}
-				else
-				{
-					retMsg.TargetStabilizationGuid = -1L;
-				}
-				sendShipStatsMsg = true;
-			}
 		}
 		if (message.VesselObjects == null)
 		{
@@ -1411,6 +1354,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 	private void DisconectListener()
 	{
 		EventSystem.RemoveListener<ShipStatsMessage>(ShipStatsMessageListener);
+		EventSystem.RemoveListener<ShipThrustMessage>(PilotInputMessageListener);
 		EventSystem.RemoveListener<ManeuverCourseRequest>(ManeuverCourseRequestListener);
 		EventSystem.RemoveListener<DistressCallRequest>(DistressCallRequestListener);
 		EventSystem.RemoveListener<VesselRequest>(VesselRequestListener);
@@ -1431,34 +1375,30 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			rotationStabilization = RCS == null && IsPrefabStationVessel ? 1f : RCSRotationStabilization;
 		}
 		double stabilizationValue = rotationStabilization.Value * stabilizationMultiplier * timeDelta;
-		Vector3D oldRotation = AngularVelocityPerAxis;
-		if (AngularVelocityPerAxis.X > 0.0)
+		Vector3D oldRotation = AngularVelocity;
+		if (AngularVelocity.X > 0.0)
 		{
-			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X - stabilizationValue * stabilizeAxes.X, 0.0, AngularVelocityPerAxis.X);
+			AngularVelocity.X = MathHelper.Clamp(AngularVelocity.X - stabilizationValue * stabilizeAxes.X, 0.0, AngularVelocity.X);
 		}
 		else
 		{
-			AngularVelocityPerAxis.X = MathHelper.Clamp(AngularVelocityPerAxis.X + stabilizationValue * stabilizeAxes.X, AngularVelocityPerAxis.X, 0.0);
+			AngularVelocity.X = MathHelper.Clamp(AngularVelocity.X + stabilizationValue * stabilizeAxes.X, AngularVelocity.X, 0.0);
 		}
-		if (AngularVelocityPerAxis.Y > 0.0)
+		if (AngularVelocity.Y > 0.0)
 		{
-			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y - stabilizationValue * stabilizeAxes.Y, 0.0, AngularVelocityPerAxis.Y);
-		}
-		else
-		{
-			AngularVelocityPerAxis.Y = MathHelper.Clamp(AngularVelocityPerAxis.Y + stabilizationValue * stabilizeAxes.Y, AngularVelocityPerAxis.Y, 0.0);
-		}
-		if (AngularVelocityPerAxis.Z > 0.0)
-		{
-			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z - stabilizationValue * stabilizeAxes.Z, 0.0, AngularVelocityPerAxis.Z);
+			AngularVelocity.Y = MathHelper.Clamp(AngularVelocity.Y - stabilizationValue * stabilizeAxes.Y, 0.0, AngularVelocity.Y);
 		}
 		else
 		{
-			AngularVelocityPerAxis.Z = MathHelper.Clamp(AngularVelocityPerAxis.Z + stabilizationValue * stabilizeAxes.Z, AngularVelocityPerAxis.Z, 0.0);
+			AngularVelocity.Y = MathHelper.Clamp(AngularVelocity.Y + stabilizationValue * stabilizeAxes.Y, AngularVelocity.Y, 0.0);
 		}
-		if (!CurrRcsRotationThrust.HasValue)
+		if (AngularVelocity.Z > 0.0)
 		{
-			CurrRcsRotationThrust = AngularVelocityPerAxis - oldRotation;
+			AngularVelocity.Z = MathHelper.Clamp(AngularVelocity.Z - stabilizationValue * stabilizeAxes.Z, 0.0, AngularVelocity.Z);
+		}
+		else
+		{
+			AngularVelocity.Z = MathHelper.Clamp(AngularVelocity.Z + stabilizationValue * stabilizeAxes.Z, AngularVelocity.Z, 0.0);
 		}
 	}
 
@@ -1475,7 +1415,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			SecurityPanelsLocked = SecurityPanelsLocked,
 			OrbitData = orbitData,
 			Rotation = Rotation.ToArray(),
-			AngularVelocity = AngularVelocityPerAxis.ToArray(),
+			AngularVelocity = AngularVelocity.ToArray(),
 			Registration = VesselRegistration,
 			Name = VesselName,
 			EmblemId = EmblemId,
@@ -1589,7 +1529,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		DistributionManager = new DistributionManager(this);
 		InitializeOrbit(Vector3D.Zero, Vector3D.One, data.Rotation.ToQuaternionD());
 		Server.Instance.PhysicsController.CreateAndAddRigidBody(this);
-		AngularVelocityPerAxis = data.AngularVelocity.ToVector3D();
+		AngularVelocity = data.AngularVelocity.ToVector3D();
 		await SetHealthAsync(data.Health);
 		IsInvulnerable = data.IsInvulnerable;
 		DockingControlsDisabled = data.DockingControlsDisabled;

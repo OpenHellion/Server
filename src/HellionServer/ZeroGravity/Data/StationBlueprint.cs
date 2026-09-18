@@ -190,7 +190,7 @@ public class StationBlueprint
 		mainVessel.Orbit.UpdateOrbit();
 		if (LocalAngularVelocity is { Length: 3 })
 		{
-			mainVessel.AngularVelocityPerAxis = LocalAngularVelocity.ToVector3D();
+			mainVessel.AngularVelocity = LocalAngularVelocity.ToVector3D();
 		}
 		return mainVessel;
 	}

@@ -245,7 +245,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 			SceneID = SceneId,
 			IsAlwaysVisible = IsAlwaysVisible,
 			Rotation = Rotation.ToArray(),
-			AngularVelocity = AngularVelocityPerAxis.ToArray(),
+			AngularVelocity = AngularVelocity.ToArray(),
 			MiningPoints = MiningPoints.Values.Select((AsteroidMiningPoint m) => m.GetDetails()).ToList()
 		};
 	}
@@ -265,7 +265,7 @@ public class Asteroid : SpaceObjectVessel, IPersistantObject
 		{
 			Orbit.ParseNetworkData(data.OrbitData, resetOrbit: true);
 		}
-		AngularVelocityPerAxis = data.AngularVelocity.ToVector3D();
+		AngularVelocity = data.AngularVelocity.ToVector3D();
 		await Task.Run(() => {
 			foreach (var det in data.MiningPoints)
 			{

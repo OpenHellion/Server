@@ -420,7 +420,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				RigidBody.Activate(forceActivation: true);
 			}
 			RigidBody.LinearVelocity = Velocity.ToVector3();
-			RigidBody.AngularVelocity = AngularVelocity.ToVector3();
+			RigidBody.AngularVelocity = (Rotation * AngularVelocity * (System.Math.PI / 180.0)).ToVector3();
 		}
 	}
 
@@ -432,7 +432,8 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 
 		PhysicsVelocityDifference = RigidBody.LinearVelocity.ToVector3D() - Velocity;
-		PhysicsRotationDifference = Rotation.Inverse() * (RigidBody.AngularVelocity.ToVector3D() - AngularVelocity) * (180.0 / System.Math.PI);
+		PhysicsRotationDifference =
+			Rotation.Inverse() * (RigidBody.AngularVelocity.ToVector3D() * (180.0 / System.Math.PI) - Rotation * AngularVelocity);
 	}
 
 	public void RemoveMachineryPart(VesselObjectID slotID)
@@ -809,7 +810,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 				float ratio2 = MathHelper.Clamp((radius - dist2) / radius, 0f, 1f);
 				await vessel.ChangeHealthBy((0f - ratio2) * baseDamage, null, VesselRepairPoint.Priority.External, force: false, VesselDamageType.NearbyVesselExplosion);
 				Vector3D thrust2 = (vessel.Position - Position).Normalized * 5.0 * ratio2;
-				vessel.AngularVelocityPerAxis += new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 5.0 * ratio2;
+				vessel.AngularVelocity += new Vector3D(MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble(), MathHelper.RandomNextDouble()) * 5.0 * ratio2;
 				vessel.Orbit.InitFromStateVectors(vessel.Orbit.Parent, vessel.Orbit.Position, vessel.Orbit.Velocity + thrust2, Server.Instance.SolarSystem.CurrentTime, areValuesRelative: false);
 				await vessel.DisableStabilization(disableForChildren: true, updateBeforeDisable: false);
 			}

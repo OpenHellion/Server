@@ -251,7 +251,7 @@ public class SpawnRule
 						SpawnRange<float>[] angularVelocity = AngularVelocity;
 						if (angularVelocity is { Length: 3 })
 						{
-							firstVessel.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
+							firstVessel.AngularVelocity = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						firstVessel.IsPartOfSpawnSystem = true;
 						clusterVessels.Add(firstVessel);
@@ -276,7 +276,7 @@ public class SpawnRule
 						SpawnRange<float>[] angularVelocity2 = AngularVelocity;
 						if (angularVelocity2 is { Length: 3 })
 						{
-							currVessel.AngularVelocityPerAxis = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
+							currVessel.AngularVelocity = new Vector3D(MathHelper.RandomRange(AngularVelocity[0].Min, AngularVelocity[0].Max), MathHelper.RandomRange(AngularVelocity[1].Min, AngularVelocity[1].Max), MathHelper.RandomRange(AngularVelocity[2].Min, AngularVelocity[2].Max));
 						}
 						currVessel.StabilizeToTarget(firstVessel, forceStabilize: true);
 						currVessel.IsPartOfSpawnSystem = true;
@@ -351,15 +351,24 @@ public class SpawnRule
 
 	private async Task<SpaceObjectVessel> ExecuteBlueprintRule(bool force = false)
 	{
-		if (!force && CheckPlayersDistance > 0.0)
+		if (!force)
 		{
-			foreach (SpaceObjectVessel ves in SpawnedVessels.Where((SpaceObjectVessel m) => m is Asteroid || m.Health > 0f))
+			List<SpaceObjectVessel> liveVessels = SpawnedVessels.Where((SpaceObjectVessel m) => m is Asteroid || m.Health > 0f).ToList();
+			foreach (Player pl in Server.Instance.AllPlayers)
 			{
-				double dist;
-				Player pl = ves.GetNearestPlayer(out dist);
-				if (pl != null && dist < CheckPlayersDistance)
+				if (liveVessels.Contains(pl.CurrentSpawnPoint?.Ship) || liveVessels.Contains(pl.AuthorizedSpawnPoint?.Ship))
 				{
 					return null;
+				}
+			}
+			if (CheckPlayersDistance > 0.0)
+			{
+				foreach (SpaceObjectVessel ves in liveVessels)
+				{
+					if (ves.GetNearestPlayer(out double dist) != null && dist < CheckPlayersDistance)
+					{
+						return null;
+					}
 				}
 			}
 		}

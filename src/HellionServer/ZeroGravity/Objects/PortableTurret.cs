@@ -124,7 +124,7 @@ internal class PortableTurret : Item
 		}
 	}
 
-	private async void DamagePlayer(double deltaTime)
+	private async Task DamagePlayer(double deltaTime)
 	{
 		if (targetPlayer is { IsAlive: true })
 		{

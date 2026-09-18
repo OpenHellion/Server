@@ -271,10 +271,9 @@ public class BulletPhysicsController
 				contactManifold.ClearManifold();
 			}
 		}
-		catch (InvalidOperationException ex)
+		catch (Exception ex)
 		{
 			Debug.LogException(ex);
-			return;
 		}
 	}
 

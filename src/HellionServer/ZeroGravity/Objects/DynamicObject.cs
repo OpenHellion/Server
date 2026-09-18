@@ -190,7 +190,7 @@ public class DynamicObject : SpaceObjectTransferable, IPersistantObject
 		return dynamicObject;
 	}
 
-	private async void SelfDestructCheck(double dbl)
+	private async Task SelfDestructCheck(double dbl)
 	{
 		if (Parent is Pivot && (DateTime.UtcNow - lastSenderTime).TotalSeconds >= 300.0)
 		{

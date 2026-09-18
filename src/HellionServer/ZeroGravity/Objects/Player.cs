@@ -1355,14 +1355,14 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 	}
 
-	private void DisconnectAfterDeath(double deltaTime)
+	private Task DisconnectAfterDeath(double deltaTime)
 	{
 		// The client closed it first, which is the normal path.
 		if (!NetworkController.IsPlayerConnected(Guid))
 		{
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, DisconnectAfterDeath);
 			_deathDisconnectWait = 0.0;
-			return;
+			return Task.CompletedTask;
 		}
 
 		_deathDisconnectWait += deltaTime;
@@ -1373,6 +1373,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, DisconnectAfterDeath);
 			_deathDisconnectWait = 0.0;
 		}
+		return Task.CompletedTask;
 	}
 
 	public void LogoutDisconnectReset()

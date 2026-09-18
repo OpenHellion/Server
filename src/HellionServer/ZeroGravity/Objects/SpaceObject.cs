@@ -45,9 +45,12 @@ public abstract class SpaceObject
 
 	public virtual Task UpdateTimers(double deltaTime)
 	{
-		IsExposedToSunlight = CalculateSunlightExposure(out _sqrDistanceFromSun);
-
 		return Task.CompletedTask;
+	}
+
+	public void RefreshSunlightExposure()
+	{
+		IsExposedToSunlight = CalculateSunlightExposure(out _sqrDistanceFromSun);
 	}
 
 	public virtual async Task Destroy()

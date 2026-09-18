@@ -54,7 +54,7 @@ public class DeathMatchArenaController : IPersistantObject
 		return r * new Vector3D(System.Math.Cos(a) * System.Math.Sin(b), System.Math.Sin(a) * System.Math.Sin(b), System.Math.Cos(b));
 	}
 
-	public async void SpawnShipCallback(double dbl)
+	public async Task SpawnShipCallback(double dbl)
 	{
 		timePassedSince += dbl;
 		if (timePassedSince > RespawnTimeForShip)
@@ -70,7 +70,7 @@ public class DeathMatchArenaController : IPersistantObject
 		}
 	}
 
-	public void DistanceCallback(double dbl)
+	public Task DistanceCallback(double dbl)
 	{
 		double distanceSquared = CurrentSpawnedShip == null ? double.MaxValue : CurrentSpawnedShip.Position.DistanceSquared(MainVessel.Position);
 		if (distanceSquared > SquaredDistanceThreshold)
@@ -79,6 +79,7 @@ public class DeathMatchArenaController : IPersistantObject
 			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_min, DistanceCallback);
 			StartTimerForNewShip();
 		}
+		return Task.CompletedTask;
 	}
 
 	public PersistenceObjectData GetPersistenceData()

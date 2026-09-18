@@ -31,7 +31,7 @@ public class DoomedShipController : IPersistantObject
 		}
 	}
 
-	private void UpdateTimerCallback(double deltaTime)
+	private Task UpdateTimerCallback(double deltaTime)
 	{
 		spawnTimer += deltaTime;
 		if (spawnTimer > SpawnFrequencySec)
@@ -42,6 +42,7 @@ public class DoomedShipController : IPersistantObject
 			}
 			spawnTimer = 0.0;
 		}
+		return Task.CompletedTask;
 	}
 
 	public void SpawnDoomedShip()

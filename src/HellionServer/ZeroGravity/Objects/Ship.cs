@@ -1294,6 +1294,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 		if (VesselCrew.Count > 0)
 		{
+			RefreshSunlightExposure();
 			Temperature = SpaceExposureTemperature(Temperature, HeatCollectionFactor, HeatDissipationFactor, (float)Mass, deltaTime);
 		}
 		if (CurrentCourse != null && AutoActivateCourse == CurrentCourse && CurrentCourse.StartSolarSystemTime > Server.SolarSystemTime && CurrentCourse.StartSolarSystemTime <= Server.SolarSystemTime + 1.0)
@@ -1310,28 +1311,33 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			await MainDistributionManager.UpdateSystems(ConnectionsChanged, ConnectionsChanged);
 			ConnectionsChanged = false;
 		}
-		ShipStatsMessage ssm = new ShipStatsMessage
+		SpaceObjectVessel main = MainVessel;
+		if (NetworkController.HasConnectedClients
+			&& (main.VesselCrew.Count != 0 || main.AllDockedVessels.Any((SpaceObjectVessel m) => m.VesselCrew.Count > 0)))
 		{
-			Guid = Guid,
-			Temperature = Temperature,
-			Health = Health,
-			Armor = Armor,
-			VesselObjects = new VesselObjects
+			ShipStatsMessage ssm = new ShipStatsMessage
 			{
-				SubSystems = DistributionManager.GetSubSystemsDetails(changedOnly: true, Guid),
-				Generators = DistributionManager.GetGeneratorsDetails(changedOnly: true, Guid),
-				RoomTriggers = DistributionManager.GetRoomsDetails(changedOnly: true, Guid),
-				ResourceContainers = DistributionManager.GetResourceContainersDetails(changedOnly: true, Guid),
-				RepairPoints = GetVesselRepairPointsDetails(changedOnly: true),
-				Doors = DistributionManager.GetDoorsDetails(changedOnly: true, Guid)
+				Guid = Guid,
+				Temperature = Temperature,
+				Health = Health,
+				Armor = Armor,
+				VesselObjects = new VesselObjects
+				{
+					SubSystems = DistributionManager.GetSubSystemsDetails(changedOnly: true, Guid),
+					Generators = DistributionManager.GetGeneratorsDetails(changedOnly: true, Guid),
+					RoomTriggers = DistributionManager.GetRoomsDetails(changedOnly: true, Guid),
+					ResourceContainers = DistributionManager.GetResourceContainersDetails(changedOnly: true, Guid),
+					RepairPoints = GetVesselRepairPointsDetails(changedOnly: true),
+					Doors = DistributionManager.GetDoorsDetails(changedOnly: true, Guid)
+				}
+			};
+			if (SelfDestructTimer != null && prevDestructionSolarSystemTime != SelfDestructTimer.DestructionSolarSystemTime)
+			{
+				prevDestructionSolarSystemTime = SelfDestructTimer.DestructionSolarSystemTime;
+				ssm.SelfDestructTime = SelfDestructTimer?.Time;
 			}
-		};
-		if (SelfDestructTimer != null && prevDestructionSolarSystemTime != SelfDestructTimer.DestructionSolarSystemTime)
-		{
-			prevDestructionSolarSystemTime = SelfDestructTimer.DestructionSolarSystemTime;
-			ssm.SelfDestructTime = SelfDestructTimer?.Time;
+			await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		}
-		await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		foreach (long guid in DynamicObjects)
 		{
 			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj)
@@ -1747,7 +1753,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		}
 	}
 
-	public async void SpawnShipCallback(double deltaTime)
+	public async Task SpawnShipCallback(double deltaTime)
 	{
 		TimePassedSinceRequest += deltaTime;
 

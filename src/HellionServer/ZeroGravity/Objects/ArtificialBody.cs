@@ -118,10 +118,7 @@ public class ArtificialBody : SpaceObject
 	{
 		if (initializeOrbit)
 		{
-			Orbit.SetArtificialBody(this);
-			InitializeFromStateVectors(position, velocity);
-			Rotation = rotation;
-			Server.Instance.SolarSystem.AddArtificialBody(this);
+			InitializeOrbit(position, velocity, rotation);
 		}
 	}
 
@@ -131,6 +128,7 @@ public class ArtificialBody : SpaceObject
 		InitializeFromStateVectors(position, velocity, orbit);
 		Rotation = rotation;
 		Server.Instance.SolarSystem.AddArtificialBody(this);
+		RefreshSunlightExposure();
 	}
 
 	public override async Task Destroy()

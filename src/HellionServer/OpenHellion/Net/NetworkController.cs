@@ -164,6 +164,8 @@ public static class NetworkController
 	}
 
 
+	public static bool HasConnectedClients => _transport.Connections > 0;
+
 	/// <summary>
 	/// 	Get a list of all the players on the server.
 	/// </summary>
@@ -210,7 +212,7 @@ public static class NetworkController
 	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
 	public static async Task SendToClientsSubscribedTo(NetworkData data, long skipPlayerGuid = -1L, params SpaceObject[] spaceObjects)
 	{
-		if (spaceObjects.Length == 0)
+		if (spaceObjects.Length == 0 || !HasConnectedClients)
 		{
 			return;
 		}

@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace ZeroGravity;
 
 public class UpdateTimer
@@ -12,7 +14,7 @@ public class UpdateTimer
 		Step_1_0_hr
 	}
 
-	public delegate void TimeStepDelegate(double deltaTime);
+	public delegate Task TimeStepDelegate(double deltaTime);
 
 	private double timePassed;
 
@@ -48,16 +50,21 @@ public class UpdateTimer
 		}
 	}
 
-	public void AddTime(double deltaTime)
+	public async Task AddTime(double deltaTime)
 	{
 		timePassed += deltaTime;
-		if (timePassed > updateInverval)
+		if (timePassed < updateInverval)
 		{
-			if (OnTick != null)
-			{
-				OnTick(timePassed);
-			}
-			timePassed = 0.0;
+			return;
+		}
+
+		double elapsed = timePassed;
+		timePassed = System.Math.Min(timePassed - updateInverval, updateInverval);
+
+		TimeStepDelegate onTick = OnTick;
+		if (onTick != null)
+		{
+			await onTick(elapsed);
 		}
 	}
 }

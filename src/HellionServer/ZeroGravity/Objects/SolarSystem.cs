@@ -25,7 +25,7 @@ public class SolarSystem
 
 	public double CurrentTime => _currentTime;
 
-	public int ArtificialBodiesCount => Server.Instance.SpaceObjects.Values.OfType<ArtificialBody>().Count();
+	public int ArtificialBodiesCount => Server.Instance.ArtificialBodiesCount;
 
 	public CelestialBody GetCelestialBody(long guid)
 	{
@@ -52,11 +52,13 @@ public class SolarSystem
 	{
 		Server.Instance.SpaceObjects.TryRemove(body.Guid, out _);
 		Server.Instance.SpaceObjects.TryAdd(body.Guid, body, body.Position);
+		Server.Instance.TrackArtificialBody(body);
 	}
 
 	public void RemoveArtificialBody(ArtificialBody body)
 	{
 		Server.Instance.SpaceObjects.TryRemove(body.Guid, out _);
+		Server.Instance.UntrackArtificialBody(body.Guid);
 		if (body is Pivot { Child: not null } pivot)
 		{
 			Server.Instance.SpaceObjects.TryAdd(pivot.Guid, pivot.Child);
@@ -84,12 +86,11 @@ public class SolarSystem
 		{
 			body.Update();
 		}
-		List<ArtificialBody> artificialBodies = [.. Server.Instance.SpaceObjects.Values.OfType<ArtificialBody>()];
-		await Parallel.ForEachAsync(artificialBodies, async (ab, ct) =>
+		foreach (ArtificialBody ab in Server.Instance.ArtificialBodies)
 		{
 			await ab.Update();
-		});
-		await Parallel.ForEachAsync(artificialBodies, async (ArtificialBody ab, CancellationToken _) =>
+		}
+		foreach (ArtificialBody ab in Server.Instance.ArtificialBodies)
 		{
 			await ab.AfterUpdate();
 			if (ab is SpaceObjectVessel { IsDocked: true })
@@ -100,14 +101,15 @@ public class SolarSystem
 			{
 				Server.Instance.SpaceObjects.SetPosition(ab.Guid, ab.Position);
 			}
-		});
+		}
 		if (CheckDestroyMarkedBodies)
 		{
-			foreach (ArtificialBody ab2 in artificialBodies.Where((ArtificialBody m) => m.MarkForDestruction))
-			{
-				await Server.Instance.DestroyArtificialBody(ab2);
-			}
 			CheckDestroyMarkedBodies = false;
+			List<ArtificialBody> markedBodies = [.. Server.Instance.ArtificialBodies.Where((ArtificialBody m) => m.MarkForDestruction)];
+			foreach (ArtificialBody ab in markedBodies)
+			{
+				await Server.Instance.DestroyArtificialBody(ab);
+			}
 		}
 	}
 
@@ -352,7 +354,7 @@ public class SolarSystem
 
 	public ArtificialBody[] GetArtificialBodies()
 	{
-		return [.. Server.Instance.SpaceObjects.Values.OfType<ArtificialBody>()];
+		return [.. Server.Instance.ArtificialBodies];
 	}
 
 	public List<SpaceObjectVessel> GetVesselsInRange(Vector3D position, double radius, long selfGuid)

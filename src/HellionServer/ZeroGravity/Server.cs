@@ -296,9 +296,14 @@ public sealed class Server
 
 	private readonly ConcurrentDictionary<long, DynamicObject> _updateableDynamicObjects = new();
 
-	private readonly List<UpdateTimer> _timersToRemove = new List<UpdateTimer>();
+	// Artificial body optimisation
+	private readonly ConcurrentDictionary<long, ArtificialBody> _artificialBodies = new();
 
-	private readonly List<UpdateTimer> _timers = new List<UpdateTimer>();
+	private ArtificialBody[] _artificialBodiesCache = [];
+
+	private volatile bool _artificialBodiesChanged = true;
+
+	private readonly ConcurrentDictionary<UpdateTimer.TimerStep, UpdateTimer> _timers = new();
 
 	public readonly SolarSystem SolarSystem;
 
@@ -380,6 +385,8 @@ public sealed class Server
 
 	private const double PilotStateSendInterval = 1.0 / 30.0;
 
+	private const double ShipSystemSweepSeconds = 1.0;
+
 	private static double _pilotStateTimer;
 
 	private static double _movementMessageTimer;
@@ -402,25 +409,62 @@ public sealed class Server
 
 	private SaveFileAuxData _manualSaveAuxData;
 
-	private bool _updatingShipSystems;
+	private SpaceObjectVessel[] _shipSystemSweep = [];
+
+	private int _shipSystemCursor;
+
+	private double _shipSystemSweepTime;
+
+	private double _shipSystemSweepSeconds = ShipSystemSweepSeconds;
 
 	public readonly ConcurrentDictionary<long, VesselDataUpdate> VesselsDataUpdate = new ConcurrentDictionary<long, VesselDataUpdate>();
 
 	public List<DynamicObjectsRespawn> DynamicObjectsRespawnList = new List<DynamicObjectsRespawn>();
 
-	private double _tickMilliseconds;
-
 	public double DeltaTime;
 
-	private DateTime _lastTime;
+	private long _lastTickTimestamp;
 
 	public const double SpawnPointInviteTimer = 300.0;
 
 	private static string _loadPersistenceFromFile;
 
-	public ImmutableList<SpaceObjectVessel> AllVessels => [.. _vessels.Values];
+	public IEnumerable<SpaceObjectVessel> AllVessels
+	{
+		get
+		{
+			foreach (KeyValuePair<long, SpaceObjectVessel> vessel in _vessels)
+			{
+				yield return vessel.Value;
+			}
+		}
+	}
 
-	public ImmutableList<Player> AllPlayers => [.. _players.Values];
+	public IEnumerable<Player> AllPlayers
+	{
+		get
+		{
+			foreach (KeyValuePair<long, Player> player in _players)
+			{
+				yield return player.Value;
+			}
+		}
+	}
+
+	public ArtificialBody[] ArtificialBodies
+	{
+		get
+		{
+			if (_artificialBodiesChanged)
+			{
+				_artificialBodiesChanged = false;
+				_artificialBodiesCache = [.. _artificialBodies.Values];
+			}
+			return _artificialBodiesCache;
+		}
+	}
+
+	public int ArtificialBodiesCount => _artificialBodies.Count;
 
 	public static Server Instance { get; private set; }
 
@@ -519,6 +563,8 @@ public sealed class Server
 		}
 
 		_vessels[vessel.Guid] = vessel;
+		_artificialBodies[vessel.Guid] = vessel;
+		_artificialBodiesChanged = true;
 		SpaceObjects.TryAdd(vessel.Guid, vessel, vessel.Position);
 	}
 
@@ -550,7 +596,21 @@ public sealed class Server
 	public void Remove(SpaceObjectVessel vessel)
 	{
 		_vessels.TryRemove(vessel.Guid, out _);
+		_artificialBodies.TryRemove(vessel.Guid, out _);
+		_artificialBodiesChanged = true;
 		SpaceObjects.TryRemove(vessel.Guid, out _);
+	}
+
+	public void TrackArtificialBody(ArtificialBody body)
+	{
+		_artificialBodies[body.Guid] = body;
+		_artificialBodiesChanged = true;
+	}
+
+	public void UntrackArtificialBody(long guid)
+	{
+		_artificialBodies.TryRemove(guid, out _);
+		_artificialBodiesChanged = true;
 	}
 
 	public void Remove(DynamicObject dobj)
@@ -2188,7 +2248,43 @@ public sealed class Server
 
 		await UpdateObjectTimers(deltaTime);
 
-		UpdatePlayerInvitationTimers(deltaTime);
+		await UpdatePlayerInvitationTimers(deltaTime);
+
+		// Tick ships over several updates instead of one singular tick.
+		_shipSystemSweepTime += deltaTime;
+		int sweepTarget = (int)(_shipSystemSweep.Length * _shipSystemSweepTime / ShipSystemSweepSeconds);
+		while (_shipSystemCursor < sweepTarget && _shipSystemCursor < _shipSystemSweep.Length)
+		{
+			SpaceObjectVessel vessel = _shipSystemSweep[_shipSystemCursor++];
+			if (vessel is null)
+			{
+				continue;
+			}
+			vessel.RefreshSunlightExposure();
+			foreach (SpaceObjectVessel dockedVessel in vessel.AllDockedVessels)
+			{
+				dockedVessel.RefreshSunlightExposure();
+			}
+			await vessel.UpdateVesselSystems();
+			vessel.DecayGraceTimer = MathHelper.Clamp(vessel.DecayGraceTimer - _shipSystemSweepSeconds, 0.0, double.MaxValue);
+			if (vessel.DecayGraceTimer <= double.Epsilon)
+			{
+				await vessel.ChangeHealthBy(
+					(float)((0f - vessel.ExposureDamage) * VesselDecayRateMultiplier * _shipSystemSweepSeconds), null,
+					VesselRepairPoint.Priority.Internal, force: false, VesselDamageType.Decay, _shipSystemSweepSeconds);
+			}
+		}
+		if (_shipSystemCursor >= _shipSystemSweep.Length && _shipSystemSweepTime >= ShipSystemSweepSeconds)
+		{
+			foreach (DebrisField debrisField in DebrisFields)
+			{
+				await debrisField.CheckVessels(_shipSystemSweepTime);
+			}
+			_shipSystemSweepSeconds = _shipSystemSweepTime;
+			_shipSystemSweep = [.. _vessels.Values];
+			_shipSystemCursor = 0;
+			_shipSystemSweepTime = 0.0;
+		}
 
 		_pilotStateTimer += deltaTime;
 		if (_pilotStateTimer >= PilotStateSendInterval)
@@ -2305,9 +2401,10 @@ public sealed class Server
 		}
 	}
 
-	private void PrintObjectsDebug(double time)
+	private Task PrintObjectsDebug(double time)
 	{
 		Debug.LogInfo("Server stats, objects", SpaceObjects.Count, "players", _players.Count, "vessels", _vessels.Count, "artificial bodies", SolarSystem.ArtificialBodiesCount);
+		return Task.CompletedTask;
 	}
 
 	public async Task MainLoop()
@@ -2337,72 +2434,75 @@ public sealed class Server
 		}
 		await Start();
 		NetworkController.Start();
-		_tickMilliseconds = System.Math.Floor(1000.0 / _numberOfTicks);
-		_lastTime = DateTime.UtcNow;
+		long tickPeriod = Stopwatch.Frequency / System.Math.Max(_numberOfTicks, 1L);
+		Volatile.Write(ref _lastTickTimestamp, Stopwatch.GetTimestamp());
 		if (ServerRestartTimeSec > 0.0)
 		{
 			RestartTime = DateTime.UtcNow.AddSeconds(ServerRestartTimeSec);
 			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, ServerAutoRestartTimer);
 		}
 		DoomedShipController.SubscribeToTimer();
-		bool hadSleep = true;
-		DateTime lastServerTickedWithoutSleepTime = DateTime.MinValue;
+		DateTime lastOverrunLogTime = DateTime.MinValue;
 		if (_printDebugObjects)
 		{
 			SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_hr, PrintObjectsDebug);
 		}
-		SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, UpdateShipSystemsTimer);
 		_mainLoopStarted = true;
 		new Thread(StartMainLoopWatcher).Start();
+		long tickDeadline = Stopwatch.GetTimestamp() + tickPeriod;
 		while (IsRunning)
 		{
-			DateTime currentTime = DateTime.UtcNow;
-			TimeSpan span = currentTime - _lastTime;
-			if (span.TotalMilliseconds >= _tickMilliseconds)
+			long now = Stopwatch.GetTimestamp();
+			if (now < tickDeadline)
 			{
-				AddRemovePlayers();
-				if (_printDebugObjects && !hadSleep && (currentTime - lastServerTickedWithoutSleepTime).TotalSeconds > 60.0)
+				await Task.Delay(TimeSpan.FromSeconds((double)(tickDeadline - now) / Stopwatch.Frequency));
+				continue;
+			}
+
+			AddRemovePlayers();
+			DeltaTime = (double)(now - Volatile.Read(ref _lastTickTimestamp)) / Stopwatch.Frequency;
+			Volatile.Write(ref _lastTickTimestamp, now);
+
+			await UpdateData(DeltaTime);
+
+			foreach (KeyValuePair<UpdateTimer.TimerStep, UpdateTimer> timer in _timers)
+			{
+				try
 				{
-					Debug.LogInfoFormat("Server ticked without sleep. Time span ms {0}. Tick ms {1}. Objects {2}. Players {3}. Vessels {4}. Artificial bodies {5}.", (int)span.TotalMilliseconds, _tickMilliseconds, SpaceObjects.Count, _players.Count, _vessels.Count, SolarSystem.ArtificialBodiesCount);
-					lastServerTickedWithoutSleepTime = currentTime;
+					await timer.Value.AddTime(DeltaTime);
 				}
-				hadSleep = false;
-				DeltaTime = span.TotalSeconds;
-				await UpdateData(DeltaTime);
-				_lastTime = currentTime;
-				foreach (UpdateTimer timer2 in _timers)
+				catch (Exception ex)
 				{
-					timer2.AddTime(DeltaTime);
-				}
-				if (_timersToRemove.Count > 0)
-				{
-					foreach (UpdateTimer timer in _timersToRemove)
-					{
-						if (timer.OnTick == null)
-						{
-							_timers.Remove(timer);
-						}
-					}
-					_timersToRemove.Clear();
-				}
-				await SpawnManager.UpdateTimers(DeltaTime);
-				if (PersistenceSaveInterval > 0.0 || _manualSave)
-				{
-					_persistenceSaveTimer += span.TotalSeconds;
-					if (_persistenceSaveTimer >= PersistenceSaveInterval || _manualSave)
-					{
-						_persistenceSaveTimer = 0.0;
-						Persistence.Save(_manualSaveFileName, _manualSaveAuxData);
-					}
-					_manualSave = false;
-					_manualSaveFileName = null;
-					_manualSaveAuxData = null;
+					Debug.LogException(ex);
 				}
 			}
-			else
+
+			await SpawnManager.UpdateTimers(DeltaTime);
+
+			long tickDuration = Stopwatch.GetTimestamp() - now;
+			if (tickDuration > tickPeriod && (DateTime.UtcNow - lastOverrunLogTime).TotalSeconds > 60.0)
 			{
-				hadSleep = true;
-				await Task.Delay((int)(_tickMilliseconds - span.TotalMilliseconds));
+				Debug.LogWarningFormat("Tick overran its budget. Tick ms {0:F1}. Budget ms {1:F2}. Objects {2}. Players {3}. Vessels {4}. Artificial bodies {5}.", tickDuration * 1000.0 / Stopwatch.Frequency, tickPeriod * 1000.0 / Stopwatch.Frequency, SpaceObjects.Count, _players.Count, _vessels.Count, SolarSystem.ArtificialBodiesCount);
+				lastOverrunLogTime = DateTime.UtcNow;
+			}
+
+			if (PersistenceSaveInterval > 0.0 || _manualSave)
+			{
+				_persistenceSaveTimer += DeltaTime;
+				if (_persistenceSaveTimer >= PersistenceSaveInterval || _manualSave)
+				{
+					_persistenceSaveTimer = 0.0;
+					Persistence.Save(_manualSaveFileName, _manualSaveAuxData);
+				}
+				_manualSave = false;
+				_manualSaveFileName = null;
+				_manualSaveAuxData = null;
+			}
+
+			tickDeadline += tickPeriod;
+			if (tickDeadline < Stopwatch.GetTimestamp())
+			{
+				tickDeadline = Stopwatch.GetTimestamp() + tickPeriod;
 			}
 		}
 
@@ -2452,7 +2552,7 @@ public sealed class Server
 		double warnedAtSeconds = 0.0;
 		while (IsRunning)
 		{
-			double stalledSeconds = (DateTime.UtcNow - _lastTime).TotalSeconds;
+			double stalledSeconds = (double)(Stopwatch.GetTimestamp() - Volatile.Read(ref _lastTickTimestamp)) / Stopwatch.Frequency;
 			if (stalledSeconds > 5.0)
 			{
 				if (stalledSeconds > warnedAtSeconds * 2.0)
@@ -2510,27 +2610,27 @@ public sealed class Server
 
 	public void SubscribeToTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = _timers.Find((UpdateTimer x) => x.Step == step);
-		if (timer == null)
+		UpdateTimer timer = _timers.GetOrAdd(step, static s => new UpdateTimer(s));
+		UpdateTimer.TimeStepDelegate current;
+		do
 		{
-			timer = new UpdateTimer(step);
-			_timers.Add(timer);
+			current = timer.OnTick;
 		}
-		UpdateTimer updateTimer = timer;
-		updateTimer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Combine(updateTimer.OnTick, del);
+		while (Interlocked.CompareExchange(ref timer.OnTick, (UpdateTimer.TimeStepDelegate)Delegate.Combine(current, del), current) != current);
 	}
 
 	public void UnsubscribeFromTimer(UpdateTimer.TimerStep step, UpdateTimer.TimeStepDelegate del)
 	{
-		UpdateTimer timer = _timers.Find((UpdateTimer x) => x.Step == step);
-		if (timer != null)
+		if (!_timers.TryGetValue(step, out UpdateTimer timer))
 		{
-			timer.OnTick = (UpdateTimer.TimeStepDelegate)Delegate.Remove(timer.OnTick, del);
-			if (timer.OnTick == null)
-			{
-				_timersToRemove.Add(timer);
-			}
+			return;
 		}
+		UpdateTimer.TimeStepDelegate current;
+		do
+		{
+			current = timer.OnTick;
+		}
+		while (Interlocked.CompareExchange(ref timer.OnTick, (UpdateTimer.TimeStepDelegate)Delegate.Remove(current, del), current) != current);
 	}
 
 	public async void PlayersOnServerRequestListener(NetworkData data)
@@ -2675,7 +2775,7 @@ public sealed class Server
 		return false;
 	}
 
-	public async void UpdatePlayerInvitationTimers(double deltaTime)
+	public async Task UpdatePlayerInvitationTimers(double deltaTime)
 	{
 		if (_spawnPointInvites.Count == 0)
 		{
@@ -2757,7 +2857,7 @@ public sealed class Server
 		return false;
 	}
 
-	private async void ServerAutoRestartTimer(double time)
+	private async Task ServerAutoRestartTimer(double time)
 	{
 		DateTime currentTime = DateTime.UtcNow;
 		if (currentTime.AddSeconds(_timeToRestart) > RestartTime)
@@ -2800,34 +2900,6 @@ public sealed class Server
 		}
 	}
 
-	private async void UpdateShipSystemsTimer(double time)
-	{
-		if (_updatingShipSystems)
-		{
-			return;
-		}
-		_updatingShipSystems = true;
-		var vessels = _vessels.Values.ToArray();
-		foreach (SpaceObjectVessel vessel in vessels)
-		{
-			if (vessel is null) continue;
-			await vessel.UpdateVesselSystems();
-			vessel.DecayGraceTimer = MathHelper.Clamp(vessel.DecayGraceTimer - time, 0.0, double.MaxValue);
-			if (vessel.DecayGraceTimer <= double.Epsilon)
-			{
-				await vessel.ChangeHealthBy(
-					(float)((0f - vessel.ExposureDamage) * VesselDecayRateMultiplier * time), null,
-					VesselRepairPoint.Priority.Internal, force: false, VesselDamageType.Decay, time);
-			}
-		}
-
-
-		foreach (DebrisField debrisField in DebrisFields)
-		{
-			await debrisField.CheckVessels(time);
-		}
-		_updatingShipSystems = false;
-	}
 
 	public List<DebrisFieldDetails> GetDebrisFieldsDetails()
 	{

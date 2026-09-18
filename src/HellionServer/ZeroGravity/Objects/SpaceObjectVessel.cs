@@ -746,7 +746,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public virtual Task UpdateVesselSystems()
 	{
-		return Task.FromException(new NotImplementedException());
+		return Task.CompletedTask;
 	}
 
 	public override async Task UpdateTimers(double deltaTime)

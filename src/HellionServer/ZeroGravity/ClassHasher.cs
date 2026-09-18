@@ -34,10 +34,13 @@ public static class ClassHasher
 			str += "\r\n";
 		}
 		uint hashedValue = 744748791u;
-		for (int i = 0; i < str.Length; i++)
+		unchecked
 		{
-			hashedValue += str[i];
-			hashedValue *= 3045351289u;
+			for (int i = 0; i < str.Length; i++)
+			{
+				hashedValue += str[i];
+				hashedValue *= 3045351289u;
+			}
 		}
 		return hashedValue;
 	}

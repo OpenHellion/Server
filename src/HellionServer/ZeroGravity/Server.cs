@@ -394,7 +394,7 @@ public sealed class Server
 
 	private static readonly uint SceneDataHash = ClassHasher.GetClassHashCode(typeof(ISceneData));
 
-	public static readonly uint CombinedHash = NetworkDataHash * SceneDataHash;
+	public static readonly uint CombinedHash = unchecked(NetworkDataHash * SceneDataHash);
 
 	private bool _manualSave;
 

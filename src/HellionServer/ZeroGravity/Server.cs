@@ -607,9 +607,15 @@ public sealed class Server
 		_artificialBodiesChanged = true;
 	}
 
-	public void UntrackArtificialBody(long guid)
+	public void UntrackArtificialBody(ArtificialBody body)
 	{
-		_artificialBodies.TryRemove(guid, out _);
+		// Make sure we're not removing a pivot by accident.
+		if (!_artificialBodies.TryGetValue(body.Guid, out ArtificialBody tracked) || !ReferenceEquals(tracked, body))
+		{
+			return;
+		}
+
+		_artificialBodies.TryRemove(body.Guid, out _);
 		_artificialBodiesChanged = true;
 	}
 

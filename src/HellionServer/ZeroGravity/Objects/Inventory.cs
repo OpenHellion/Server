@@ -169,6 +169,10 @@ public class Inventory
 		}
 		if (newSlot == null || !newSlot.CanStoreItem(item))
 		{
+			Debug.LogWarning("AddItemToInventory refused", item.GUID, item.Type, "requestedSlot", slotID,
+				"slotFound", newSlot != null, "canStore", newSlot != null && newSlot.CanStoreItem(item),
+				"hasOutfit", CurrOutfit != null,
+				"outfitSlotIds", CurrOutfit == null ? "none" : string.Join(",", CurrOutfit.InventorySlots.Keys));
 			return false;
 		}
 		if (newSlot.Item != null && newSlot.Item != item)

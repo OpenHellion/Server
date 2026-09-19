@@ -57,8 +57,16 @@ public class SolarSystem
 
 	public void RemoveArtificialBody(ArtificialBody body)
 	{
+		Server.Instance.UntrackArtificialBody(body);
+
+		// Make sure we're not removing a pivot by accident.
+		Server.Instance.SpaceObjects.TryGet(body.Guid, out SpaceObject registered);
+		if (!ReferenceEquals(registered, body))
+		{
+			return;
+		}
+
 		Server.Instance.SpaceObjects.TryRemove(body.Guid, out _);
-		Server.Instance.UntrackArtificialBody(body.Guid);
 		if (body is Pivot { Child: not null } pivot)
 		{
 			Server.Instance.SpaceObjects.TryAdd(pivot.Guid, pivot.Child);

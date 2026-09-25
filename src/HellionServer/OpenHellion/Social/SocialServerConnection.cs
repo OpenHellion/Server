@@ -47,6 +47,11 @@ public static class SocialServerConnection
 	/// <exception cref="ArgumentNullException" />
 	public static async Task<T> Send<T>(NakamaMessage message)
 	{
+		if (HttpKey is null)
+		{
+			throw new MainServerException("No http_key is configured, so the main server cannot be reached.");
+		}
+
 		if (HttpKey.Contains('&'))
 		{
 			throw new MainServerException("HttpKey contains &.");
@@ -112,6 +117,11 @@ public static class SocialServerConnection
 	/// <exception cref="ArgumentNullException" />
 	public static async Task Send(NakamaMessage message)
 	{
+		if (HttpKey is null)
+		{
+			throw new MainServerException("No http_key is configured, so the main server cannot be reached.");
+		}
+
 		if (HttpKey.Contains('&'))
 		{
 			throw new MainServerException("HttpKey contains &.");

@@ -15,10 +15,6 @@ public class LogInResponse : NetworkData
 
 	public bool IsAlive;
 
-	public bool CanContinue;
-
-	public List<SpawnPointDetails> SpawnPointsList;
-
 	public List<DebrisFieldDetails> DebrisFields;
 
 	public List<ItemIngredientsData> ItemsIngredients;

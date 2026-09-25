@@ -1,6 +1,8 @@
-// RegisterServerRequest.cs
+// JoinInfoRequest.cs
 //
-// Copyright (C) 2025, OpenHellion contributors
+// Copyright (C) 2026, OpenHellion contributors
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,23 +17,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using System;
-using Newtonsoft.Json;
+using ProtoBuf;
+using ZeroGravity.Network;
 
-namespace OpenHellion.Social.Message;
+namespace OpenHellion.Net.Message;
 
-[Serializable]
-[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-public class RegisterServerRequest : NakamaMessage
+[ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+public class JoinInfoRequest : NetworkData
 {
-	public string AuthToken;
+	public string PlayerId;
 
-	public int GamePort;
-
-	public int StatusPort;
-
-	public override string GetDestination()
-	{
-		return "register_server";
-	}
+	public string Password;
 }

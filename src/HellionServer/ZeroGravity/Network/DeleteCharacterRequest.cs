@@ -6,6 +6,4 @@ namespace ZeroGravity.Network;
 public class DeleteCharacterRequest : NetworkData
 {
 	public string PlayerId;
-
-	public string ServerId;
 }

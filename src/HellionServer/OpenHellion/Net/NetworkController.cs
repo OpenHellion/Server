@@ -33,70 +33,60 @@ public static class NetworkController
 			var loginData = await ProtoSerialiser.Unpack(stream, maxMessageSize) as LogInRequest;
 			if (loginData is null)
 			{
-				Debug.LogError("Connected client did not send loginrequest on connect.", loginData.ToString());
+				Debug.LogError("Connected client did not send a login request on connect.");
 				return -1;
 			}
 
-			Debug.LogInfoFormat("Received login request for player {0} with id {1}.", loginData.CharacterData.Name, loginData.PlayerId);
+			async Task<long> Reject(string reason)
+			{
+				Debug.LogInfo("Rejected login.", reason);
+				await stream.WriteAsync(await ProtoSerialiser.Pack(new LogInResponse
+				{
+					SyncResponse = true,
+					ConversationGuid = loginData.ConversationGuid,
+					Status = NetworkData.MessageStatus.Failure
+				})).ConfigureAwait(false);
+				return -1;
+			}
+
+			Debug.LogInfoFormat("Received login request for player {0} with id {1}.", loginData.CharacterData?.Name,
+				loginData.PlayerId);
+
 			if (loginData.ClientHash != Server.CombinedHash)
 			{
-				Debug.LogInfo("Client/server hash mismatch.", loginData.ClientHash, Server.CombinedHash);
-				var logInResponse = new LogInResponse
-				{
-					SyncResponse = true,
-					ConversationGuid = loginData.ConversationGuid,
-					Status = NetworkData.MessageStatus.Failure
-				};
-				await stream.WriteAsync(await ProtoSerialiser.Pack(logInResponse)).ConfigureAwait(false);
-				return -1;
+				return await Reject($"client hash {loginData.ClientHash} does not match server hash {Server.CombinedHash}");
 			}
 
-#if !DEBUG
-			// Also has the added benefit of blocking players from joining non-nakama servers.
-			if (loginData.ServerID != ServerId)
+			// Offline clients pick their own player id, so they must never reach a server that trusts main
+			// server identities, and vice versa.
+			if (loginData.IsOffline != Server.OfflineMode)
 			{
-				Debug.LogInfo("LogInRequest server ID doesn't match this server ID.", loginData.ServerID, ServerId);
-				var logInResponse = new LogInResponse
-				{
-					SyncResponse = true,
-					ConversationGuid = loginData.ConversationGuid,
-					Status = NetworkData.MessageStatus.Failure
-				};
-				await stream.WriteAsync(await ProtoSerialiser.Pack(logInResponse)).ConfigureAwait(false);
-				return -1;
+				return await Reject(loginData.IsOffline
+					? "client is in offline mode but this server uses the main server"
+					: "client expects a main server but this server runs in offline mode");
 			}
-#endif
 
-			// Check if player id is valid.
-			// TODO: Verify playerid with Nakama.
+			if (!Server.ServerPassword.IsNullOrEmpty() && loginData.Password != Server.ServerPassword)
+			{
+				return await Reject("wrong server password");
+			}
+
 			if (!Guid.TryParse(loginData.PlayerId, out _))
 			{
-				Debug.LogInfo("Player id isn't valid.", loginData.ServerID, ServerId);
-				var logInResponse = new LogInResponse
-				{
-					SyncResponse = true,
-					ConversationGuid = loginData.ConversationGuid,
-					Status = NetworkData.MessageStatus.Failure
-				};
-				await stream.WriteAsync(await ProtoSerialiser.Pack(logInResponse)).ConfigureAwait(false);
-				return -1;
+				return await Reject($"player id {loginData.PlayerId} is not a valid guid");
 			}
 
 			long guid = GUIDFactory.PlayerIdToGuid(loginData.PlayerId);
 			if (otherConnections.Contains(guid))
 			{
-				Debug.LogInfoFormat("Client with guid {0} is already connected.", guid);
-				var logInResponse = new LogInResponse
-				{
-					SyncResponse = true,
-					ConversationGuid = loginData.ConversationGuid,
-					Status = NetworkData.MessageStatus.Failure
-				};
-				await stream.WriteAsync(await ProtoSerialiser.Pack(logInResponse)).ConfigureAwait(false);
-				return -1;
+				return await Reject($"client with guid {guid} is already connected");
 			}
 
 			var player = await Server.Instance.GetOrCreateConnectedPlayerAsync(guid, loginData.PlayerId, loginData.CharacterData);
+			if (player is null)
+			{
+				return await Reject($"could not create a player for id {loginData.PlayerId}");
+			}
 
 			if (!player.PlayerReady || !player.EnvironmentReady)
 			{
@@ -120,7 +110,6 @@ public static class NetworkController
 				},
 				ServerTime = Server.Instance.SolarSystem.CurrentTime,
 				IsAlive = player.IsAlive,
-				CanContinue = player.AuthorizedSpawnPoint != null,
 				DebrisFields = Server.Instance.GetDebrisFieldsDetails(),
 				ItemsIngredients = StaticData.ItemsIngredients,
 				Quests = StaticData.QuestsData,
@@ -129,11 +118,6 @@ public static class NetworkController
 				PlayerExposureValues = StaticData.SolarSystem.PlayerExposureValues,
 				VesselDecayRateMultiplier = Server.VesselDecayRateMultiplier
 			};
-
-			if (!player.IsAlive)
-			{
-				loginResponse.SpawnPointsList = Server.Instance.GetAvailableSpawnPoints(player);
-			}
 
 			var packedData = await ProtoSerialiser.Pack(loginResponse);
 			await stream.WriteAsync(packedData).ConfigureAwait(false);

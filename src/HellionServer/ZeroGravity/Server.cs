@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -312,6 +311,14 @@ public sealed class Server
 	private long _numberOfTicks = 64L;
 
 	public static int GamePort = 6004;
+
+	public static bool OfflineMode;
+
+	public static string ServerName = "Hellion Server";
+
+	public static string ServerDescription = "";
+
+	public static string ServerPassword = "";
 
 	public static int StatusPort = 6005;
 
@@ -746,6 +753,10 @@ public sealed class Server
 		Properties.TryGetPropertySafe("server_tick_count", ref _numberOfTicks);
 		Properties.TryGetPropertySafe("game_port", ref GamePort);
 		Properties.TryGetPropertySafe("status_port", ref StatusPort);
+		Properties.TryGetPropertySafe("offline_mode", ref OfflineMode);
+		Properties.TryGetPropertySafe("server_name", ref ServerName);
+		Properties.TryGetPropertySafe("server_description", ref ServerDescription);
+		Properties.TryGetPropertySafe("server_password", ref ServerPassword);
 		Properties.TryGetPropertySafe("http_key", ref SocialServerConnection.HttpKey);
 		Properties.TryGetPropertySafe("main_server_ip", ref SocialServerConnection.IpAddress);
 		Properties.TryGetPropertySafe("main_server_port", ref SocialServerConnection.Port);
@@ -796,6 +807,12 @@ public sealed class Server
 		if (player is null)
 		{
 			Debug.Log("Creating new player for client with guid:", guid);
+
+			if (characterData is null)
+			{
+				Debug.LogError("Cannot create a player without character data.", playerId);
+				return null;
+			}
 
 			player = await Player.CreatePlayerAsync(guid, Vector3D.Zero, QuaternionD.Identity, characterData.Name, playerId, characterData.Gender, characterData.HeadType, characterData.HairType);
 			Add(player);
@@ -950,25 +967,26 @@ public sealed class Server
 		EventSystem.AddListener<ServerShutDownMessage>(ServerShutDownMessageListener);
 		EventSystem.AddListener<NameTagMessage>(NameTagMessageListener);
 
-		try
+		if (!OfflineMode)
 		{
-			RegisterServerResponse response = await SocialServerConnection.Send<RegisterServerResponse>(new RegisterServerRequest
+			try
 			{
-				AuthToken = Properties.GetProperty<string>("auth_key"),
-				Location = RegionInfo.CurrentRegion.EnglishName,
-				GamePort = GamePort,
-				StatusPort = StatusPort,
-				Hash = CombinedHash
-			});
+				RegisterServerResponse response = await SocialServerConnection.Send<RegisterServerResponse>(new RegisterServerRequest
+				{
+					AuthToken = Properties.GetProperty<string>("auth_key"),
+					GamePort = GamePort,
+					StatusPort = StatusPort
+				});
 
-			NetworkController.ServerId = response.ServerId;
-			_adminIpAddressRanges = response.AdminIpAddressRanges;
-		}
-		catch
-		{
-			Debug.LogError("Could not connect to main server. Check if ip, port and auth key is correct.");
-			IsRunning = false;
-			return;
+				NetworkController.ServerId = response.ServerId;
+				_adminIpAddressRanges = response.AdminIpAddressRanges;
+			}
+			catch
+			{
+				Debug.LogError("Could not connect to main server. Check if ip, port and auth key is correct.");
+				IsRunning = false;
+				return;
+			}
 		}
 
 		Console.Title = " (id: " + (NetworkController.ServerId == null ? "Not yet assigned" : string.Concat(NetworkController.ServerId)) + ")";
@@ -2532,7 +2550,7 @@ public sealed class Server
 		{
 			RestartServer(CleanRestart);
 		}
-		else
+		else if (!OfflineMode)
 		{
 			try
 			{

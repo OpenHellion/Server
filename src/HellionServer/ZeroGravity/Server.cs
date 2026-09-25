@@ -973,7 +973,6 @@ public sealed class Server
 			{
 				RegisterServerResponse response = await SocialServerConnection.Send<RegisterServerResponse>(new RegisterServerRequest
 				{
-					AuthToken = Properties.GetProperty<string>("auth_key"),
 					GamePort = GamePort,
 					StatusPort = StatusPort
 				});

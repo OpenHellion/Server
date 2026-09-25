@@ -91,11 +91,6 @@ public static class Program
 		// The main server keys only matter when we are in online mode.
 		if (!Server.Properties.TryGetProperty<bool>("offline_mode", out var offlineMode) || !offlineMode)
 		{
-			if (!Server.Properties.TryGetProperty<string>("auth_key", out var _))
-			{
-				Debug.LogError("Missing or invalid 'auth_key' field. Set 'offline_mode=true' to run without a main server.");
-				Environment.Exit(1);
-			}
 			if (!Server.Properties.TryGetProperty<string>("http_key", out var _))
 			{
 				Debug.LogError("Missing or invalid 'http_key' field. Set 'offline_mode=true' to run without a main server.");

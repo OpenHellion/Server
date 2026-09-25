@@ -24,8 +24,6 @@ namespace OpenHellion.Social.Message;
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
 public class RegisterServerRequest : NakamaMessage
 {
-	public string AuthToken;
-
 	public int GamePort;
 
 	public int StatusPort;

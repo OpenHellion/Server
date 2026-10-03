@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenHellion.State;
 using ZeroGravity.Data;
+using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.ShipComponents;
 
@@ -12,31 +14,15 @@ public abstract class Item : IPersistantObject, IDamageable
 {
 	public ItemType Type;
 
-	public int Tier = 1;
-
 	public float[] TierMultipliers;
 
 	public float[] AuxValues;
 
 	public double AttachmentChangeTime;
 
-	private InventorySlot _Slot;
-
-	private VesselObjectID _AttachPointID;
-
-	private AttachPointType _attachPointType = AttachPointType.None;
-
-	private float _MaxHealth = 100f;
-
-	private float _Health = 100f;
-
-	private float _Armor;
-
 	public float MeleeDamage;
 
 	public Dictionary<short, ItemSlot> Slots;
-
-	public short ItemSlotID;
 
 	public float ExplosionRadius;
 
@@ -46,44 +32,47 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	protected bool TierMultiplierApplied;
 
+	protected List<CargoCompartmentData> CargoTemplates;
+
+	private double _destroyAt;
+
+	protected static SolarSystemState State => Server.Instance.SolarSystem.State;
+
+	protected ItemId Row => DynamicObj.Row;
+
+	public short ItemSlotID => State.Location(Row) is { Kind: LocationKind.ItemSlot } location ? location.SlotId : (short)0;
+
 	public InventorySlot Slot
 	{
 		get
 		{
-			return _Slot;
-		}
-		protected set
-		{
-			_Slot = value;
-			AttachmentChangeTime = Server.SolarSystemTime;
+			ItemLocation location = State.Location(Row);
+			if (location.Kind != LocationKind.Inventory)
+			{
+				return null;
+			}
+			return DynamicObj.Parent switch
+			{
+				Player player => player.PlayerInventory.GetSlot(location.SlotId),
+				Corpse corpse => corpse.CorpseInventory.GetSlot(location.SlotId),
+				DynamicObject { Item: Outfit outfit } => outfit.InventorySlots.GetValueOrDefault(location.SlotId),
+				_ => null
+			};
 		}
 	}
 
-	public abstract DynamicObjectStats StatsNew { get; }
-
-	public VesselObjectID AttachPointID
-	{
-		get
-		{
-			return _AttachPointID;
-		}
-		private set
-		{
-			_AttachPointID = value;
-			AttachmentChangeTime = Server.SolarSystemTime;
-		}
-	}
+	public VesselObjectID AttachPointID => State.Location(Row) is { Kind: LocationKind.AttachPoint } location ? new VesselObjectID(location.ParentKey, location.SlotId) : null;
 
 	public AttachPointType AttachPointType
 	{
 		get
 		{
-			return _attachPointType;
-		}
-		private set
-		{
-			_attachPointType = value;
-			AttachmentChangeTime = Server.SolarSystemTime;
+			ItemLocation location = State.Location(Row);
+			if (location.Kind != LocationKind.AttachPoint || Server.Instance.GetVessel(location.ParentKey) is not { } vessel)
+			{
+				return AttachPointType.None;
+			}
+			return vessel.AttachPointsTypes.GetValueOrDefault(new VesselObjectID(location.ParentKey, location.SlotId));
 		}
 	}
 
@@ -91,40 +80,28 @@ public abstract class Item : IPersistantObject, IDamageable
 
 	public DynamicObject DynamicObj { get; private set; }
 
+	public int Tier
+	{
+		get => State.Tier(Row);
+		set => State.SetTier(Row, value);
+	}
+
 	public float MaxHealth
 	{
-		get
-		{
-			return _MaxHealth;
-		}
-		set
-		{
-			_MaxHealth = value < 0f ? 0f : value;
-		}
+		get => State.MaxHealth(Row);
+		set => State.SetMaxHealth(Row, value < 0f ? 0f : value);
 	}
 
 	public float Health
 	{
-		get
-		{
-			return _Health;
-		}
-		set
-		{
-			_Health = value > MaxHealth ? MaxHealth : value < 0f ? 0f : value;
-		}
+		get => State.Health(Row);
+		set => State.SetHealth(Row, value > MaxHealth ? MaxHealth : value < 0f ? 0f : value);
 	}
 
 	public float Armor
 	{
-		get
-		{
-			return _Armor;
-		}
-		set
-		{
-			_Armor = value < 0f ? 0f : value;
-		}
+		get => State.Armor(Row);
+		set => State.SetArmor(Row, value < 0f ? 0f : value);
 	}
 
 	public bool Damageable { get; set; }
@@ -205,68 +182,12 @@ public abstract class Item : IPersistantObject, IDamageable
 		}
 	}
 
-	public abstract Task<bool> ChangeStats(DynamicObjectStats stats);
-
-	public virtual void SetInventorySlot(InventorySlot slot)
-	{
-		if (Slot != null && Slot.Item == this)
-		{
-			Slot.Item = null;
-		}
-		Slot = slot;
-		if (slot != null)
-		{
-			Slot.Item = this;
-		}
-		if (slot != null)
-		{
-			DynamicObj.Parent = slot.GetParent();
-			ChangeEquip(slot.GetEquipType());
-		}
-		else
-		{
-			ChangeEquip(Inventory.EquipType.None);
-		}
-	}
-
-	public virtual void SetAttachPoint(AttachPointDetails data)
-	{
-		if (data is not { InSceneID: > 0 })
-		{
-			if (AttachPointID != null)
-			{
-				SpaceObjectVessel ves = Server.Instance.GetVessel(AttachPointID.VesselGUID);
-				if (ves != null && ves.AttachPoints.TryGetValue(AttachPointID.InSceneID, out var point))
-				{
-					point.Item = null;
-				}
-			}
-			AttachPointID = null;
-			AttachPointType = AttachPointType.None;
-		}
-		else if (DynamicObj.Parent is SpaceObjectVessel)
-		{
-			AttachPointID = new VesselObjectID(DynamicObj.Parent.Guid, data.InSceneID);
-			AttachPointType apType = AttachPointType.None;
-			(DynamicObj.Parent as SpaceObjectVessel).AttachPointsTypes.TryGetValue(AttachPointID, out apType);
-			AttachPointType = apType;
-			if (apType == AttachPointType.ResourcesAutoTransferPoint && this is Canister && DynamicObj.Parent is Ship)
-			{
-				AutoTransferResources();
-			}
-			if ((DynamicObj.Parent as SpaceObjectVessel).AttachPoints.ContainsKey(AttachPointID.InSceneID))
-			{
-				(DynamicObj.Parent as SpaceObjectVessel).AttachPoints[AttachPointID.InSceneID].Item = this;
-			}
-		}
-	}
-
 	internal async Task<Item> GetCopy()
 	{
 		return (await DynamicObj.GetCopy()).Item;
 	}
 
-	private void AutoTransferResources()
+	internal void AutoTransferResources()
 	{
 		ICargo cargo = this as ICargo;
 		CargoCompartmentData comp = cargo.GetCompartment();
@@ -293,106 +214,103 @@ public abstract class Item : IPersistantObject, IDamageable
 		Item it = null;
 		if (ItemTypeRange.IsHelmet(type))
 		{
-			it = await Helmet.CreateAsync(data);
+			it = new Helmet();
 		}
 		else if (ItemTypeRange.IsJetpack(type))
 		{
-			it = await Jetpack.CreateAsync(data);
+			it = new Jetpack();
 		}
 		else if (ItemTypeRange.IsWeapon(type))
 		{
-			it = await Weapon.CreateAsync(data);
+			it = new Weapon();
 		}
 		else if (ItemTypeRange.IsOutfit(type))
 		{
-			it = await Outfit.CreateOutfitAsync(data);
+			it = new Outfit();
 		}
 		else if (ItemTypeRange.IsAmmo(type))
 		{
-			it = await Magazine.CreateMagazineAsync(data);
+			it = new Magazine();
 		}
 		else if (ItemTypeRange.IsMachineryPart(type))
 		{
-			it = await MachineryPart.CreateAsync(data);
+			it = new MachineryPart();
 		}
 		else if (ItemTypeRange.IsBattery(type))
 		{
-			it = await Battery.CreateBatteryAsync(data);
+			it = new Battery();
 		}
 		else if (ItemTypeRange.IsCanister(type))
 		{
-			it = await Canister.CreateAsync(data);
+			it = new Canister();
 		}
 		else if (ItemTypeRange.IsDrill(type))
 		{
-			it = await HandDrill.CreateAsync(data);
+			it = new HandDrill();
 		}
 		else if (ItemTypeRange.IsMelee(type))
 		{
-			it = await MeleeWeapon.CreateAsync(data);
+			it = new MeleeWeapon();
 		}
 		else if (ItemTypeRange.IsGlowStick(type))
 		{
-			it = new GlowStick(data);
+			it = new GlowStick();
 		}
 		else if (ItemTypeRange.IsMedpack(type))
 		{
-			it = await Medpack.CreateAsync(data);
+			it = new Medpack();
 		}
 		else if (ItemTypeRange.IsHackingTool(type))
 		{
-			it = new DisposableHackingTool(data);
+			it = new DisposableHackingTool();
 		}
 		else if (ItemTypeRange.IsAsteroidScanningTool(type))
 		{
-			it = await HandheldAsteroidScanner.CreateAsync(data);
+			it = new HandheldAsteroidScanner();
 		}
 		else if (ItemTypeRange.IsLogItem(type))
 		{
-			it = await LogItem.CreateAsync(data);
+			it = new LogItem();
 		}
 		else if (ItemTypeRange.IsGenericItem(type))
 		{
-			it = await GenericItem.CreateAsync(data);
+			it = new GenericItem();
 		}
 		else if (ItemTypeRange.IsGrenade(type))
 		{
-			it = await Grenade.CreateAsync(data);
+			it = new Grenade();
 		}
 		else if (ItemTypeRange.IsPortableTurret(type))
 		{
-			it = await PortableTurret.CreateAsync(data);
+			it = new PortableTurret();
 		}
 		else if (ItemTypeRange.IsRepairTool(type))
 		{
-			it = await RepairTool.CreateAsync(data);
+			it = new RepairTool();
 		}
-		if (it != null)
+		if (it == null)
 		{
-			it.Type = type;
-			it.DynamicObj = dobj;
-			if (data == null)
+			return null;
+		}
+
+		it.Type = type;
+		it.DynamicObj = dobj;
+		data ??= ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList[dobj.ItemID].DefaultAuxData);
+		if (data == null)
+		{
+			return it;
+		}
+
+		await it.SetData(data);
+		if (it is Helmet helmet)
+		{
+			helmet.IsVisorActive = true;
+		}
+		foreach (ItemSlotData isd in data.Slots ?? [])
+		{
+			if (it.Slots.TryGetValue(isd.ID, out var isl) && (isd.SpawnItem.Type != 0 || isd.SpawnItem.SubType != 0 || isd.SpawnItem.PartType != 0))
 			{
-				data = ObjectCopier.DeepCopy(StaticData.DynamicObjectsDataList[it.DynamicObj.ItemID].DefaultAuxData);
-				if (data != null)
-				{
-					await it.SetData(data);
-				}
-			}
-			List<ItemSlotData> slots = data.Slots;
-			if (slots is { Count: > 0 })
-			{
-				foreach (ItemSlotData isd in data.Slots)
-				{
-					if (it.Slots.TryGetValue(isd.ID, out var isl))
-					{
-						isl.Parent = dobj;
-						if (isd.SpawnItem.Type != 0 || isd.SpawnItem.SubType != 0 || isd.SpawnItem.PartType != 0)
-						{
-							await DynamicObject.SpawnDynamicObject(isd.SpawnItem.Type, isd.SpawnItem.SubType, isd.SpawnItem.PartType, it.DynamicObj, -1, null, null, null, itemSlot: isl, tier: isd.SpawnItem.Tier);
-						}
-					}
-				}
+				await DynamicObject.SpawnDynamicObject(isd.SpawnItem.Type, isd.SpawnItem.SubType, isd.SpawnItem.PartType, it.DynamicObj, -1, null, null, null, itemSlot: isl, tier: isd.SpawnItem.Tier);
 			}
 		}
 		return it;
@@ -415,19 +333,149 @@ public abstract class Item : IPersistantObject, IDamageable
 		ExplosionRadius = data.ExplosionRadius;
 		if (Slots == null && data.Slots != null)
 		{
-			Slots = data.Slots.ToDictionary((ItemSlotData k) => k.ID, (ItemSlotData v) => new ItemSlot(v));
+			Slots = data.Slots.ToDictionary((ItemSlotData k) => k.ID, (ItemSlotData v) => new ItemSlot(v)
+			{
+				Parent = DynamicObj
+			});
 		}
 
 		return Task.CompletedTask;
 	}
 
-	protected virtual void ChangeEquip(Inventory.EquipType equipType)
+	/// <summary>
+	/// 	A new, empty stats message of this item's own type, so the client can read it as such.
+	/// </summary>
+	public virtual DynamicObjectStats NewStats()
 	{
+		return new DynamicObjectStats();
 	}
 
-	public virtual Task SendAllStats()
+	/// <summary>
+	/// 	Writes the requested fields of this item's state into a stats message. ItemChanges.All also writes
+	/// 	the values that never change after creation.
+	/// </summary>
+	public virtual void FillStats(DynamicObjectStats stats, ItemChanges fields)
 	{
-		return Task.CompletedTask;
+		if ((fields & ItemChanges.Health) != 0)
+		{
+			stats.Health = Health;
+		}
+		if ((fields & ItemChanges.MaxHealth) != 0)
+		{
+			stats.MaxHealth = MaxHealth;
+		}
+		if ((fields & ItemChanges.Armor) != 0)
+		{
+			stats.Armor = Armor;
+		}
+		if ((fields & ItemChanges.Tier) != 0)
+		{
+			stats.Tier = Tier;
+		}
+	}
+
+	protected virtual bool KeepsEmptyResource(CargoCompartmentData compartment)
+	{
+		return compartment.AllowOnlyOneType;
+	}
+
+	protected void LoadCargo(List<CargoCompartmentData> templates)
+	{
+		CargoTemplates = templates;
+		for (int resource = State.FirstResource(Row); resource >= 0; resource = State.FirstResource(Row))
+		{
+			State.RemoveResource(Row, State.ResourceCompartment(resource), State.ResourceType(resource));
+		}
+		foreach (CargoCompartmentData template in templates)
+		{
+			foreach (CargoResourceData resource in template.Resources ?? [])
+			{
+				if (KeepsEmptyResource(template) || resource.Quantity > float.Epsilon)
+				{
+					State.SetResource(Row, template.ID, (short)resource.ResourceType, resource.Quantity);
+				}
+			}
+		}
+	}
+
+	public List<CargoCompartmentData> Compartments => CargoTemplates?.Select(CargoView).ToList();
+
+	public CargoCompartmentData GetCompartment(int? id = null)
+	{
+		CargoCompartmentData template = id.HasValue ? CargoTemplates.Find(m => m.ID == id.Value) : CargoTemplates[0];
+		return template == null ? null : CargoView(template);
+	}
+
+	private CargoCompartmentData CargoView(CargoCompartmentData template)
+	{
+		List<CargoResourceData> resources = [];
+		for (int resource = State.FirstResource(Row); resource >= 0; resource = State.NextResource(resource))
+		{
+			if (State.ResourceCompartment(resource) == template.ID)
+			{
+				resources.Add(new CargoResourceData
+				{
+					ResourceType = (ResourceType)State.ResourceType(resource),
+					Quantity = State.ResourceQuantity(resource)
+				});
+			}
+		}
+		return new CargoCompartmentData
+		{
+			ID = template.ID,
+			AllowedResources = template.AllowedResources,
+			AllowOnlyOneType = template.AllowOnlyOneType,
+			Capacity = template.Capacity,
+			Type = template.Type,
+			Resources = resources
+		};
+	}
+
+	protected float ChangeCargoQuantity(int compartmentId, ResourceType resourceType, float quantity)
+	{
+		CargoCompartmentData template = CargoTemplates.Find(m => m.ID == compartmentId);
+		if (template == null)
+		{
+			return 0f;
+		}
+
+		float stored = 0f;
+		for (int resource = State.FirstResource(Row); resource >= 0; resource = State.NextResource(resource))
+		{
+			if (State.ResourceCompartment(resource) == template.ID)
+			{
+				stored += State.ResourceQuantity(resource);
+			}
+		}
+		float available = State.ResourceQuantity(Row, template.ID, (short)resourceType);
+		float qty = quantity > 0f ? MathHelper.Clamp(quantity, 0f, template.Capacity - stored) : -MathHelper.Clamp(-quantity, 0f, available);
+		float result = available + qty;
+		if (result <= float.Epsilon && !KeepsEmptyResource(template))
+		{
+			State.RemoveResource(Row, template.ID, (short)resourceType);
+		}
+		else
+		{
+			State.SetResource(Row, template.ID, (short)resourceType, result);
+		}
+		return qty;
+	}
+
+	public void ApplyCargoSpawnSettings(SpaceObjectVessel vessel)
+	{
+		foreach (CargoCompartmentData template in CargoTemplates ?? [])
+		{
+			foreach (CargoResourceData resource in (template.Resources ?? []).Where(m => m.SpawnSettings != null))
+			{
+				ResourcesSpawnSettings settings = resource.SpawnSettings.FirstOrDefault(m => vessel.CheckTag(m.Tag, m.Case));
+				if (settings == null)
+				{
+					continue;
+				}
+				ChangeCargoQuantity(template.ID, resource.ResourceType, -State.ResourceQuantity(Row, template.ID, (short)resource.ResourceType));
+				ChangeCargoQuantity(template.ID, resource.ResourceType, MathHelper.RandomRange(settings.MinQuantity, settings.MaxQuantity));
+			}
+		}
 	}
 
 	public void FillPersistenceData(PersistenceObjectDataItem data)
@@ -464,44 +512,37 @@ public abstract class Item : IPersistantObject, IDamageable
 		await DynamicObj.Destroy();
 	}
 
+	public bool IsDestroyScheduled => _destroyAt > 0.0;
+
+	public void DestroyAfter(double seconds)
+	{
+		if (!IsDestroyScheduled)
+		{
+			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, DestroyWhenDue);
+		}
+		_destroyAt = Server.SolarSystemTime + seconds;
+	}
+
+	private async Task DestroyWhenDue(double deltaTime)
+	{
+		bool alive = DynamicObj != null && State.IsAlive(Row);
+		if (alive && Server.SolarSystemTime < _destroyAt)
+		{
+			return;
+		}
+		Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, DestroyWhenDue);
+		if (alive)
+		{
+			await DestroyItem();
+		}
+	}
+
 	public virtual async Task LoadPersistenceData(PersistenceObjectData persistenceData)
 	{
 		PersistenceObjectDataItem data = persistenceData as PersistenceObjectDataItem;
 		await DynamicObj.LoadPersistenceData(data);
 		Health = data.Health;
 		Armor = data.Armor;
-		AttachPointDetails apd = null;
-		if (data.AttachPointID is > 0)
-		{
-			apd = new AttachPointDetails
-			{
-				InSceneID = data.AttachPointID.Value
-			};
-			try
-			{
-				SetAttachPoint(apd);
-			}
-			catch
-			{
-			}
-		}
-		DynamicObj.APDetails = apd;
-		if (DynamicObj.Parent is DynamicObject { Item: not null } parentDynObj)
-		{
-			if (data.SlotID.HasValue && parentDynObj.Item is Outfit outfit && outfit.InventorySlots.TryGetValue(data.SlotID.Value, out var inventorySlot))
-			{
-				SetInventorySlot(inventorySlot);
-			}
-		}
-		if (DynamicObj.Parent is Player player && data.SlotID.HasValue)
-		{
-			await player.PlayerInventory.AddItemToInventory(this, data.SlotID.Value);
-		}
-		if (DynamicObj.Parent is DynamicObject dynamicObject && data.ItemSlotID.HasValue && dynamicObject.Item.Slots != null && dynamicObject.Item.Slots.TryGetValue(data.ItemSlotID.Value, out var slot))
-		{
-			slot.Item = this;
-			ItemSlotID = slot.ID;
-		}
 	}
 
 	public virtual async Task TakeDamage(TypeOfDamage type, float damage, bool forceTakeDamage = false)
@@ -523,12 +564,6 @@ public abstract class Item : IPersistantObject, IDamageable
 		if (!((amount -= Armor) < float.Epsilon))
 		{
 			Health -= amount;
-			if (StatsNew != null)
-			{
-				StatsNew.Health = Health;
-				StatsNew.Damages = damages;
-			}
-			await DynamicObj.SendStatsToClient();
 		}
 	}
 

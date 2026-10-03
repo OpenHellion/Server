@@ -198,7 +198,6 @@ public class SubSystemFTL : SubSystem
 				warpCell.Health -= warpFuel;
 				warpFuel = 0f;
 			}
-			await warpCell.DynamicObj.SendStatsToClient();
 		}
 	}
 

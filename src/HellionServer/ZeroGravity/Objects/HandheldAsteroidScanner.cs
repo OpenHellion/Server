@@ -8,23 +8,6 @@ public class HandheldAsteroidScanner : Item
 {
 	private int penetrationLevel;
 
-	public override DynamicObjectStats StatsNew => null;
-
-	private HandheldAsteroidScanner()
-	{
-	}
-
-	public static async Task<HandheldAsteroidScanner> CreateAsync(DynamicObjectAuxData data)
-	{
-		HandheldAsteroidScanner asteroidScanner = new();
-		if (data != null)
-		{
-			await asteroidScanner.SetData(data);
-		}
-
-		return asteroidScanner;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
@@ -59,8 +42,4 @@ public class HandheldAsteroidScanner : Item
 		}
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		return Task.FromResult(true);
-	}
 }

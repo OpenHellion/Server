@@ -1,5 +1,5 @@
+using OpenHellion.State;
 using System.Threading.Tasks;
-using System.Timers;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -11,63 +11,12 @@ public class Medpack : Item
 
 	public float MaxHp;
 
-	private MedpackStats medStats = new();
-
-	private Timer destroyTimer;
-
-	public override DynamicObjectStats StatsNew => medStats;
-
-	private Medpack()
-	{
-	}
-
-	public static async Task<Medpack> CreateAsync(DynamicObjectAuxData data)
-	{
-		Medpack medpack = new();
-		if (data != null)
-		{
-			await medpack.SetData(data);
-		}
-
-		return medpack;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		MedpackData md = data as MedpackData;
 		RegenRate = md.RegenRate;
 		MaxHp = md.MaxHP;
-	}
-
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		MedpackStats ms = stats as MedpackStats;
-		if (ms.Use)
-		{
-			if (DynamicObj.Parent is Player)
-			{
-				(DynamicObj.Parent as Player).HealOverTime(RegenRate, MaxHp / RegenRate);
-			}
-			await DynamicObj.SendStatsToClient();
-			destroyTimer = new Timer(2500.0);
-			destroyTimer.Elapsed += async delegate
-			{
-				await DestroyItem();
-			};
-			destroyTimer.Enabled = true;
-			return true;
-		}
-		return false;
-	}
-
-	public override async Task DestroyItem()
-	{
-		await base.DestroyItem();
-		if (destroyTimer != null)
-		{
-			destroyTimer.Dispose();
-		}
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

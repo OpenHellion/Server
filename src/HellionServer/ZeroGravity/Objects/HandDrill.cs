@@ -8,8 +8,6 @@ namespace ZeroGravity.Objects;
 
 internal class HandDrill : Item
 {
-	private HandDrillStats _stats = new();
-
 	private ItemSlot batterySlot;
 
 	private ItemSlot canisterSlot;
@@ -21,8 +19,6 @@ internal class HandDrill : Item
 	private Asteroid _inAsteroidObj;
 
 	private long _inAsteroidGUID;
-
-	public override DynamicObjectStats StatsNew => _stats;
 
 	public Battery Battery => batterySlot != null ? batterySlot.Item as Battery : null;
 
@@ -48,7 +44,6 @@ internal class HandDrill : Item
 			}
 			_inAsteroidDistanceSqr = _inAsteroidObj != null ? System.Math.Pow(_inAsteroidObj.Radius + 100.0, 2.0) : 0.0;
 			_inAsteroidGUID = value;
-			_stats.InAsteroidGUID = value;
 		}
 	}
 
@@ -61,56 +56,15 @@ internal class HandDrill : Item
 		Health: > float.Epsilon
 	};
 
-	private HandDrill()
-	{
-	}
-
-		public static async Task<HandDrill> CreateAsync(DynamicObjectAuxData data)
-	{
-		HandDrill handDrill = new();
-		if (data != null)
-		{
-			await handDrill.SetData(data);
-		}
-
-		if (handDrill.Slots != null)
-		{
-			handDrill.batterySlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillBattery)).Value;
-			handDrill.canisterSlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.Contains(ItemType.AltairHandDrillCanister)).Value;
-			handDrill.drillBitSlot = handDrill.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.GenericSubTypes.Contains(GenericItemSubType.DiamondCoreDrillBit)).Value;
-		}
-
-		return handDrill;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		HandDrillData hd = data as HandDrillData;
 		BatteryUsage = hd.BatteryConsumption;
 		DrillingStrength = hd.DrillingStrength;
-	}
-
-	public override async Task SendAllStats()
-	{
-		if (Battery != null && Battery.DynamicObj.StatsChanged)
-		{
-			await Battery.DynamicObj.SendStatsToClient();
-		}
-		if (Canister != null && Canister.DynamicObj.StatsChanged)
-		{
-			await Canister.DynamicObj.SendStatsToClient();
-		}
-	}
-
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		HandDrillStats hds = stats as HandDrillStats;
-		if (hds.InAsteroidGUID.HasValue)
-		{
-			InAsteroidGUID = hds.InAsteroidGUID.Value;
-		}
-		return Task.FromResult(true);
+		batterySlot = Slots?.Values.FirstOrDefault(m => m.ItemTypes.Contains(ItemType.AltairHandDrillBattery));
+		canisterSlot = Slots?.Values.FirstOrDefault(m => m.ItemTypes.Contains(ItemType.AltairHandDrillCanister));
+		drillBitSlot = Slots?.Values.FirstOrDefault(m => m.GenericSubTypes.Contains(GenericItemSubType.DiamondCoreDrillBit));
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

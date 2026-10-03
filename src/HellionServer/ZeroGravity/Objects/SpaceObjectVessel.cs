@@ -7,6 +7,7 @@ using BulletSharp;
 using BulletSharp.Math;
 using OpenHellion;
 using OpenHellion.Net;
+using OpenHellion.State;
 using ZeroGravity.BulletPhysics;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -408,6 +409,29 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		DistributionManager.GetVesselComponentByPartSlot(slotID)?.FitPartToSlot(slotID, part);
 	}
 
+	/// <summary>
+	/// 	Puts an item on one of this vessel's attach points, fitting machinery parts into their system and
+	/// 	emptying canisters into the ship's containers where the point transfers resources.
+	/// </summary>
+	public bool AttachItem(Item item, short inSceneId)
+	{
+		if (!item.DynamicObj.MoveTo(new ItemLocation(LocationKind.AttachPoint, Guid, inSceneId)))
+		{
+			return false;
+		}
+		item.DynamicObj.LocalPosition = Vector3D.Zero;
+		item.DynamicObj.LocalRotation = QuaternionD.Identity;
+		if (item is MachineryPart { AttachPointType: AttachPointType.MachineryPartSlot } part)
+		{
+			DistributionManager?.GetVesselComponentByPartSlot(part.AttachPointID)?.FitPartToSlot(part.AttachPointID, part);
+		}
+		if (item is Canister && item.AttachPointType == AttachPointType.ResourcesAutoTransferPoint && this is Ship)
+		{
+			item.AutoTransferResources();
+		}
+		return true;
+	}
+
 	public void SetPhysicsParameters()
 	{
 		if (RigidBody != null)
@@ -678,10 +702,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 		}
 		AuthorizedPersonel.Clear();
 		CopyAuthorizedPersonelListToChildren();
-		pl.ItemInHands.ChangeStats(new DisposableHackingToolStats
-		{
-			Use = true
-		});
+		((DisposableHackingTool)pl.ItemInHands).Use();
 		return true;
 	}
 
@@ -977,18 +998,12 @@ public abstract class SpaceObjectVessel : ArtificialBody
 
 	public static async Task RemoveAllLooseDynamicObjects(SpaceObjectVessel vessel)
 	{
-		List<DynamicObject> forRemoval = [];
-		foreach (long dynamicObjectGuid in vessel.DynamicObjects)
+		foreach (DynamicObject dobj in Server.Instance.ItemsInSpaceObject(vessel))
 		{
-			if (Server.Instance.TryGetDynamicObject(dynamicObjectGuid, out var dobj2) && dobj2.Item is { Slot: null, AttachPointID: null, AttachmentChangeTime: > 0.0 } && Server.SolarSystemTime - dobj2.Item.AttachmentChangeTime > Server.JunkItemsTimeToLive)
+			if (dobj.Item is { AttachPointID: null, AttachmentChangeTime: > 0.0 } && Server.SolarSystemTime - dobj.Item.AttachmentChangeTime > Server.JunkItemsTimeToLive)
 			{
-				forRemoval.Add(dobj2);
+				await dobj.Destroy();
 			}
-		}
-		foreach (DynamicObject rem in forRemoval)
-		{
-			await rem.Destroy();
-			vessel.DynamicObjects.Remove(rem.Guid);
 		}
 	}
 

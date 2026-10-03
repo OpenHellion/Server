@@ -18,6 +18,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -47,6 +48,10 @@ internal sealed class GameTransport
 	private const int DrainTimeoutMs = 500;
 
 	private readonly Dictionary<long, ConnectionData> _connections = [];
+
+	private readonly ConcurrentQueue<(long Guid, NetworkData Data)> _received = new();
+
+	private readonly ConcurrentQueue<long> _disconnectQueue = new();
 
 	private Socket _server;
 
@@ -182,20 +187,13 @@ internal sealed class GameTransport
 					{
 						networkData.Sender = guid;
 
-						if (networkData.SyncRequest)
-						{
-							NetworkData res = await EventSystem.InvokeSyncRequest(networkData);
-							res.ConversationGuid = networkData.ConversationGuid;
-							res.SyncResponse = true;
-							await SendAsyncInternal(guid, res).ConfigureAwait(false);
-						}
-						else if (networkData.SyncResponse)
+						if (networkData.SyncResponse)
 						{
 							data.syncResponseReceivedEvent(networkData);
 						}
-						else if (DateTime.UtcNow <= networkData.ExpirationUtc) // If message hasn't expired
+						else if (networkData.SyncRequest || DateTime.UtcNow <= networkData.ExpirationUtc)
 						{
-							EventSystem.Invoke(networkData);
+							_received.Enqueue((guid, networkData));
 						}
 						else
 						{
@@ -236,6 +234,36 @@ internal sealed class GameTransport
 		}
 	}
 
+	internal async Task Tick()
+	{
+		while (_received.TryDequeue(out var received))
+		{
+			try
+			{
+				if (received.Data.SyncRequest)
+				{
+					NetworkData res = await EventSystem.InvokeSyncRequest(received.Data);
+					res.ConversationGuid = received.Data.ConversationGuid;
+					res.SyncResponse = true;
+					await SendAsyncInternal(received.Guid, res);
+				}
+				else
+				{
+					EventSystem.Invoke(received.Data);
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.LogException(ex);
+			}
+		}
+
+		while (_disconnectQueue.TryDequeue(out long guid))
+		{
+			_onDisconnected(guid);
+		}
+	}
+
 	/// <summary>
 	/// 	Send network data to a client.
 	/// </summary>
@@ -247,7 +275,10 @@ internal sealed class GameTransport
 		{
 			if (_connections.TryGetValue(guid, out var connectionData))
 			{
-				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+				if (data.ExpirationUtc != DateTime.MaxValue)
+				{
+					data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+				}
 				var packedData = await ProtoSerialiser.Pack(data);
 				if (packedData == null)
 				{
@@ -325,7 +356,10 @@ internal sealed class GameTransport
 	internal async Task SendToAllAsyncInternal(NetworkData data, long skipPlayerGuid = -1L)
 	{
 		if (_connections.Count == 0) return;
-		data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+		if (data.ExpirationUtc != DateTime.MaxValue)
+		{
+			data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+		}
 		var packedData = await ProtoSerialiser.Pack(data);
 		if (packedData == null)
 		{
@@ -356,7 +390,10 @@ internal sealed class GameTransport
 			if (_connections.TryGetValue(guid, out var handler))
 			{
 
-				data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+				if (data.ExpirationUtc != DateTime.MaxValue)
+				{
+					data.ExpirationUtc = DateTime.UtcNow.AddMilliseconds(TIMEOUT_MS);
+				}
 				var packedData = await ProtoSerialiser.Pack(data);
 				if (packedData == null)
 				{
@@ -395,7 +432,7 @@ internal sealed class GameTransport
 		if (!_connections.TryGetValue(guid, out ConnectionData connection)) return;
 
 		_connections.Remove(guid);
-		_onDisconnected(guid);
+		_disconnectQueue.Enqueue(guid);
 		connection.cancellationToken.Cancel();
 
 		Task.Run(() =>

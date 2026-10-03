@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,25 +10,15 @@ namespace ZeroGravity.Objects;
 
 public class Helmet : Item, IBatteryConsumer, IUpdateable
 {
-	private HelmetStats _stats = new();
-
 	public bool IsVisorToggleable;
 
 	public float HUDPowerConsumption;
 
 	public float LightPowerConsumption;
 
-	private bool _isVisorActive;
-
-	private bool _isLightActive;
-
-	public Jetpack Jetpack;
-
 	public float DamageReduction;
 
 	public float DamageResistance = 1f;
-
-	public override DynamicObjectStats StatsNew => _stats;
 
 	public ItemSlot BatterySlot { get; set; }
 
@@ -37,50 +28,14 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 
 	public bool IsVisorActive
 	{
-		get
-		{
-			return _isVisorActive;
-		}
-		set
-		{
-			_isVisorActive = value;
-			_stats.isVisorActive = value;
-		}
+		get => State.VisorOn(Row);
+		set => State.SetVisorOn(Row, value);
 	}
 
 	public bool IsLightActive
 	{
-		get
-		{
-			return _isLightActive;
-		}
-		set
-		{
-			_isLightActive = value;
-			_stats.isLightActive = value;
-		}
-	}
-
-	private Helmet()
-	{
-	}
-
-	public static async Task<Helmet> CreateAsync(DynamicObjectAuxData data)
-	{
-		if (data == null)
-		{
-			return null;
-		}
-		Helmet helmet = new();
-		await helmet.SetData(data);
-
-		if (helmet.Slots != null)
-		{
-			helmet.BatterySlot = helmet.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => n == ItemType.AltairHandDrillBattery) != ItemType.None).Value;
-		}
-		helmet.IsVisorActive = true;
-
-		return helmet;
+		get => State.LightOn(Row);
+		set => State.SetLightOn(Row, value);
 	}
 
 	public override async Task SetData(DynamicObjectAuxData data)
@@ -94,49 +49,25 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		IsVisorToggleable = hd.IsVisorToggleable;
 		DamageReduction = hd.DamageReduction;
 		DamageResistance = hd.DamageResistance;
+		BatterySlot = Slots?.Values.FirstOrDefault(m => m.ItemTypes.Contains(ItemType.AltairHandDrillBattery));
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	public override DynamicObjectStats NewStats()
 	{
-		HelmetStats hs = stats as HelmetStats;
-		bool retVal = false;
-		if (hs.isLightActive.HasValue && hs.isLightActive.Value != IsLightActive && (!hs.isLightActive.Value || BatteryPower > float.Epsilon))
-		{
-			IsLightActive = hs.isLightActive.Value;
-			retVal = true;
-		}
-		if (IsVisorToggleable && hs.isVisorActive.HasValue && hs.isVisorActive.Value != IsVisorActive)
-		{
-			IsVisorActive = hs.isVisorActive.Value;
-			retVal = true;
-		}
-		return Task.FromResult(retVal);
+		return new HelmetStats();
 	}
 
-	protected override void ChangeEquip(Inventory.EquipType equipType)
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
 	{
-		if (DynamicObj.Parent is not Player)
+		base.FillStats(stats, fields);
+		HelmetStats helmet = (HelmetStats)stats;
+		if ((fields & ItemChanges.LightOn) != 0)
 		{
-			return;
+			helmet.isLightActive = IsLightActive;
 		}
-		Player pl = DynamicObj.Parent as Player;
-		if (equipType == Inventory.EquipType.EquipInventory)
+		if ((fields & ItemChanges.VisorOn) != 0)
 		{
-			pl.CurrentHelmet = this;
-			if (pl.CurrentJetpack != null)
-			{
-				Jetpack = pl.CurrentJetpack;
-				Jetpack.Helmet = this;
-			}
-		}
-		else if (pl.CurrentHelmet == this)
-		{
-			pl.CurrentHelmet = null;
-			if (Jetpack != null)
-			{
-				Jetpack.Helmet = null;
-				Jetpack = null;
-			}
+			helmet.isVisorActive = IsVisorActive;
 		}
 	}
 
@@ -190,7 +121,6 @@ public class Helmet : Item, IBatteryConsumer, IUpdateable
 		if (BatteryPower < float.Epsilon && IsLightActive)
 		{
 			IsLightActive = false;
-			await DynamicObj.SendStatsToClient();
 		}
 	}
 }

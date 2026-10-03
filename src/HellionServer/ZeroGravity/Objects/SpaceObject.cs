@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenHellion.Net;
+using OpenHellion.State;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
 using ZeroGravity.Spawn;
@@ -11,8 +12,6 @@ namespace ZeroGravity.Objects;
 public abstract class SpaceObject
 {
 	public long Guid;
-
-	public readonly HashSet<long> DynamicObjects = [];
 
 	public readonly HashSet<long> Corpses = [];
 
@@ -27,6 +26,13 @@ public abstract class SpaceObject
 	public virtual SpaceObjectType ObjectType => SpaceObjectType.None;
 
 	public virtual SpaceObject Parent { get; set; }
+
+	public long Key => this switch
+	{
+		Player player => player.FakeGuid,
+		Pivot => 0,
+		_ => Guid
+	};
 
 	public virtual Vector3D Position => Vector3D.Zero;
 
@@ -55,12 +61,15 @@ public abstract class SpaceObject
 
 	public virtual async Task Destroy()
 	{
-		foreach (long dynamicObject in new List<long>(DynamicObjects))
+		SolarSystemState state = Server.Instance.SolarSystem.State;
+		List<long> items = [];
+		for (ItemId item = state.FirstChild(Key); item.IsValid; item = state.NextSibling(item))
 		{
-			if (Server.Instance.SpaceObjects.TryRemove(dynamicObject, out SpaceObject spaceObject))
-			{
-				await spaceObject.Destroy();
-			}
+			items.Add(state.Guid(item));
+		}
+		foreach (long item in items)
+		{
+			await Server.Instance.GetDynamicObject(item).Destroy();
 		}
 
 		foreach (long corpse in new List<long>(Corpses))
@@ -182,10 +191,10 @@ public abstract class SpaceObject
 
 	public static T GetParent<T>(SpaceObject parent) where T : SpaceObject
 	{
-		if (parent is T spaceObject)
+		while (parent is not null and not T)
 		{
-			return spaceObject;
+			parent = parent.Parent;
 		}
-		return GetParent<T>(parent.Parent);
+		return parent as T;
 	}
 }

@@ -6,37 +6,15 @@ namespace ZeroGravity.Objects;
 
 public class DisposableHackingTool : Item
 {
-	private DisposableHackingToolStats objStats = new DisposableHackingToolStats();
-
-	public override DynamicObjectStats StatsNew => objStats;
-
-	public DisposableHackingTool(DynamicObjectAuxData data)
+	public override async Task SetData(DynamicObjectAuxData data)
 	{
-		if (data != null)
-		{
-			SetData(data);
-			ApplyTierMultiplier();
-		}
+		await base.SetData(data);
+		ApplyTierMultiplier();
 	}
 
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
+	public Task Use()
 	{
-		DisposableHackingToolStats dhs = stats as DisposableHackingToolStats;
-		if (dhs.Use)
-		{
-			objStats.Use = dhs.Use;
-			await DynamicObj.SendStatsToClient();
-			await TakeDamage(TypeOfDamage.None, 1f);
-			return true;
-		}
-		return false;
-	}
-
-	public async Task Destroy()
-	{
-		SetInventorySlot(null);
-		SetAttachPoint(null);
-		await DynamicObj.Destroy();
+		return TakeDamage(TypeOfDamage.None, 1f);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

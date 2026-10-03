@@ -1449,12 +1449,7 @@ public class DistributionManager
 				float healthDec = scrubber.ScrubberCartridgeConsumption * tempQty / cartridges.Count;
 				foreach (MachineryPart cartridge in cartridges)
 				{
-					float prevHealth = cartridge.Health;
 					cartridge.Health -= healthDec;
-					if ((int)prevHealth != (int)cartridge.Health || (prevHealth > 0f && cartridge.Health == 0f) || (cartridge.Health != prevHealth && Server.SolarSystemTime - cartridge.DynamicObj.LastStatsSendTime > 10.0))
-					{
-						await cartridge.DynamicObj.SendStatsToClient();
-					}
 				}
 			}
 			qtyForScrubbing -= scrubQty;

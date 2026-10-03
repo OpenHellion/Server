@@ -12,28 +12,6 @@ internal class MeleeWeapon : Item
 
 	public float Range;
 
-	public override DynamicObjectStats StatsNew => null;
-
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		return Task.FromResult(false);
-	}
-
-	private MeleeWeapon()
-	{
-	}
-
-	public static async Task<MeleeWeapon> CreateAsync(DynamicObjectAuxData data)
-	{
-		MeleeWeapon meleeWeapon = new();
-		if (data != null)
-		{
-			await meleeWeapon.SetData(data);
-		}
-
-		return meleeWeapon;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);

@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -6,99 +7,40 @@ namespace ZeroGravity.Objects;
 
 public class Magazine : Item
 {
-	private MagazineStats _stats = new();
-
-	private int _bulletCount;
-
-	public override DynamicObjectStats StatsNew => _stats;
-
-	public int BulletCount
-	{
-		get
-		{
-			return _bulletCount;
-		}
-	}
+	public int BulletCount => State.Bullets(Row);
 
 	public int MaxBulletCount { get; private set; }
 
 	public bool HasAmmo => BulletCount > 0;
 
-	private Magazine()
-	{
-	}
-
-	public static async Task<Magazine> CreateMagazineAsync(DynamicObjectAuxData data)
-	{
-		Magazine magazine = new Magazine();
-		if (data != null)
-		{
-			await magazine.SetData(data);
-		}
-
-		return magazine;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		MagazineData md = data as MagazineData;
-		await SetBulletCountAsync(md.BulletCount);
+		State.SetBullets(Row, md.BulletCount);
 		MaxBulletCount = md.MaxBulletCount;
-	}
-
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		MagazineStats ms = stats as MagazineStats;
-		if (ms.BulletsFrom.HasValue && ms.BulletsTo.HasValue && (ms.BulletsFrom.Value == GUID || ms.BulletsTo.Value == GUID))
-		{
-			Magazine magFrom = ms.BulletsFrom.Value == GUID ? this : Server.Instance.GetItem(ms.BulletsFrom.Value) as Magazine;
-			Magazine magTo = ms.BulletsTo.Value == GUID ? this : Server.Instance.GetItem(ms.BulletsTo.Value) as Magazine;
-			if (magFrom != null && magTo != null)
-			{
-				await SplitMagazines(magFrom, magTo);
-			}
-		}
-		return false;
-	}
-
-	private static async Task SplitMagazines(Magazine fromMag, Magazine toMag)
-	{
-		int splitCount = toMag.MaxBulletCount - toMag.BulletCount;
-		if (toMag.BulletCount == 0)
-		{
-			splitCount = fromMag.BulletCount / 2;
-		}
-		else if (fromMag.BulletCount < splitCount)
-		{
-			splitCount = fromMag.BulletCount;
-		}
-		await toMag.SetBulletCountAsync(splitCount);
-		await fromMag.SetBulletCountAsync(splitCount);
-		await fromMag.DynamicObj.SendStatsToClient();
-		await toMag.DynamicObj.SendStatsToClient();
 	}
 
 	public async Task ChangeQuantity(int amount)
 	{
-		await SetBulletCountAsync(amount);
-		if (BulletCount == 0)
+		State.SetBullets(Row, BulletCount + amount);
+		if (BulletCount <= 0)
 		{
-			await DynamicObj.SendStatsToClient();
-		}
-		else
-		{
-			DynamicObj.StatsChanged = true;
+			await DestroyItem();
 		}
 	}
 
-	private async Task SetBulletCountAsync(int amount)
+	public override DynamicObjectStats NewStats()
 	{
-		_bulletCount = amount;
-		_stats.BulletCount = amount;
-		if (amount <= 0)
+		return new MagazineStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		if ((fields & ItemChanges.Bullets) != 0)
 		{
-			await DestroyItem();
+			((MagazineStats)stats).BulletCount = BulletCount;
 		}
 	}
 

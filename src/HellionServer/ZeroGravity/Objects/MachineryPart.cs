@@ -10,31 +10,6 @@ public class MachineryPart : Item, IPersistantObject
 
 	public float WearMultiplier = 1f;
 
-	public override DynamicObjectStats StatsNew => new MachineryPartStats
-	{
-		Health = Health
-	};
-
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		return Task.FromResult(false);
-	}
-
-	private MachineryPart()
-	{
-	}
-
-	public static async Task<MachineryPart> CreateAsync(DynamicObjectAuxData data)
-	{
-		MachineryPart machineryPart = new();
-		if (data != null)
-		{
-			await machineryPart.SetData(data);
-		}
-
-		return machineryPart;
-	}
-
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
@@ -59,6 +34,11 @@ public class MachineryPart : Item, IPersistantObject
 			}
 		}
 		base.ApplyTierMultiplier();
+	}
+
+	public override DynamicObjectStats NewStats()
+	{
+		return new MachineryPartStats();
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

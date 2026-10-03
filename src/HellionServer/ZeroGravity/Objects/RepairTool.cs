@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -19,46 +20,15 @@ internal class RepairTool : Item, ICargo
 
 	public float FuelConsumption;
 
-	public bool Active;
-
-	private List<CargoCompartmentData> _Compartments;
-
-	private RepairToolStats _StatsNew = new RepairToolStats();
-
-	private float currentFuel => FuelCompartment.Resources.Count > 0 ? FuelCompartment.Resources[0].Quantity : 0f;
-
-	public float FreeSpace => FuelCompartment.Capacity - FuelCompartment.Resources.Sum((CargoResourceData m) => m.Quantity);
-
-	public List<CargoCompartmentData> Compartments => _Compartments;
-
-	public override DynamicObjectStats StatsNew => _StatsNew;
-
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
+	public bool Active
 	{
-		RepairToolStats rts = stats as RepairToolStats;
-		if (rts.Active.HasValue)
-		{
-			Active = rts.Active.Value;
-			_StatsNew.Active = Active;
-		}
-		await DynamicObj.SendStatsToClient();
-		return false;
+		get => State.Active(Row);
+		set => State.SetActive(Row, value);
 	}
 
-	private RepairTool()
-	{
-	}
+	private float currentFuel => State.ResourceQuantity(Row, FuelCompartment.ID, (short)FuelType);
 
-	public static async Task<RepairTool> CreateAsync(DynamicObjectAuxData data)
-	{
-		RepairTool repairTool = new();
-		if (data != null)
-		{
-			await repairTool.SetData(data);
-		}
-
-		return repairTool;
-	}
+	private ResourceType FuelType => FuelCompartment.Resources[0].ResourceType;
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
@@ -67,11 +37,9 @@ internal class RepairTool : Item, ICargo
 		RepairAmount = rtd.RepairAmount;
 		UsageCooldown = rtd.UsageCooldown;
 		Range = rtd.Range;
-		FuelCompartment = rtd.FuelCompartment;
+		FuelCompartment = ObjectCopier.DeepCopy(rtd.FuelCompartment);
 		FuelConsumption = rtd.FuelConsumption;
-		_Compartments = new List<CargoCompartmentData> { FuelCompartment };
-		_StatsNew.FuelResource = FuelCompartment.Resources[0];
-		_StatsNew.Active = Active;
+		LoadCargo([FuelCompartment]);
 	}
 
 	private RepairToolData GetData()
@@ -81,7 +49,7 @@ internal class RepairTool : Item, ICargo
 			RepairAmount = RepairAmount,
 			UsageCooldown = UsageCooldown,
 			Range = Range,
-			FuelCompartment = FuelCompartment,
+			FuelCompartment = GetCompartment(FuelCompartment.ID),
 			FuelConsumption = FuelConsumption
 		};
 		FillBaseAuxData(rtd);
@@ -113,18 +81,14 @@ internal class RepairTool : Item, ICargo
 			}
 			if (amount > 0f)
 			{
-				CargoResourceData res = FuelCompartment.Resources[0];
-				await ChangeQuantityByAsync(FuelCompartment.ID, res.ResourceType, (0f - amount) * FuelConsumption);
-				_StatsNew.FuelResource = res;
-				await DynamicObj.SendStatsToClient();
+				await ConsumeFuel(amount * FuelConsumption);
 			}
 		}
 	}
 
 	public async Task RepairItem(long guid)
 	{
-		SpaceObject obj = Server.Instance.GetSpaceObject(guid);
-		if (obj is not DynamicObject dynamicObject)
+		if (Server.Instance.GetDynamicObject(guid) is not { } dynamicObject)
 		{
 			return;
 		}
@@ -144,56 +108,41 @@ internal class RepairTool : Item, ICargo
 			{
 				await ConsumeFuel(repairedAmount * FuelConsumption);
 			}
-			await item.DynamicObj.SendStatsToClient();
 		}
 	}
 
 	public async Task ConsumeFuel(float amount)
 	{
-		CargoResourceData res = FuelCompartment.Resources[0];
-		await ChangeQuantityByAsync(FuelCompartment.ID, res.ResourceType, 0f - amount);
-		_StatsNew.FuelResource = res;
-		await DynamicObj.SendStatsToClient();
-		await DynamicObj.SendStatsToClient();
+		await ChangeQuantityByAsync(FuelCompartment.ID, FuelType, 0f - amount);
 	}
 
-	public CargoCompartmentData GetCompartment(int? id = null)
+	public Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
 	{
-		if (id.HasValue)
-		{
-			return _Compartments.Find((CargoCompartmentData m) => m.ID == id.Value);
-		}
-		return _Compartments[0];
+		return Task.FromResult(ChangeCargoQuantity(compartmentID, resourceType, quantity));
 	}
 
-	public async Task<float> ChangeQuantityByAsync(int compartmentID, ResourceType resourceType, float quantity, bool wholeAmount = false)
+	protected override bool KeepsEmptyResource(CargoCompartmentData compartment)
 	{
-		CargoResourceData res = FuelCompartment.Resources.Find((CargoResourceData m) => m.ResourceType == resourceType);
-		if (res == null)
+		return true;
+	}
+
+	public override DynamicObjectStats NewStats()
+	{
+		return new RepairToolStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		RepairToolStats repairTool = (RepairToolStats)stats;
+		if ((fields & ItemChanges.Active) != 0)
 		{
-			res = new CargoResourceData
-			{
-				ResourceType = resourceType,
-				Quantity = 0f
-			};
-			FuelCompartment.Resources.Add(res);
+			repairTool.Active = Active;
 		}
-		float freeSpace = FreeSpace;
-		float qty = quantity;
-		float resourceAvailable = res.Quantity;
-		if (quantity > 0f && quantity > freeSpace)
+		if ((fields & ItemChanges.Resources) != 0)
 		{
-			qty = freeSpace;
+			repairTool.FuelResource = GetCompartment(FuelCompartment.ID).Resources.FirstOrDefault();
 		}
-		else if (quantity < 0f && 0f - qty > resourceAvailable)
-		{
-			qty = 0f - resourceAvailable;
-		}
-		res.Quantity = resourceAvailable + qty;
-		DynamicObj.StatsChanged = true;
-		_StatsNew.FuelResource = GetCompartment(compartmentID).Resources[0];
-		await DynamicObj.SendStatsToClient();
-		return qty;
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

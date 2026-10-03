@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,6 +7,7 @@ using OpenHellion.Net;
 using OpenHellion;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
+using ZeroGravity.Network;
 using ZeroGravity.Spawn;
 using OpenHellion.Net.Message;
 
@@ -14,6 +16,8 @@ namespace ZeroGravity.Objects;
 public class SolarSystem
 {
 	public const double ViewRadius = 10000.0; // in meters
+
+	public readonly SolarSystemState State = new();
 
 	private double _currentTime;
 
@@ -124,38 +128,7 @@ public class SolarSystem
 	/// <summary>
 	/// 	Get the guids of a list of bodies and their child objects (commonly docked vessels).
 	/// </summary>
-	/// <remarks>
-	/// 	Dynamic objects owned by a player, a corpse or another dyamic object is sent elsewhere.
-	/// </remarks>
-	public HashSet<long> GetChildrenOfBodies(List<ArtificialBody> bodies)
-	{
-		HashSet<long> children = [];
-		foreach (ArtificialBody body in bodies)
-		{
-			children.Add(body.Guid);
-			if (body is SpaceObjectVessel vessel)
-			{
-				foreach (SpaceObjectVessel memberVessel in vessel.AllVessels)
-				{
-					children.Add(memberVessel.Guid);
-					children.UnionWith(memberVessel.DynamicObjects);
-					children.UnionWith(memberVessel.Corpses);
-					foreach (Player crewPlayer in memberVessel.VesselCrew)
-					{
-						children.Add(crewPlayer.FakeGuid);
-					}
-				}
-			}
-			else if (body is Pivot { Child: Player pivotPlayer })
-			{
-				children.Add(pivotPlayer.FakeGuid);
-			}
-		}
-
-		return children;
-	}
-
-	public HashSet<long> BuildPlayerView(Player player, ArtificialBody mustInclude,
+	public HashSet<long> GetPlayerView(Player player, ArtificialBody mustInclude,
 		List<ArtificialBody> bodiesInRange)
 	{
 		if (mustInclude != null && !bodiesInRange.Contains(mustInclude))
@@ -163,13 +136,208 @@ public class SolarSystem
 			bodiesInRange.Add(mustInclude);
 		}
 
-		HashSet<long> view = GetChildrenOfBodies(bodiesInRange);
+		HashSet<long> view = [];
+		List<ItemId> items = [];
+		foreach (ArtificialBody body in bodiesInRange)
+		{
+			view.Add(body.Guid);
+			if (body is SpaceObjectVessel vessel)
+			{
+				foreach (SpaceObjectVessel memberVessel in vessel.AllVessels)
+				{
+					view.Add(memberVessel.Guid);
+					State.AddDescendants(memberVessel.Guid, items);
+					foreach (long corpseGuid in memberVessel.Corpses)
+					{
+						view.Add(corpseGuid);
+						State.AddDescendants(corpseGuid, items);
+					}
+					foreach (Player crewPlayer in memberVessel.VesselCrew)
+					{
+						view.Add(crewPlayer.FakeGuid);
+						AddCarriedItemsToState(crewPlayer, player, items);
+					}
+				}
+			}
+			else if (body is Pivot { Child: { } child })
+			{
+				view.Add(child.Key);
+				if (child is Player pivotPlayer)
+				{
+					AddCarriedItemsToState(pivotPlayer, player, items);
+				}
+				else
+				{
+					State.AddDescendants(child.Key, items);
+				}
+			}
+		}
+
+		foreach (ItemId item in items)
+		{
+			view.Add(State.Guid(item));
+		}
 		if (player.Parent is not Pivot)
 		{
 			view.Remove(player.FakeGuid);
 		}
 
 		return view;
+	}
+
+	private void AddCarriedItemsToState(Player owner, Player viewer, List<ItemId> items)
+	{
+		if (owner == viewer)
+		{
+			State.AddDescendants(owner.FakeGuid, items);
+			return;
+		}
+		foreach (DynamicObject carried in Server.Instance.ItemsInSpaceObject(owner))
+		{
+			if (carried.IsVisibleTo(viewer))
+			{
+				items.Add(carried.Row);
+				State.AddDescendants(carried.Guid, items);
+			}
+		}
+	}
+
+	/// <summary>
+	/// 	Runs a client's request against the state. Whatever it changes reaches the clients as a delta.
+	/// </summary>
+	public async void StateUpdateRequestListener(NetworkData data)
+	{
+		StateUpdateRequest request = (StateUpdateRequest)data;
+		Player sender = Server.Instance.GetPlayer(data.Sender);
+		if (sender == null || Server.Instance.GetDynamicObject(request.Subject) is not { Item: { } item } dynamicObject)
+		{
+			Debug.LogWarning("Command for an object that does not exist", request.Type, request.Subject, "sender", data.Sender);
+			return;
+		}
+
+		ItemId row = dynamicObject.Row;
+		ItemLocation location = State.Location(row);
+		ItemLocation holder = location;
+		while (holder.Kind == LocationKind.ItemSlot && State.TryGetItem(holder.ParentKey, out ItemId container))
+		{
+			holder = State.Location(container);
+		}
+		bool reachable = holder.Kind != LocationKind.Inventory || holder.ParentKey == sender.Key || Server.Instance.ResolveKey(holder.ParentKey) is not Player;
+		bool held = location.Kind == LocationKind.Inventory && location.ParentKey == sender.Key;
+
+		try
+		{
+			switch (request.Type)
+			{
+				case StateUpdateRequest.CommandType.MoveToInventory when reachable && Server.Instance.ResolveKey(request.Target) == sender:
+					dynamicObject.PickedUp();
+					sender.PlayerInventory.AddItemToInventory(item, request.Slot);
+					break;
+				case StateUpdateRequest.CommandType.MoveToItemSlot when reachable && Server.Instance.GetItem(request.Target) is { Slots: { } slots } && slots.TryGetValue(request.Slot, out ItemSlot slot):
+					dynamicObject.PickedUp();
+					slot.FitItem(item);
+					break;
+				case StateUpdateRequest.CommandType.MoveToAttachPoint when reachable && Server.Instance.GetVessel(request.Target) is { } vessel && vessel.AttachPoints.TryGetValue(request.Slot, out VesselAttachPoint point) && point.CanFitItem(item):
+					vessel.AttachItem(item, request.Slot);
+					break;
+				case StateUpdateRequest.CommandType.Drop when reachable && location.IsSlot:
+				case StateUpdateRequest.CommandType.Relocate when location.Kind == LocationKind.Loose || (location.Kind == LocationKind.Floating && dynamicObject.MasterClientID == sender.Guid):
+					dynamicObject.Place(Server.Instance.GetSpaceObject(request.Target), sender, request.Position, request.Rotation, request.Velocity, request.Torque, request.ThrowForce);
+					break;
+				case StateUpdateRequest.CommandType.SetHelmetLight when held && item is Helmet helmet && (!request.Value || helmet.BatteryPower > float.Epsilon):
+					State.SetLightOn(row, request.Value);
+					break;
+				case StateUpdateRequest.CommandType.SetHelmetVisor when held && item is Helmet { IsVisorToggleable: true }:
+					State.SetVisorOn(row, request.Value);
+					break;
+				case StateUpdateRequest.CommandType.SetWeaponMod when held && item is Weapon weapon:
+					weapon.CurrentModIndex = request.Number;
+					break;
+				case StateUpdateRequest.CommandType.SetRepairToolActive when held && item is RepairTool:
+					State.SetActive(row, request.Value);
+					break;
+				case StateUpdateRequest.CommandType.SetGrenadeActive when held && item is Grenade grenade && request.Value != State.Active(row):
+					grenade.SetActive(request.Value, sender);
+					break;
+				case StateUpdateRequest.CommandType.UseMedpack when held && item is Medpack { IsDestroyScheduled: false } medpack:
+					sender.HealOverTime(medpack.RegenRate, medpack.MaxHp / medpack.RegenRate);
+					medpack.DestroyAfter(2.5);
+					break;
+				case StateUpdateRequest.CommandType.UseHackingTool when held && item is DisposableHackingTool hackingTool:
+					await hackingTool.Use();
+					break;
+				case StateUpdateRequest.CommandType.UseCanister when held && item is Canister canister && sender.CurrentJetpack is { } jetpack:
+					foreach (CargoCompartmentData tank in jetpack.Compartments.Where(m => m.AllowOnlyOneType))
+					{
+						CargoCompartmentData source = canister.GetCompartment();
+						foreach (CargoResourceData resource in source.Resources.Where(m => m.Quantity > 0f && tank.AllowedResources.Contains(m.ResourceType)))
+						{
+							float moved = await jetpack.ChangeQuantityByAsync(tank.ID, resource.ResourceType, resource.Quantity);
+							await canister.ChangeQuantityByAsync(source.ID, resource.ResourceType, 0f - moved);
+						}
+					}
+					break;
+			}
+		}
+		catch (System.Exception ex)
+		{
+			Debug.LogError("Command threw", request.Type, dynamicObject.Guid, dynamicObject.ItemType, "sender", data.Sender, ex);
+		}
+	}
+
+	/// <summary>
+	/// 	Sends every player the changed fields of the items in their view, then forgets the changes.
+	/// </summary>
+	public async Task SendStateMessages(Player[] players)
+	{
+		List<DynamicObjectInfo> deltas = [];
+		foreach (ItemId item in State.ChangedItems.ToArray())
+		{
+			if (!State.IsAlive(item) || Server.Instance.GetDynamicObject(State.Guid(item)) is not { } dynamicObject)
+			{
+				continue;
+			}
+
+			ItemChanges changes = State.Changes(item);
+			ItemChanges statChanges = changes & ~(ItemChanges.Location | ItemChanges.Impulse);
+			DynamicObjectInfo delta = new()
+			{
+				GUID = dynamicObject.Guid
+			};
+			if (changes != statChanges && dynamicObject.Parent != null)
+			{
+				delta.AttachData = dynamicObject.GetCurrAttachData();
+				System.Numerics.Vector3 velocity = State.Velocity(item);
+				System.Numerics.Vector3 torque = State.Torque(item);
+				System.Numerics.Vector3 throwForce = State.ThrowForce(item);
+				delta.AttachData.Velocity = velocity == default ? null : [velocity.X, velocity.Y, velocity.Z];
+				delta.AttachData.Torque = torque == default ? null : [torque.X, torque.Y, torque.Z];
+				delta.AttachData.ThrowForce = throwForce == default ? null : [throwForce.X, throwForce.Y, throwForce.Z];
+			}
+			if (statChanges != ItemChanges.None && dynamicObject.Item != null)
+			{
+				delta.Stats = dynamicObject.Item.NewStats();
+				dynamicObject.Item.FillStats(delta.Stats, statChanges);
+			}
+			if (delta.AttachData != null || delta.Stats != null)
+			{
+				deltas.Add(delta);
+			}
+		}
+		State.ClearChanges();
+
+		foreach (Player player in players)
+		{
+			DynamicObjectInfo[] known = [.. deltas.Where(m => player.KnownView.Contains(m.GUID))];
+			if (known.Length > 0)
+			{
+				await NetworkController.SendAsync(player.Guid, new StateUpdateMessage
+				{
+					DynamicObjects = known,
+					ExpirationUtc = System.DateTime.MaxValue
+				});
+			}
+		}
 	}
 
 	/// <summary>
@@ -206,6 +374,7 @@ public class SolarSystem
 		}
 
 		List<ArtificialBody> bodiesInRange = Server.Instance.SpaceObjects.QueryRadius<ArtificialBody>(player.Position, ViewRadius);
+		player.KnownView = GetPlayerView(player, anchor, bodiesInRange);
 
 		MovementMessage movementMessage = new MovementMessage
 		{
@@ -213,7 +382,7 @@ public class SolarSystem
 			ParentGuid = player.Parent.Guid,
 			PlayerAnimationData = player.AnimationData,
 			OriginWorldPosition = anchor.Position.ToArray(),
-			VisibleObjects = [.. BuildPlayerView(player, anchor, bodiesInRange)],
+			VisibleObjects = [.. player.KnownView],
 			ArtificialBodiesMovement = [],
 			OtherPlayersMovement = [],
 			CorpsesMovement = [],
@@ -250,11 +419,6 @@ public class SolarSystem
 			{
 				foreach (SpaceObjectVessel memberVessel in vessel.AllVessels)
 				{
-					if (player.Parent.Guid != memberVessel.Guid && !player.IsSubscribedTo(memberVessel.Guid))
-					{
-						continue;
-					}
-
 					foreach (Player crewPlayer in memberVessel.VesselCrew)
 					{
 						if (!crewPlayer.PlayerReady || crewPlayer.Guid == player.Guid)
@@ -298,14 +462,13 @@ public class SolarSystem
 						}
 					}
 
-					foreach (long dynamicObjectGuid in memberVessel.DynamicObjects)
+					foreach (DynamicObject dynamicObject in Server.Instance.ItemsInSpaceObject(memberVessel))
 					{
-						if (Server.Instance.SpaceObjects.TryGet(dynamicObjectGuid, out SpaceObject obj) && obj is DynamicObject dynamicObject
-							&& dynamicObject.LastChangeTime > player.LastMovementMessageSolarSystemTime)
+						if (dynamicObject.LastChangeTime > player.LastMovementMessageSolarSystemTime)
 						{
 							MovementMessage.TransformInfo dynamicObjectInfo = new()
 							{
-								Guid = dynamicObjectGuid,
+								Guid = dynamicObject.Guid,
 								ParentGuid = dynamicObject.Parent.Guid,
 								Position = dynamicObject.LocalPosition.ToFloatArray(),
 								Rotation = dynamicObject.LocalRotation.ToFloatArray(),

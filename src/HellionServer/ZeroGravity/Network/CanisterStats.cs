@@ -11,5 +11,5 @@ public class CanisterStats : DynamicObjectStats
 
 	public bool? UseCanister;
 
-	public float Capacity;
+	public float? Capacity;
 }

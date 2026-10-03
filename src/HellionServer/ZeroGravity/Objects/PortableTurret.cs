@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenHellion.Net;
@@ -8,43 +9,27 @@ namespace ZeroGravity.Objects;
 
 internal class PortableTurret : Item
 {
-	public bool IsActive;
+	public bool IsActive
+	{
+		get => State.Active(Row);
+		set => State.SetActive(Row, value);
+	}
 
 	public float Damage;
 
 	private Player targetPlayer;
 
-	private PortableTurretStats _stats = new();
+	public bool isStunned
+	{
+		get => State.Stunned(Row);
+		set => State.SetStunned(Row, value);
+	}
 
-	public bool isStunned;
+	private double unstunTime;
 
-	public override DynamicObjectStats StatsNew => _stats;
-
-	private PortableTurret()
+	public PortableTurret()
 	{
 		EventSystem.AddListener<PortableTurretShootingMessage>(PortableTurretShootingMessageListener);
-	}
-
-	public static async Task<PortableTurret> CreateAsync(DynamicObjectAuxData data)
-	{
-		PortableTurret portableTurret = new();
-		if (data != null)
-		{
-			await portableTurret.SetData(data);
-		}
-
-		return portableTurret;
-	}
-
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		PortableTurretStats ts = stats as PortableTurretStats;
-		if (ts.IsActive.HasValue)
-		{
-			IsActive = ts.IsActive.Value;
-		}
-		await DynamicObj.SendStatsToClient();
-		return false;
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -99,14 +84,17 @@ internal class PortableTurret : Item
 		}
 	}
 
-	public async Task UnStun()
+	private Task CheckStun(double deltaTime)
 	{
-		if (DynamicObj.Parent != null)
+		if (!State.IsAlive(Row) || Server.SolarSystemTime >= unstunTime)
 		{
-			isStunned = false;
-			(StatsNew as PortableTurretStats).IsStunned = false;
-			await DynamicObj.SendStatsToClient();
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckStun);
+			if (State.IsAlive(Row))
+			{
+				isStunned = false;
+			}
 		}
+		return Task.CompletedTask;
 	}
 
 	public override async Task TakeDamage(Dictionary<TypeOfDamage, float> damages, bool forceTakeDamage = false)
@@ -114,13 +102,31 @@ internal class PortableTurret : Item
 		await base.TakeDamage(damages, forceTakeDamage);
 		if (damages.ContainsKey(TypeOfDamage.EMP))
 		{
-			isStunned = true;
-			Extensions.Invoke(async delegate
+			if (!isStunned)
 			{
-				await UnStun();
-			}, 10.0);
-			(StatsNew as PortableTurretStats).IsStunned = isStunned;
-			await DynamicObj.SendStatsToClient();
+				Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckStun);
+			}
+			isStunned = true;
+			unstunTime = Server.SolarSystemTime + 10.0;
+		}
+	}
+
+	public override DynamicObjectStats NewStats()
+	{
+		return new PortableTurretStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		PortableTurretStats turret = (PortableTurretStats)stats;
+		if ((fields & ItemChanges.Active) != 0)
+		{
+			turret.IsActive = IsActive;
+		}
+		if ((fields & ItemChanges.Stunned) != 0)
+		{
+			turret.IsStunned = isStunned;
 		}
 	}
 

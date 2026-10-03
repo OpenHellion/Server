@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System;
 using System.Threading.Tasks;
 using ZeroGravity.Data;
@@ -8,39 +9,7 @@ namespace ZeroGravity.Objects;
 
 internal class LogItem : Item
 {
-	private int logId;
-
-	private LogItemStats itemStats = new();
-
-	public int LogID
-	{
-		get
-		{
-			return logId;
-		}
-		set
-		{
-			logId = value;
-			itemStats.LogID = value;
-		}
-	}
-
-	public override DynamicObjectStats StatsNew => itemStats;
-
-	private LogItem()
-	{
-	}
-
-	public static async Task<LogItem> CreateAsync(DynamicObjectAuxData data)
-	{
-		LogItem item = new();
-		if (data != null)
-		{
-			await item.SetData(data);
-		}
-
-		return item;
-	}
+	public int LogID;
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
@@ -54,9 +23,18 @@ internal class LogItem : Item
 		LogID = tmpInt;
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	public override DynamicObjectStats NewStats()
 	{
-		return Task.FromResult(false);
+		return new LogItemStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		if (fields == ItemChanges.All)
+		{
+			((LogItemStats)stats).LogID = LogID;
+		}
 	}
 
 	public override PersistenceObjectData GetPersistenceData()
@@ -65,7 +43,7 @@ internal class LogItem : Item
 		FillPersistenceData(data);
 		data.LogItemData = new LogItemData();
 		FillBaseAuxData(data.LogItemData);
-		data.LogItemData.logID = logId;
+		data.LogItemData.logID = LogID;
 		return data;
 	}
 

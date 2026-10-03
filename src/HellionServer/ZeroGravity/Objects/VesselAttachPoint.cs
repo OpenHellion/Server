@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenHellion.State;
 using ZeroGravity.Data;
 
 namespace ZeroGravity.Objects;
@@ -17,7 +18,9 @@ public class VesselAttachPoint : IItemSlot
 
 	public List<MachineryPartType> MachineryPartTypes;
 
-	public Item Item { get; set; }
+	public Item Item => Vessel != null && Server.Instance.SolarSystem.State.ItemInSlot(Vessel.Guid, LocationKind.AttachPoint, (short)InSceneID) is { IsValid: true } item
+		? Server.Instance.GetItem(Server.Instance.SolarSystem.State.Guid(item))
+		: null;
 
 	public SpaceObject Parent => Vessel;
 

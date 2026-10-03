@@ -21,6 +21,4 @@ public class DynamicObjectDetails
 	public float[] Velocity;
 
 	public float[] AngularVelocity;
-
-	public DynamicObjectDetails[] ChildObjects;
 }

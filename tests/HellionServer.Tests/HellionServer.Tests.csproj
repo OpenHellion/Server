@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HellionServer\HellionServer.csproj" />
+    <ProjectReference Include="..\..\src\OpenHellion.State\OpenHellion.State.csproj" />
   </ItemGroup>
 
 </Project>

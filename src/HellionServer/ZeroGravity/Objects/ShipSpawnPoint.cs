@@ -87,10 +87,7 @@ public class ShipSpawnPoint
 		{
 			State = SpawnPointState.Unlocked;
 			Player = null;
-			await sender.ItemInHands.ChangeStats(new DisposableHackingToolStats
-			{
-				Use = true
-			});
+			await ((DisposableHackingTool)sender.ItemInHands).Use();
 			if (InvitedPlayerId.IsNullOrEmpty())
 			{
 				return new SpawnPointStats

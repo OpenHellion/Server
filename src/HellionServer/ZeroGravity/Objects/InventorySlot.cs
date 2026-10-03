@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenHellion.State;
 using ZeroGravity.Data;
 
 namespace ZeroGravity.Objects;
@@ -20,7 +21,7 @@ public class InventorySlot
 
 	public const short OutfitSlotID = -2;
 
-	public Inventory Inventory;
+	public Inventory Inventory { get; private set; }
 
 	public Outfit Outfit { get; private set; }
 
@@ -32,7 +33,9 @@ public class InventorySlot
 
 	public bool MustBeEmptyToRemoveOutfit { get; private set; }
 
-	public Item Item { get; set; }
+	public Item Item => GetParent() is { } owner && Server.Instance.SolarSystem.State.ItemInSlot(owner.Key, LocationKind.Inventory, SlotID) is { IsValid: true } item
+		? Server.Instance.GetItem(Server.Instance.SolarSystem.State.Guid(item))
+		: null;
 
 	public InventorySlot(Type slotType, short slotID, List<ItemType> itemTypes, bool mustBeEmptyToRemoveOutfit, Outfit outfit, Inventory inventory)
 	{
@@ -59,7 +62,7 @@ public class InventorySlot
 
 	public bool CanStoreItem(ItemType itemType)
 	{
-		return SlotType == Type.Hands || (this == Inventory.OutfitSlot && itemType is >= ItemType.AltairPressurisedSuit and <= (ItemType)399) || (ItemTypes?.Contains(itemType) ?? false);
+		return SlotType == Type.Hands || (this == Inventory?.OutfitSlot && itemType is >= ItemType.AltairPressurisedSuit and <= (ItemType)399) || (ItemTypes?.Contains(itemType) ?? false);
 	}
 
 	public SpaceObject GetParent()
@@ -76,25 +79,4 @@ public class InventorySlot
 		return null;
 	}
 
-	public Inventory.EquipType GetEquipType()
-	{
-		if (SlotType == Type.Hands)
-		{
-			return Inventory.EquipType.Hands;
-		}
-		if (SlotType == Type.Equip)
-		{
-			return Inventory.EquipType.EquipInventory;
-		}
-		if (SlotType == Type.General)
-		{
-			return Inventory.EquipType.Inventory;
-		}
-		return Inventory.EquipType.None;
-	}
-
-	public bool DropItem()
-	{
-		return Inventory.DropItem(SlotID);
-	}
 }

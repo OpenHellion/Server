@@ -389,12 +389,7 @@ public abstract class VesselComponent : IResourceConsumer, IResourceUser, IPersi
 				MachineryParts.TryGetValue(kv.Key, out mp);
 				if (kv.Value.IsActive && mp is { Health: > 0f })
 				{
-					float prevHealth = mp.Health;
 					mp.Health = MathHelper.Clamp((float)(mp.Health - PartsWearFactor * mp.WearMultiplier * decay / 3600f * duration * OperationRate), 0f, mp.MaxHealth);
-					if ((int)prevHealth != (int)mp.Health || (prevHealth > 0f && mp.Health == 0f) || (mp.Health != prevHealth && Server.SolarSystemTime - mp.DynamicObj.LastStatsSendTime > 10.0))
-					{
-						await mp.DynamicObj.SendStatsToClient();
-					}
 				}
 			}
 		}

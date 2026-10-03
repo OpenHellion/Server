@@ -29,24 +29,7 @@ public class Outfit : Item
 
 	public float CollisionResistance = 1f;
 
-	public override DynamicObjectStats StatsNew => null;
-
 	public Dictionary<short, InventorySlot> InventorySlots { get; private set; }
-
-	private Outfit()
-	{
-	}
-
-	public static async Task<Outfit> CreateOutfitAsync(DynamicObjectAuxData data)
-	{
-		Outfit outfit = new();
-		if (data != null)
-		{
-			await outfit.SetData(data);
-		}
-
-		return outfit;
-	}
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
@@ -67,11 +50,6 @@ public class Outfit : Item
 		DamageResistanceArms = od.DamageResistanceArms;
 		DamageResistanceLegs = od.DamageResistanceLegs;
 		CollisionResistance = od.CollisionResistance;
-	}
-
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		return Task.FromResult(false);
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

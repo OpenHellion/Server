@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,17 +10,11 @@ namespace ZeroGravity.Objects;
 
 public class Weapon : Item
 {
-	private WeaponStats _stats = new();
-
 	private ItemSlot magazineSlot;
-
-	private int _currentModIndex;
 
 	private List<WeaponModData> weaponMods = new List<WeaponModData>();
 
 	private double lastShotTime;
-
-	public override DynamicObjectStats StatsNew => _stats;
 
 	public float Damage
 	{
@@ -38,50 +33,19 @@ public class Weapon : Item
 
 	public int CurrentModIndex
 	{
-		get
-		{
-			return _currentModIndex;
-		}
-		set
-		{
-			_currentModIndex = value;
-			CurrentMod = weaponMods[_currentModIndex];
-			_stats.CurrentMod = _currentModIndex;
-		}
+		get => State.WeaponMod(Row);
+		set => State.SetWeaponMod(Row, MathHelper.Clamp(value, 0, System.Math.Max(0, weaponMods.Count - 1)));
 	}
 
-	public WeaponModData CurrentMod { get; private set; }
+	public WeaponModData CurrentMod => weaponMods[CurrentModIndex];
 
 	public float ChargeAmount => 1f;
-
-	private Weapon()
-	{
-	}
-
-	public static async Task<Weapon> CreateAsync(DynamicObjectAuxData data)
-	{
-		if (data == null)
-		{
-			return null;
-		}
-		Weapon weapon = new();
-		await weapon.SetData(data);
-
-		if (weapon.Slots == null)
-		{
-			return null;
-		}
-		weapon.magazineSlot = weapon.Slots.FirstOrDefault((KeyValuePair<short, ItemSlot> m) => m.Value.ItemTypes.FirstOrDefault((ItemType n) => ItemTypeRange.IsAmmo(n)) != ItemType.None).Value;
-
-
-		return weapon;
-	}
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		WeaponData wd = data as WeaponData;
-		weaponMods = wd.weaponMods;
+		weaponMods = ObjectCopier.DeepCopy(wd.weaponMods);
 		foreach (WeaponModData wmod in weaponMods)
 		{
 			wmod.RateOfFire *= 0.95f;
@@ -94,17 +58,21 @@ public class Weapon : Item
 		{
 			CurrentModIndex = wd.CurrentMod;
 		}
+		magazineSlot = Slots?.Values.FirstOrDefault(m => m.ItemTypes.Any(ItemTypeRange.IsAmmo));
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	public override DynamicObjectStats NewStats()
 	{
-		WeaponStats ws = stats as WeaponStats;
-		if (ws.CurrentMod.HasValue)
+		return new WeaponStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		if ((fields & ItemChanges.WeaponMod) != 0)
 		{
-			CurrentModIndex = MathHelper.Clamp(ws.CurrentMod.Value, 0, weaponMods.Count - 1);
-			return Task.FromResult(true);
+			((WeaponStats)stats).CurrentMod = CurrentModIndex;
 		}
-		return Task.FromResult(false);
 	}
 
 	public void ConsumePower(double amount)
@@ -117,7 +85,6 @@ public class Weapon : Item
 		{
 			await Magazine.ChangeQuantity(-1);
 			lastShotTime = Server.Instance.SolarSystem.CurrentTime;
-			DynamicObj.StatsChanged = true;
 			return true;
 		}
 		return false;

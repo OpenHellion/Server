@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Math;
@@ -7,58 +8,21 @@ namespace ZeroGravity.Objects;
 
 public class Battery : Item
 {
-	private readonly BatteryStats _stats = new();
-
-	private float _CurrentPower;
-
-	private float _MaxPower;
-
-	public override DynamicObjectStats StatsNew => _stats;
-
 	public bool HasPower => CurrentPower > float.Epsilon;
 
 	public float CurrentPower
 	{
-		get
-		{
-			return _CurrentPower;
-		}
-		set
-		{
-			_CurrentPower = value;
-			_stats.CurrentPower = value;
-		}
+		get => State.Power(Row);
+		set => State.SetPower(Row, value);
 	}
 
 	public float MaxPower
 	{
-		get
-		{
-			return _MaxPower;
-		}
-		set
-		{
-			_MaxPower = value;
-			_stats.MaxPower = value;
-		}
+		get => State.MaxPower(Row);
+		set => State.SetMaxPower(Row, value);
 	}
 
 	public float ChargeAmount => 1f;
-
-	private Battery()
-	{
-	}
-
-	public static async Task<Battery> CreateBatteryAsync(DynamicObjectAuxData data)
-	{
-		Battery battery = new();
-		if (data != null)
-		{
-			await battery.SetData(data);
-		}
-
-		return battery;
-	}
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
@@ -81,21 +45,26 @@ public class Battery : Item
 
 	public async Task ChangeQuantity(float amount)
 	{
-		float prevPower = CurrentPower;
 		CurrentPower = MathHelper.Clamp(CurrentPower + amount, 0f, MaxPower);
-		if (CurrentPower == 0f || CurrentPower == MaxPower || (int)prevPower != (int)CurrentPower)
-		{
-			await DynamicObj.SendStatsToClient();
-		}
-		else
-		{
-			DynamicObj.StatsChanged = true;
-		}
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	public override DynamicObjectStats NewStats()
 	{
-		return Task.FromResult(false);
+		return new BatteryStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		BatteryStats battery = (BatteryStats)stats;
+		if ((fields & ItemChanges.Power) != 0)
+		{
+			battery.CurrentPower = CurrentPower;
+		}
+		if ((fields & ItemChanges.MaxPower) != 0)
+		{
+			battery.MaxPower = MaxPower;
+		}
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

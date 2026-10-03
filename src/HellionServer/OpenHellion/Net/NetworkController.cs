@@ -150,6 +150,11 @@ public static class NetworkController
 
 	public static bool HasConnectedClients => _transport.Connections > 0;
 
+	public static Task Tick()
+	{
+		return _transport.Tick();
+	}
+
 	/// <summary>
 	/// 	Get a list of all the players on the server.
 	/// </summary>

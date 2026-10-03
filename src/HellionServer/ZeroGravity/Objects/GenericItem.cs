@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System.Threading.Tasks;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
@@ -8,49 +9,28 @@ public class GenericItem : Item
 {
 	public GenericItemSubType SubType;
 
-	private GenericItemStats stats = new GenericItemStats();
-
-	public override DynamicObjectStats StatsNew => stats;
-
-	public string Look
-	{
-		get
-		{
-			return stats != null ? stats.Look : "";
-		}
-		set
-		{
-			stats.Look = value;
-		}
-	}
-
-	private GenericItem()
-	{
-	}
-
-	public static async Task<GenericItem> CreateAsync(DynamicObjectAuxData data)
-	{
-		GenericItem genericItem = new();
-		if (data != null)
-		{
-			await genericItem.SetData(data);
-		}
-
-		return genericItem;
-	}
+	public string Look;
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		GenericItemData i = data as GenericItemData;
-		stats.Health = Health;
 		SubType = i.SubType;
 		Look = i.Look;
 	}
 
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
+	public override DynamicObjectStats NewStats()
 	{
-		return Task.FromResult(false);
+		return new GenericItemStats();
+	}
+
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
+	{
+		base.FillStats(stats, fields);
+		if (fields == ItemChanges.All)
+		{
+			((GenericItemStats)stats).Look = Look;
+		}
 	}
 
 	public override PersistenceObjectData GetPersistenceData()

@@ -1007,8 +1007,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					Type = apd2.AttachPointType,
 					ItemTypes = apd2.ItemTypes != null ? new List<ItemType>(apd2.ItemTypes) : new List<ItemType>(),
 					GenericSubTypes = apd2.GenericSubTypes != null ? new List<GenericItemSubType>(apd2.GenericSubTypes) : new List<GenericItemSubType>(),
-					MachineryPartTypes = apd2.MachineryPartTypes != null ? new List<MachineryPartType>(apd2.MachineryPartTypes) : new List<MachineryPartType>(),
-					Item = null
+					MachineryPartTypes = apd2.MachineryPartTypes != null ? new List<MachineryPartType>(apd2.MachineryPartTypes) : new List<MachineryPartType>()
 				});
 			}
 		}
@@ -1113,7 +1112,7 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					{
 						InSceneID = dosd.AttachPointInSceneId
 					};
-					dobj.Item.SetAttachPoint(apd);
+					AttachItem(dobj.Item, (short)dosd.AttachPointInSceneId);
 				}
 				if (dobj.Item is MachineryPart part)
 				{
@@ -1202,9 +1201,9 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 		{
 			newShip.VesselRegistration = Server.NameGenerator.GenerateObjectRegistration(SpaceObjectType.Ship, newShip.Orbit.Parent.CelestialBody, sceneID);
 		}
-		foreach (long guid in newShip.DynamicObjects)
+		foreach (DynamicObject dobj in Server.Instance.ItemsInSpaceObject(newShip))
 		{
-			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj) && dobj.Item is { AttachPointID: not null })
+			if (dobj.Item is { AttachPointID: not null })
 			{
 				VesselComponent comp = newShip.MainDistributionManager.GetVesselComponentByPartSlot(dobj.Item.AttachPointID);
 				if (comp != null && dobj.Item is MachineryPart part)
@@ -1338,11 +1337,9 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			}
 			await NetworkController.SendToClientsSubscribedTo(ssm, -1L, this);
 		}
-		foreach (long guid in DynamicObjects)
+		foreach (DynamicObject dobj in Server.Instance.ItemsInSpaceObject(this))
 		{
-			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dobj)
-				&& dobj.Item is Battery bat
-				&& bat.AttachPointType == AttachPointType.BatteryRechargePoint)
+			if (dobj.Item is Battery bat && bat.AttachPointType == AttachPointType.BatteryRechargePoint)
 			{
 				await bat.ChangeQuantity(bat.ChargeAmount);
 			}
@@ -1458,12 +1455,9 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 			data.CourseInProgress = CurrentCourse.CurrentCourseItem;
 		}
 		data.DynamicObjects = new List<PersistenceObjectData>();
-		foreach (long guid in DynamicObjects)
+		foreach (DynamicObject dynamicObject in Server.Instance.ItemsInSpaceObject(this))
 		{
-			if (Server.Instance.TryGetDynamicObject(guid, out DynamicObject dynamicObject))
-			{
-				data.DynamicObjects.Add(dynamicObject.Item != null ? dynamicObject.Item.GetPersistenceData() : dynamicObject.GetPersistenceData());
-			}
+			data.DynamicObjects.Add(dynamicObject.Item != null ? dynamicObject.Item.GetPersistenceData() : dynamicObject.GetPersistenceData());
 		}
 		if (CargoBay != null)
 		{
@@ -1931,10 +1925,6 @@ public class Ship : SpaceObjectVessel, IPersistantObject
 					await RecycleItem(slot.Item, mode, pl);
 				}
 			}
-		}
-		if (item.AttachPointID != null)
-		{
-			item.SetAttachPoint(null);
 		}
 		if (mode != 0)
 		{

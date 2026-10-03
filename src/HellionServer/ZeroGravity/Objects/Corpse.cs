@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Timers;
 using OpenHellion.Net.Message;
 using ZeroGravity.Math;
 using ZeroGravity.Network;
@@ -25,7 +24,7 @@ public class Corpse : SpaceObjectTransferable
 
 	public double LastChangeTime;
 
-	private Timer _destroyTimer;
+	private double _destroyAt;
 
 	public Gender Gender;
 
@@ -69,8 +68,8 @@ public class Corpse : SpaceObjectTransferable
 		LocalPosition = player.LocalPosition;
 		LocalRotation = player.LocalRotation;
 		CorpseInventory = player.PlayerInventory;
-		CorpseInventory.ChangeParent(this);
 		Server.Instance.Add(this);
+		CorpseInventory.ChangeParent(this);
 		LastChangeTime = Server.SolarSystemTime;
 		if (Parent is SpaceObjectVessel)
 		{
@@ -97,32 +96,25 @@ public class Corpse : SpaceObjectTransferable
 		}
 		if (DestroyTime > -1.0)
 		{
-			_destroyTimer = new Timer(DestroyTime);
-			_destroyTimer.Elapsed += async delegate
-			{
-				await DestoyCorpseTimerElapsed();
-			};
-			_destroyTimer.Enabled = true;
+			_destroyAt = Server.SolarSystemTime + DestroyTime / 1000.0;
+			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_1_0_sec, DestroyWhenDue);
 		}
 		Gender = player.Gender;
 	}
 
-	private Task DestoyCorpseTimerElapsed()
+	private async Task DestroyWhenDue(double deltaTime)
 	{
-		return Destroy();
+		if (Server.SolarSystemTime >= _destroyAt)
+		{
+			await Destroy();
+		}
 	}
 
 	internal void CheckInventoryDestroy()
 	{
-		if (CorpseInventory.HandsSlot.Item == null && (CorpseInventory.CurrOutfit == null || CorpseInventory.CurrOutfit.InventorySlots.Where((KeyValuePair<short, InventorySlot> m) => m.Value.Item != null) != null))
+		if (CorpseInventory.HandsSlot.Item == null && (CorpseInventory.CurrOutfit == null || CorpseInventory.CurrOutfit.InventorySlots.Values.All(m => m.Item == null)))
 		{
-			_destroyTimer?.Dispose();
-			_destroyTimer = new Timer(TimeSpan.FromMinutes(5.0).TotalMilliseconds);
-			_destroyTimer.Elapsed += async delegate
-			{
-				await DestoyCorpseTimerElapsed();
-			};
-			_destroyTimer.Enabled = true;
+			_destroyAt = Server.SolarSystemTime + EmptyCorpseTimer / 1000.0;
 		}
 	}
 
@@ -135,13 +127,13 @@ public class Corpse : SpaceObjectTransferable
 			Rotation = LocalRotation.ToFloatArray(),
 			ParentGUID = Parent == null ? -1 : Parent.Guid,
 			Gender = Gender,
-			DynamicObjects = DynamicObject.GetCarriedDetails(this)
+			DynamicObjects = DynamicObject.GetCarriedDetails(this, pl)
 		};
 	}
 
 	public override async Task Destroy()
 	{
-		_destroyTimer?.Dispose();
+		Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_1_0_sec, DestroyWhenDue);
 		await base.Destroy();
 	}
 }

@@ -1,3 +1,4 @@
+using OpenHellion.State;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -369,19 +370,43 @@ public class Persistence
 		{
 			sceneData.AuxData.Tier = item.Tier;
 		}
+		foreach (ItemSlotData slot in sceneData.AuxData?.Slots ?? [])
+		{
+			slot.SpawnItem = new ItemCompoundType();
+		}
 		DynamicObject dobj = await DynamicObject.CreateDynamicObjectAsync(sceneData, parent, persistenceData.GUID);
 		if (dobj.Item != null)
 		{
 			if (dobj.Parent is SpaceObjectVessel)
 			{
 				PersistenceObjectDataItem persistenceObjectDataItem = data;
-				if (persistenceObjectDataItem is { AttachPointID: not null } && dobj.Parent.DynamicObjects.Select(Server.Instance.GetDynamicObject).FirstOrDefault((DynamicObject m) => m?.Item?.AttachPointID != null && m.Item.AttachPointID.InSceneID == data.AttachPointID.Value) != null)
+				if (persistenceObjectDataItem is { AttachPointID: not null } && Server.Instance.SolarSystem.State.ItemInSlot(dobj.Parent.Guid, LocationKind.AttachPoint, (short)data.AttachPointID.Value).IsValid)
 				{
 					await dobj.Destroy();
 					return null;
 				}
 			}
 			await dobj.Item.LoadPersistenceData(persistenceData);
+			if (data.AttachPointID is > 0 && parent is SpaceObjectVessel vessel)
+			{
+				vessel.AttachItem(dobj.Item, (short)data.AttachPointID.Value);
+				dobj.APDetails = new AttachPointDetails
+				{
+					InSceneID = data.AttachPointID.Value
+				};
+			}
+			else if (data.SlotID.HasValue && parent is Player player)
+			{
+				player.PlayerInventory.AddItemToInventory(dobj.Item, data.SlotID.Value);
+			}
+			else if (data.SlotID.HasValue && parent is DynamicObject { Item: Outfit outfit } && outfit.InventorySlots.ContainsKey(data.SlotID.Value))
+			{
+				dobj.MoveTo(new ItemLocation(LocationKind.Inventory, outfit.GUID, data.SlotID.Value));
+			}
+			else if (data.ItemSlotID.HasValue && parent is DynamicObject { Item.Slots: { } slots } && slots.TryGetValue(data.ItemSlotID.Value, out ItemSlot itemSlot))
+			{
+				itemSlot.FitItem(dobj.Item);
+			}
 		}
 		else
 		{

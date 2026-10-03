@@ -6,26 +6,7 @@ namespace ZeroGravity.Objects;
 
 internal class GlowStick : Item
 {
-	public GlowStickStats stats = new GlowStickStats();
-
 	public bool isOn;
-
-	public override DynamicObjectStats StatsNew => stats;
-
-	public GlowStick(DynamicObjectAuxData data)
-	{
-		if (data != null)
-		{
-			SetData(data);
-		}
-	}
-
-	public override async Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		isOn = true;
-		await DynamicObj.SendStatsToClient();
-		return false;
-	}
 
 	public override PersistenceObjectData GetPersistenceData()
 	{

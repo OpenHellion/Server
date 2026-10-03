@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenHellion.State;
 using ZeroGravity.Data;
 
 namespace ZeroGravity.Objects;
@@ -13,7 +14,9 @@ public class ItemSlot : IItemSlot
 
 	public List<MachineryPartType> MachineryPartTypes;
 
-	public Item Item { get; set; }
+	public Item Item => Parent is DynamicObject container && Server.Instance.SolarSystem.State.ItemInSlot(container.Guid, LocationKind.ItemSlot, ID) is { IsValid: true } item
+		? Server.Instance.GetItem(Server.Instance.SolarSystem.State.Guid(item))
+		: null;
 
 	public SpaceObject Parent { get; set; }
 
@@ -27,13 +30,7 @@ public class ItemSlot : IItemSlot
 
 	public bool FitItem(Item item)
 	{
-		if (CanFitItem(item))
-		{
-			Item = item;
-			item.ItemSlotID = ID;
-			return true;
-		}
-		return false;
+		return Parent is DynamicObject container && CanFitItem(item) && item.DynamicObj.MoveTo(new ItemLocation(LocationKind.ItemSlot, container.Guid, ID));
 	}
 
 	public bool CanFitItem(Item item)

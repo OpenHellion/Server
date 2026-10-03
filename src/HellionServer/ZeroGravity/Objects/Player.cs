@@ -74,6 +74,8 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	private readonly HashSet<long> _subscribedToSpaceObjects = [];
 
+	public HashSet<long> KnownView = [];
+
 	/// <summary>
 	/// 	The player's own motion, measured against the parent and in the parent's axes: the rate
 	/// 	<see cref="SpaceObjectTransferable.LocalPosition" /> changes at.
@@ -108,10 +110,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	private const double AcceptedJumpWarningDistance = 5.0;
 
 	private const double TransformCorrectionEpsilon = 0.01;
-
-	private Helmet _currentHelmet;
-
-	private Jetpack _currentJetpack;
 
 	public bool IsAdmin = false;
 
@@ -189,37 +187,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 
 	public ShipSpawnPoint AuthorizedSpawnPoint { get; private set; }
 
-	public Helmet CurrentHelmet
-	{
-		get
-		{
-			return _currentHelmet;
-		}
-		set
-		{
-			_currentHelmet = value;
-			if (value == null && CurrentJetpack != null)
-			{
-				CurrentJetpack.Helmet = null;
-			}
-		}
-	}
+	public Helmet CurrentHelmet => PlayerInventory.Equipped<Helmet>();
 
-	public Jetpack CurrentJetpack
-	{
-		get
-		{
-			return _currentJetpack;
-		}
-		set
-		{
-			_currentJetpack = value;
-			if (value == null && CurrentHelmet != null)
-			{
-				CurrentHelmet.Jetpack = value;
-			}
-		}
-	}
+	public Jetpack CurrentJetpack => PlayerInventory.Equipped<Jetpack>();
 
 	public Item ItemInHands => PlayerInventory.HandsSlot.Item;
 
@@ -321,15 +291,15 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		if (clone.PlayerInventory.OutfitSlot.Item != null)
 		{
-			await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.OutfitSlot.Item.GetCopy(), clone.PlayerInventory.OutfitSlot.SlotID);
+			player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.OutfitSlot.Item.GetCopy(), clone.PlayerInventory.OutfitSlot.SlotID);
 			foreach (InventorySlot sl in clone.PlayerInventory.CurrOutfit.InventorySlots.Values.Where((InventorySlot m) => m.Item != null))
 			{
-				await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.CurrOutfit.InventorySlots[sl.SlotID].Item.GetCopy(), sl.SlotID);
+				player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.CurrOutfit.InventorySlots[sl.SlotID].Item.GetCopy(), sl.SlotID);
 			}
 		}
 		if (clone.PlayerInventory.HandsSlot.Item != null)
 		{
-			await player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.HandsSlot.Item.GetCopy(), clone.PlayerInventory.HandsSlot.SlotID);
+			player.PlayerInventory.AddItemToInventory(await clone.PlayerInventory.HandsSlot.Item.GetCopy(), clone.PlayerInventory.HandsSlot.SlotID);
 		}
 
 		return player;
@@ -1008,60 +978,6 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 				Amount = exposureDamage
 			});
 		}
-		if (CurrentHelmet == null && CurrentJetpack == null && ItemInHands == null)
-		{
-			return;
-		}
-		DynamicObjectsInfoMessage doim = new DynamicObjectsInfoMessage();
-		doim.Infos = new List<DynamicObjectInfo>();
-		if (CurrentHelmet != null && CurrentHelmet.DynamicObj.StatsChanged)
-		{
-			doim.Infos.Add(new DynamicObjectInfo
-			{
-				GUID = CurrentHelmet.GUID,
-				Stats = CurrentHelmet.StatsNew
-			});
-			CurrentHelmet.DynamicObj.StatsChanged = false;
-		}
-		if (CurrentJetpack != null && CurrentJetpack.DynamicObj.StatsChanged)
-		{
-			doim.Infos.Add(new DynamicObjectInfo
-			{
-				GUID = CurrentJetpack.GUID,
-				Stats = CurrentJetpack.StatsNew
-			});
-			CurrentJetpack.DynamicObj.StatsChanged = false;
-		}
-		if (ItemInHands != null)
-		{
-			await ItemInHands.SendAllStats();
-		}
-		if (ItemInHands is not HandDrill && ItemInHands is Weapon)
-		{
-			Weapon wep = ItemInHands as Weapon;
-			if (wep.DynamicObj.StatsChanged)
-			{
-				doim.Infos.Add(new DynamicObjectInfo
-				{
-					GUID = ItemInHands.GUID,
-					Stats = wep.StatsNew
-				});
-				wep.DynamicObj.StatsChanged = false;
-			}
-			if (wep.Magazine != null && wep.Magazine.DynamicObj.StatsChanged)
-			{
-				doim.Infos.Add(new DynamicObjectInfo
-				{
-					GUID = wep.Magazine.GUID,
-					Stats = wep.Magazine.StatsNew
-				});
-				wep.Magazine.DynamicObj.StatsChanged = false;
-			}
-		}
-		if (doim.Infos.Count > 0)
-		{
-			await NetworkController.SendToClientsSubscribedTo(doim, -1L, Parent);
-		}
 	}
 
 	[Obsolete("This subscribe system needs to be replaced with a more permanent solution that works better with the new movement architecture.")]
@@ -1180,7 +1096,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 			HeadType = HeadType,
 			HairType = HairType,
 			Name = Name,
-			DynamicObjects = DynamicObject.GetCarriedDetails(this),
+			DynamicObjects = DynamicObject.GetCarriedDetails(this, pl),
 			AnimationStatsMask = AnimationStatsMask,
 			LockedToTriggerID = LockedToTriggerID
 		};
@@ -1189,17 +1105,9 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 	public override async Task Destroy()
 	{
 		DisconnectFromNetworkController();
-		while (DynamicObjects.Count > 0)
+		foreach (DynamicObject dobj in Server.Instance.ItemsInSpaceObject(this))
 		{
-			long dobjGuid = DynamicObjects.First();
-			if (Server.Instance.TryGetDynamicObject(dobjGuid, out DynamicObject dobj))
-			{
-				await dobj.Destroy();
-			}
-			else
-			{
-				DynamicObjects.Remove(dobjGuid);
-			}
+			await dobj.Destroy();
 		}
 		foreach (SpaceObjectVessel ves in Server.Instance.AllVessels)
 		{
@@ -1260,31 +1168,12 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		else
 		{
-			while (DynamicObjects.Count > 0)
+			foreach (DynamicObject dobj in Server.Instance.ItemsInSpaceObject(this))
 			{
-				long dobjGuid = DynamicObjects.First();
-				if (Server.Instance.TryGetDynamicObject(dobjGuid, out DynamicObject dobj))
-				{
-					await dobj.Destroy();
-				}
-				else
-				{
-					DynamicObjects.Remove(dobjGuid);
-				}
+				await dobj.Destroy();
 			}
 		}
 		PlayerInventory = new Inventory(this);
-		CurrentJetpack = null;
-		CurrentHelmet = null;
-		if (DynamicObjects.Count > 0)
-		{
-			string error = "Player had some dynamic objects that are not moved to corpse:";
-			foreach (long dobjGuid in DynamicObjects)
-			{
-				error = error + " " + dobjGuid + ",";
-			}
-			DynamicObjects.Clear();
-		}
 		UnsubscribeFromAll();
 		Health = 100;
 		VesselDamageType vesselDamageType = VesselDamageType.None;
@@ -1442,7 +1331,7 @@ public class Player : SpaceObjectTransferable, IPersistantObject, IAirConsumer
 		}
 		data.CoreTemperature = CoreTemperature;
 		data.ChildObjects = new List<PersistenceObjectData>();
-		List<DynamicObject> dynamicObjects = DynamicObjects.Select(Server.Instance.GetDynamicObject).Where((DynamicObject m) => m != null).ToList();
+		List<DynamicObject> dynamicObjects = Server.Instance.ItemsInSpaceObject(this);
 		DynamicObject outfitItem = dynamicObjects.FirstOrDefault(m => m.Item is { Slot.SlotID: -2 });
 		if (outfitItem != null)
 		{

@@ -78,7 +78,6 @@ public class VesselBaseSystem : SubSystem
 					admorConsumed += armorLeft;
 				}
 				armorLeft -= armor;
-				await mp.DynamicObj.SendStatsToClient();
 				continue;
 			}
 			break;

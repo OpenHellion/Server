@@ -1,20 +1,11 @@
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using OpenHellion.Net;
-using ZeroGravity.Network;
+using OpenHellion.State;
 
 namespace ZeroGravity.Objects;
 
 public class Inventory
 {
-	public enum EquipType
-	{
-		None,
-		Hands,
-		EquipInventory,
-		Inventory
-	}
-
 	private Player parentPlayer;
 
 	private Corpse parentCorpse;
@@ -25,17 +16,7 @@ public class Inventory
 
 	public InventorySlot OutfitSlot { get; private set; }
 
-	public SpaceObject Parent
-	{
-		get
-		{
-			if (parentPlayer != null)
-			{
-				return parentPlayer;
-			}
-			return parentCorpse;
-		}
-	}
+	public SpaceObject Parent => (SpaceObject)parentPlayer ?? parentCorpse;
 
 	public Inventory()
 	{
@@ -51,28 +32,30 @@ public class Inventory
 		OutfitSlot = new InventorySlot(InventorySlot.Type.Equip, -2, null, mustBeEmptyToRemoveOutfit: false, null, this);
 	}
 
+	public T Equipped<T>() where T : Item
+	{
+		return CurrOutfit?.InventorySlots.Values.Where(m => m.SlotType == InventorySlot.Type.Equip).Select(m => m.Item).OfType<T>().FirstOrDefault();
+	}
+
+	public InventorySlot GetSlot(short slotId)
+	{
+		return slotId switch
+		{
+			InventorySlot.HandsSlotID => HandsSlot,
+			InventorySlot.OutfitSlotID => OutfitSlot,
+			_ => CurrOutfit?.InventorySlots.GetValueOrDefault(slotId)
+		};
+	}
+
 	public void ChangeParent(Corpse corpse)
 	{
+		List<(Item Item, short Slot)> carried = [(HandsSlot.Item, HandsSlot.SlotID), (OutfitSlot.Item, OutfitSlot.SlotID)];
+		carried.AddRange(CurrOutfit?.InventorySlots.Values.Select(m => (m.Item, m.SlotID)) ?? []);
 		parentPlayer = null;
 		parentCorpse = corpse;
-		if (HandsSlot.Item != null)
+		foreach ((Item item, short slot) in carried.Where(m => m.Item != null))
 		{
-			HandsSlot.Item.DynamicObj.Parent = corpse;
-		}
-		if (OutfitSlot.Item != null)
-		{
-			OutfitSlot.Item.DynamicObj.Parent = corpse;
-		}
-		if (CurrOutfit == null)
-		{
-			return;
-		}
-		foreach (InventorySlot sl in CurrOutfit.InventorySlots.Values)
-		{
-			if (sl.Item != null)
-			{
-				sl.Item.DynamicObj.Parent = corpse;
-			}
+			item.DynamicObj.MoveTo(new ItemLocation(LocationKind.Inventory, corpse.Key, slot));
 		}
 	}
 
@@ -91,82 +74,53 @@ public class Inventory
 		{
 			return false;
 		}
-		if (outfit.Slot != null && outfit.Slot.Item == outfit)
+		List<(Item Item, short Slot)> contents = [.. outfit.InventorySlots.Values.Where(m => m.Item != null).Select(m => (m.Item, m.SlotID))];
+		if (!outfit.DynamicObj.MoveTo(new ItemLocation(LocationKind.Inventory, Parent.Key, InventorySlot.OutfitSlotID)))
 		{
-			outfit.Slot.Item = null;
+			return false;
 		}
 		CurrOutfit = outfit;
-		CurrOutfit.SetInventorySlot(OutfitSlot);
+		foreach (InventorySlot slot in outfit.InventorySlots.Values)
+		{
+			slot.SetInventory(this);
+		}
+		foreach ((Item item, short slot) in contents)
+		{
+			item.DynamicObj.MoveTo(new ItemLocation(LocationKind.Inventory, Parent.Key, slot));
+		}
 		if (parentPlayer != null)
 		{
-			CurrOutfit.DynamicObj.Parent = parentPlayer;
-			foreach (InventorySlot sl2 in CurrOutfit.InventorySlots.Values)
-			{
-				if (sl2.Item != null)
-				{
-					sl2.Item.DynamicObj.Parent = parentPlayer;
-				}
-			}
-			CurrOutfit.ExternalTemperature = parentPlayer.AmbientTemperature.HasValue ? parentPlayer.AmbientTemperature.Value : parentPlayer.CoreTemperature;
-			CurrOutfit.InternalTemperature = parentPlayer.CoreTemperature;
-		}
-		foreach (InventorySlot sl in CurrOutfit.InventorySlots.Values)
-		{
-			sl.SetInventory(this);
+			outfit.ExternalTemperature = parentPlayer.AmbientTemperature.HasValue ? parentPlayer.AmbientTemperature.Value : parentPlayer.CoreTemperature;
+			outfit.InternalTemperature = parentPlayer.CoreTemperature;
 		}
 		return true;
 	}
 
-	private bool TakeOffOutfit(short slotID)
+	/// <summary>
+	/// 	Called while the worn outfit is leaving its slot: its contents go back into it.
+	/// </summary>
+	internal void ReleaseOutfit()
 	{
-		if (CurrOutfit == null)
-		{
-			return false;
-		}
-		foreach (InventorySlot sl in CurrOutfit.InventorySlots.Values)
-		{
-			if (sl.Item != null)
-			{
-				sl.Item.DynamicObj.Parent = CurrOutfit.DynamicObj;
-			}
-			sl.SetInventory(null);
-		}
-		switch (slotID)
-		{
-		case -1:
-			CurrOutfit.SetInventorySlot(HandsSlot);
-			break;
-		case -1111:
-			CurrOutfit.SetInventorySlot(null);
-			break;
-		default:
-			return false;
-		}
-		OutfitSlot.Item = null;
+		Outfit outfit = CurrOutfit;
+		List<(Item Item, short Slot)> contents = [.. outfit.InventorySlots.Values.Where(m => m.Item != null).Select(m => (m.Item, m.SlotID))];
 		CurrOutfit = null;
-		return true;
+		foreach (InventorySlot slot in outfit.InventorySlots.Values)
+		{
+			slot.SetInventory(null);
+		}
+		foreach ((Item item, short slot) in contents)
+		{
+			item.DynamicObj.MoveTo(new ItemLocation(LocationKind.Inventory, outfit.GUID, slot));
+		}
 	}
 
-	public async Task<bool> AddItemToInventory(Item item, short slotID)
+	public bool AddItemToInventory(Item item, short slotID)
 	{
-		item.DynamicObj.PickedUp();
-		if (item is Outfit outfit && slotID == -2)
+		if (item is Outfit outfit && slotID == InventorySlot.OutfitSlotID)
 		{
 			return EquipOutfit(outfit);
 		}
-		if (item is Outfit && CurrOutfit == item && slotID != -2)
-		{
-			return TakeOffOutfit(slotID);
-		}
-		InventorySlot newSlot = null;
-		if (slotID == -1)
-		{
-			newSlot = HandsSlot;
-		}
-		else if (CurrOutfit != null && CurrOutfit.InventorySlots.TryGetValue(slotID, out var slot))
-		{
-			newSlot = slot;
-		}
+		InventorySlot newSlot = slotID == InventorySlot.HandsSlotID ? HandsSlot : CurrOutfit?.InventorySlots.GetValueOrDefault(slotID);
 		if (newSlot == null || !newSlot.CanStoreItem(item))
 		{
 			Debug.LogWarning("AddItemToInventory refused", item.GUID, item.Type, "requestedSlot", slotID,
@@ -175,80 +129,30 @@ public class Inventory
 				"outfitSlotIds", CurrOutfit == null ? "none" : string.Join(",", CurrOutfit.InventorySlots.Keys));
 			return false;
 		}
-		if (newSlot.Item != null && newSlot.Item != item)
-		{
-			InventorySlot itemSlot = item.Slot;
-			if (item.DynamicObj.Parent is DynamicObject { Item: not null } dynamicObject)
-			{
-				Item parentItem = dynamicObject.Item;
-				if (parentItem == newSlot.Item)
-				{
-					return false;
-				}
-				newSlot.Item.DynamicObj.Parent = parentItem.DynamicObj;
-			}
-			else
-			{
-				if (item.Slot == null)
-				{
-					return false;
-				}
-				if (!item.Slot.CanStoreItem(newSlot.Item))
-				{
-					InventorySlot tmp = CurrOutfit.InventorySlots.Values.FirstOrDefault((InventorySlot m) => m.Item == null && m.CanStoreItem(newSlot.Item));
-					if (tmp == null)
-					{
-						return false;
-					}
-					itemSlot = tmp;
-				}
-			}
-			Item targetSlotItem = newSlot.Item;
-			targetSlotItem.SetInventorySlot(itemSlot);
-			DynamicObjectStatsMessage dosm = new DynamicObjectStatsMessage
-			{
-				Info = new DynamicObjectInfo
-				{
-					GUID = targetSlotItem.GUID,
-					Stats = targetSlotItem.StatsNew
-				},
-				AttachData = targetSlotItem.DynamicObj.GetCurrAttachData()
-			};
-			await NetworkController.SendToClientsSubscribedTo(dosm, -1L, targetSlotItem.DynamicObj.GetParents(includeMe: false).ToArray());
-		}
-		item.SetInventorySlot(newSlot);
-		if (parentCorpse != null)
-		{
-			parentCorpse.CheckInventoryDestroy();
-		}
-		return true;
-	}
 
-	public bool DropItem(short slotID)
-	{
-		if (slotID == -2)
+		ItemLocation destination = new(LocationKind.Inventory, Parent.Key, slotID);
+		Item displaced = newSlot.Item;
+		if (displaced == item)
 		{
-			return TakeOffOutfit(-1111);
+			return true;
 		}
-		InventorySlot dropSlot = null;
-		if (slotID == -1)
+		if (displaced != null)
 		{
-			dropSlot = HandsSlot;
+			ItemLocation origin = Server.Instance.SolarSystem.State.Location(item.DynamicObj.Row);
+			ItemLocation refuge = origin.Kind switch
+			{
+				LocationKind.ItemSlot when origin.ParentKey != displaced.GUID && item.DynamicObj.Parent is DynamicObject { Item.Slots: { } slots } && slots.TryGetValue(origin.SlotId, out ItemSlot containerSlot) && containerSlot.CanFitItem(displaced) => origin,
+				LocationKind.Inventory when item.Slot is { SlotID: not InventorySlot.OutfitSlotID } originSlot && originSlot.CanStoreItem(displaced) => origin,
+				LocationKind.Inventory when CurrOutfit?.InventorySlots.Values.FirstOrDefault(m => m.Item == null && m.CanStoreItem(displaced)) is { } freeSlot => new ItemLocation(LocationKind.Inventory, Parent.Key, freeSlot.SlotID),
+				_ => default
+			};
+			if (refuge.Kind == LocationKind.None)
+			{
+				return false;
+			}
+			item.DynamicObj.MoveTo(default);
+			displaced.DynamicObj.MoveTo(refuge);
 		}
-		else if (CurrOutfit != null && CurrOutfit.InventorySlots.TryGetValue(slotID, out var slot))
-		{
-			dropSlot = slot;
-		}
-		if (dropSlot == null)
-		{
-			return false;
-		}
-		dropSlot.Item.SetInventorySlot(null);
-		dropSlot.Item = null;
-		if (parentCorpse != null)
-		{
-			parentCorpse.CheckInventoryDestroy();
-		}
-		return true;
+		return item.DynamicObj.MoveTo(destination);
 	}
 }

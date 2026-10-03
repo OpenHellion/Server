@@ -1,6 +1,6 @@
+using OpenHellion.State;
 using System;
 using System.Threading.Tasks;
-using System.Timers;
 using ZeroGravity.Data;
 using ZeroGravity.Network;
 
@@ -8,96 +8,64 @@ namespace ZeroGravity.Objects;
 
 public class Grenade : Item
 {
-	private GrenadeStats gs = new GrenadeStats();
-
-	private bool isActive;
-
 	private float detonationTime;
 
 	public long PlayerGUID;
 
 	private double activationTime;
 
-	private Timer destroyTimer;
-
-	private bool isCanceled;
-
-	public override DynamicObjectStats StatsNew => gs;
-
-	private Grenade()
+	public void SetActive(bool value, Player sender)
 	{
-	}
-
-	public static async Task<Grenade> CreateAsync(DynamicObjectAuxData data)
-	{
-		Grenade grenade = new();
-		if (data != null)
+		PlayerGUID = sender.Guid;
+		State.SetActive(Row, value);
+		if (value)
 		{
-			await grenade.SetData(data);
+			activationTime = Server.SolarSystemTime;
+			Server.Instance.SubscribeToTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckDetonation);
 		}
-
-		return grenade;
-	}
-
-	public override Task<bool> ChangeStats(DynamicObjectStats stats)
-	{
-		GrenadeStats gstats = stats as GrenadeStats;
-		if (gstats.IsActive.HasValue && gstats.IsActive.Value != isActive)
+		else
 		{
-			PlayerGUID = DynamicObj.Parent.Guid;
-			if (isActive && gstats.IsActive == false)
-			{
-				isCanceled = true;
-				activationTime = -1.0;
-				destroyTimer.Dispose();
-			}
-			gs.IsActive = isActive = gstats.IsActive.Value;
-			if (gs.IsActive == true)
-			{
-				isCanceled = false;
-				activationTime = Server.Instance.SolarSystem.CurrentTime;
-				CallBlastAfterTime();
-			}
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckDetonation);
 		}
-		return Task.FromResult(false);
 	}
 
 	public override async Task SetData(DynamicObjectAuxData data)
 	{
 		await base.SetData(data);
 		GrenadeData i = data as GrenadeData;
-		gs.IsActive = i.IsActive;
 		detonationTime = i.DetonationTime;
-		if (i.IsActive)
+	}
+
+	private Task CheckDetonation(double deltaTime)
+	{
+		if (!State.IsAlive(Row) || !State.Active(Row))
 		{
-			CallBlastAfterTime();
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckDetonation);
 		}
+		else if (Server.SolarSystemTime - activationTime >= detonationTime)
+		{
+			Server.Instance.UnsubscribeFromTimer(UpdateTimer.TimerStep.Step_0_1_sec, CheckDetonation);
+			State.SetDetonated(Row, true);
+		}
+		return Task.CompletedTask;
 	}
 
-	public void CallBlastAfterTime(double? time = null)
+	public override DynamicObjectStats NewStats()
 	{
-		destroyTimer = new Timer(TimeSpan.FromSeconds(detonationTime).TotalMilliseconds);
-		destroyTimer.Elapsed += async delegate
-		{
-			await Blast();
-		};
-		destroyTimer.Enabled = true;
+		return new GrenadeStats();
 	}
 
-	private async Task Blast()
+	public override void FillStats(DynamicObjectStats stats, ItemChanges fields)
 	{
-		if (DynamicObj.Parent != null)
+		base.FillStats(stats, fields);
+		GrenadeStats grenade = (GrenadeStats)stats;
+		if ((fields & ItemChanges.Active) != 0)
 		{
-			if (!isActive || isCanceled || (Health > float.Epsilon && (activationTime == -1.0 || Server.Instance.SolarSystem.CurrentTime - activationTime < detonationTime * 0.9f)))
-			{
-				isCanceled = false;
-				activationTime = -1.0;
-			}
-			else
-			{
-				gs.Blast = true;
-				await DynamicObj.SendStatsToClient();
-			}
+			grenade.IsActive = State.Active(Row);
+		}
+		if ((fields & ItemChanges.Detonated) != 0 && State.Detonated(Row))
+		{
+			grenade.Blast = true;
 		}
 	}
 

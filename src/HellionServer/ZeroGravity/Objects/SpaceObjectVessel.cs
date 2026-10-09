@@ -1579,8 +1579,7 @@ public abstract class SpaceObjectVessel : ArtificialBody
 			VesselRegistration = vesselRegistration,
 			RadarSignature = GetCompoundRadarSignature(),
 			IsAlwaysVisible = IsAlwaysVisible,
-			IsDistressSignalActive = IsDistressSignalActive,
-			ExposureDamage = ExposureDamage
+			IsDistressSignalActive = IsDistressSignalActive
 		};
 	}
 }

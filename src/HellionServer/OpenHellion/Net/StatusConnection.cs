@@ -69,12 +69,7 @@ public class StatusConnection
 						return;
 					}
 
-					Player pl = Server.Instance.GetPlayerFromPlayerId(dcr.PlayerId);
-					if (pl is not null && !NetworkController.IsPlayerConnected(pl.Guid))
-					{
-						await pl.Destroy();
-					}
-
+					Server.Instance.DeleteCharacter(dcr.PlayerId);
 					return;
 				}
 				case ServerStatusRequest ssr:

@@ -292,6 +292,8 @@ public sealed class Server
 
 	private readonly ConcurrentBag<Player> _playersToRemove = [];
 
+	private readonly ConcurrentQueue<string> _charactersToDelete = new();
+
 	private readonly ConcurrentDictionary<long, SpaceObjectVessel> _vessels = new();
 
 	private readonly ConcurrentDictionary<long, DynamicObject> _updateableDynamicObjects = new();
@@ -614,6 +616,11 @@ public sealed class Server
 		}
 		_players.TryRemove(player.Guid, out _);
 		SpaceObjects.TryRemove(player.FakeGuid, out _);
+	}
+
+	public void DeleteCharacter(string playerId)
+	{
+		_charactersToDelete.Enqueue(playerId);
 	}
 
 	public void Remove(SpaceObjectVessel vessel)
@@ -2507,7 +2514,7 @@ public sealed class Server
 				continue;
 			}
 
-			AddRemovePlayers();
+			await AddRemovePlayers();
 			DeltaTime = (double)(now - Volatile.Read(ref _lastTickTimestamp)) / Stopwatch.Frequency;
 			Volatile.Write(ref _lastTickTimestamp, now);
 
@@ -2617,12 +2624,21 @@ public sealed class Server
 		}
 	}
 
-	private void AddRemovePlayers()
+	private async Task AddRemovePlayers()
 	{
 		while (_playersToAdd.TryTake(out Player player))
 		{
 			_players[player.Guid] = player;
 			SpaceObjects.TryAdd(player.FakeGuid, player);
+		}
+
+		while (_charactersToDelete.TryDequeue(out string playerId))
+		{
+			Player player = GetPlayerFromPlayerId(playerId);
+			if (player is not null && !NetworkController.IsPlayerConnected(player.Guid))
+			{
+				await player.Destroy();
+			}
 		}
 
 		while (_playersToRemove.TryTake(out Player player))

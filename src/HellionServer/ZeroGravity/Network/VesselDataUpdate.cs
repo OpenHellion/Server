@@ -16,6 +16,4 @@ public class VesselDataUpdate
 	public bool? IsDistressSignalActive;
 
 	public bool? IsAlwaysVisible;
-
-	public float ExposureDamage;
 }
